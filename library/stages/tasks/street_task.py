@@ -12,7 +12,7 @@ class StreetTask(TaskBase):
     """Idle the GTI on the street: blip the throttle, preview pops for cred, and
     watch the Karen meter climb. Pops/throttle spit exhaust flames."""
 
-    title = "STREET"
+    title = "SKREETS"
     key = "street"
     live = True
 

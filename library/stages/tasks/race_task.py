@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import time
+
 from library.core import assets
-from library.core.constants import AUDIO, BLUE, FINAL_DRIVE, GEAR_RATIOS, GREEN_2, TEXT, TIRE_CIRC, TRACK_M
+from library.core.constants import AMBER, AUDIO, BLUE, DIM, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, RED, TEXT, TIRE_CIRC, TRACK_M
 from library.core.utils import clamp
 from library.stages.task_base import TaskBase
 
-STRIP_LENGTH = 28.0  # scene units the quarter mile maps onto
+STRIP_LENGTH = 14.0  # scene units the quarter mile maps onto (keeps both cars in frame)
 
 
 class RaceTask(TaskBase):
-    """Quarter-mile vs the street ladder: stage, launch on green, shift up."""
+    """Quarter-mile vs the skreets ladder: stage, launch on green, shift up.
+
+    The race model lives on ``Game`` (countdown, physics, payout). This task draws it:
+    a live countdown -> GO! status, the running gap, and the win/loss + payout, plus
+    a dynamic Launch/Shift prompt. Status text is refreshed every frame in ``tick`` so
+    the countdown and distances stay smooth between the periodic full redraws."""
 
     title = "RACE"
     key = "race"
@@ -40,6 +47,11 @@ class RaceTask(TaskBase):
             self.app.audio.set_engine(rpm, load)
         else:
             self.app.audio.idle(900)
+        # Refresh the status/hint text every frame so the countdown + gap stay smooth.
+        if getattr(self, "status", None):
+            text, _, hint = self._race_status()
+            self.status["text"] = text
+            self.hint["text"] = hint
 
     def bind_keys(self):
         self.accept("space", self.do_key)
@@ -51,15 +63,48 @@ class RaceTask(TaskBase):
         if event == "shift":  # bang + a quick crackle on each upshift
             self.app.audio.bang()
             self.app.audio.overrun(28, 0.3)
-        self.dirty = True
+        self.dirty = True  # flip the Launch button to Shift, etc.
+
+    def _race_status(self):
+        """Return (status text, color, hint) for the current race phase."""
+        race = self.game.race
+        if not race:
+            return "Pick a rival, then Stage & Race.", DIM, "SPACE launches on GREEN, then shifts gears."
+        player, rival = race["p"], race["r"]
+        now = time.perf_counter()
+        if race["active"]:
+            if now < race["green_at"]:
+                if not player["launched"]:
+                    return f"STAGED - get ready  {race['green_at'] - now:0.1f}s", AMBER, "Hands on the wheel. Wait for GREEN."
+                return "WAIT FOR GREEN!", RED, "Pre-loaded - you'll roll the moment it goes green."
+            if not player["launched"]:
+                return "GREEN - GO!", GREEN, "Press SPACE to LAUNCH now!"
+            return f"GO!   You {player['d']:.0f} m   /   Rival {rival['d']:.0f} m", GREEN, f"SPACE to shift  (gear {player['gear']})"
+        # finished
+        won = player["et"] < rival["et"] if rival["et"] else True
+        foe = self.game.rivals[self.game.bro.selected_rival]
+        if won:
+            return (f"WIN!  {player['et']:.2f}s @ {player['trap']:.0f} mph", GREEN,
+                    f"+${foe.purse} banked. Rival ran {rival['et']:.2f}s. Stage to run it again.")
+        return (f"LOSS  {player['et']:.2f}s @ {player['trap']:.0f} mph", RED,
+                f"Rival ran {rival['et']:.2f}s. Tune up or buy parts, then run it back.")
 
     def build_ui(self, left, right):
         game = self.game
         lbox, rbox = self.panel_pair(left, right)
         self.label("QUARTER MILE", (lbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
-        self.button("Stage & Race", (lbox[0] + 0.28, 0, 0.22), (0.40, 0.11), self.bind(game.start_race), game.car.flashed and not game.race_active(), GREEN_2)
-        self.button("Launch / Shift", (lbox[0] + 0.72, 0, 0.22), (0.40, 0.11), self.do_key, game.race_active())
-        self.label(game.race_result_text(), (lbox[0] + 0.05, 0, 0.02), 0.036, TEXT, wordwrap=30)
-        self.label("STREET LADDER", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
+        text, color, hint = self._race_status()
+        self.status = self.label(text, (lbox[0] + 0.05, 0, 0.25), 0.050, color, wordwrap=24)
+        self.hint = self.label(hint, (lbox[0] + 0.05, 0, 0.11), 0.030, DIM, wordwrap=34)
+        staged = game.race_active()
+        launching = (not staged) or not game.race["p"]["launched"]
+        self.button("Stage & Race", (lbox[0] + 0.30, 0, -0.14), (0.44, 0.11),
+                    self.bind(game.start_race), game.car.flashed and not staged, GREEN_2)
+        self.button(("Launch" if launching else "Shift") + " (SPACE)", (lbox[0] + 0.30, 0, -0.34),
+                    (0.44, 0.11), self.do_key, staged)
+        self.label("SKREETS LADDER", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
         for index, rival in enumerate(game.rivals):
-            self.button(f"{rival.name} ${rival.purse}", (rbox[0] + 0.45, 0, 0.27 - index * 0.09), (0.76, 0.075), self.bind(game.select_rival, index), index <= game.bro.unlocked_rival)
+            sel = index == game.bro.selected_rival
+            self.button(f"{rival.name}  ${rival.purse}", (rbox[0] + 0.45, 0, 0.27 - index * 0.10), (0.80, 0.08),
+                        self.bind(game.select_rival, index), index <= game.bro.unlocked_rival,
+                        GREEN_2 if sel else None, 0.034)

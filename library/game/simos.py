@@ -89,7 +89,7 @@ RULES = [
         ],
         "tips": [
             "Build a map, then Flash ECU. The car will not tune itself.",
-            "Flash once to unlock dyno, street, race, and shop progression.",
+            "Flash once to unlock dyno, skreets, race, and shop progression.",
         ],
     },
     {
@@ -253,7 +253,7 @@ RULES = [
         "priority": 70,
         "when": lambda c: c["karen"] > TUNE_THRESHOLDS["karen_hot"],
         "roasts": [
-            "The whole street has your plate memorized.",
+            "The whole skreets has your plate memorized.",
             "You are three bangs from a citation and a doorbell-camera compilation.",
         ],
         "tips": [
@@ -296,7 +296,7 @@ RULES = [
             "The laptop is not a dyno. Helpful, but not a dyno.",
         ],
         "tips": [
-            "After flashing, use Dyno to grade it or Street to make irresponsible noises.",
+            "After flashing, use Dyno to grade it or Skreets to make irresponsible noises.",
             "Switch Patch ON before flashing if you want four selectable personalities.",
         ],
     },

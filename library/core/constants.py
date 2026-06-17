@@ -284,8 +284,8 @@ PHONE_UI_HALF_H = 0.72        # half height of the phone body
 MODES = [
     ("maps", "TUNE", "Boost, timing, fuel & pops"),
     ("dyno", "DYNO", "Pull it and grade the map"),
-    ("street", "STREET", "Bangs, pops & cred"),
-    ("race", "RACE", "Quarter-mile street ladder"),
+    ("street", "SKREETS", "Bangs, pops & cred"),
+    ("race", "RACE", "Quarter-mile skreets ladder"),
     ("shop", "SHOP", "Spend winnings on mods"),
     ("bench", "BENCH", "Re-flash new staged maps"),
 ]
