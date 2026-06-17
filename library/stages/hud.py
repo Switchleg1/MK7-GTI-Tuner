@@ -94,8 +94,9 @@ class Hud(DirectObject):
         self.frame((left, right, -0.085, 0.085), (0, 0, 0.86), PANEL, border=None)
         self.label("MK7 GTI TUNER", (left + 0.05, 0, 0.89), 0.05, GREEN)
         self.label("EA888  .  SIMOS18.1  .  POPS & BANGS  .  CAREER", (left + 0.05, 0, 0.835), 0.026, DIM)
-        self.image("emoji_cash", (right - 1.16, 0, 0.872), 0.028)
-        self.label(f"${round(game.bro.cash)}", (right - 1.11, 0, 0.858), 0.036, GREEN)
-        self.label(f"ECU {game.car.ecu_status()}", (right - 0.80, 0, 0.858), 0.032, TEXT)
-        self.label(f"MAP {game.car.active_slot + 1} {game.car.active_tune().get('name', 'Stock')}", (right - 0.46, 0, 0.858), 0.030, TEXT)
-        self.label(f"REP {game.bro.rep()}", (right - 0.03, 0, 0.858), 0.030, TEXT, align=TextNode.ARight)
+        # Right side: two right-aligned lines. The old fixed-x labels overlapped
+        # once names/rep titles got long (e.g. "Crackle Monster", "Wanted by the
+        # HOA") -- right-aligning whole lines keeps them from colliding.
+        name = str(game.car.active_tune().get("name", "Stock"))[:16]
+        self.label(f"${round(game.bro.cash)}   .   ECU {game.car.ecu_status()}", (right - 0.04, 0, 0.888), 0.033, GREEN, align=TextNode.ARight)
+        self.label(f"MAP {game.car.active_slot + 1} {name}   .   REP {game.bro.rep()}", (right - 0.04, 0, 0.832), 0.027, TEXT, align=TextNode.ARight)
