@@ -1,14 +1,3 @@
-we need to make sure 'bench, maps, dyno, street, race, shop' are modular classes.  we need a task base class and then derive these from the base class.
-
-each need a back button (bottom left,  same style as the simos button) which brings us back to the main screen 'garage' where we can navigate to the next task.
--remove the old tab layout system and remove all functions that become orphans
--back button has been added but task seems to render overtop once its been built the first time, this should be rectified once we build a task based navigation system.
-we need to add graphics to each of the tasks that more match the original game.  in the street task we can use the car model we made and add all the emojis and mechanics from the original game
-
-
---------------------------
-
-
 I think the most important addition we need to make is asking discord for help, and you need the ability to become pro to tuner other gti’s for money to buy parts 
 And then once you do that Simon and the discord don’t answer so you need to decide which route to go, greenname pro or DIY mega tuner
 

@@ -53,15 +53,18 @@ or the project root when run from source (see `library/core/assets.py`).
    3. **Hit FLASH** on the phone → progress bars + delays while the ECU readout
       (VIN, ECU, software, calibration, flash size…) streams onto the screen.
    4. He celebrates → **Continue**.
-2. **Select a mode** from the menu (Tune / Dyno / Street / Race / Shop / Bench).
-3. **Garage** — the tabbed game. The ECU is already unlocked; the **BENCH** tab is
-   now a re-flash screen for writing new staged maps you build in **TUNE/MAPS**.
+2. **Garage hub.** The GTI sits in the bay; click a task button to enter a task:
+   - **TUNE** — boost/timing/fuel presets and switch-patch map slots.
+   - **DYNO** — strap it down, run a pull, get a graded result.
+   - **STREET** — blip the throttle and preview pops for cred (mind the Karen meter).
+   - **RACE** — quarter-mile vs the street ladder.
+   - **SHOP** — spend winnings on mods. **BENCH** — re-flash the current tune.
+3. Each task has a **Back** button (bottom-left) that returns you to the garage hub.
 
 ### Controls
 
-- **Mouse** — click hotspots, phone buttons, menu cards, and tabs.
-- **1–6** — switch garage tabs. **Space** — throttle (Street) / launch & shift (Race).
-- **Esc** — quit.
+- **Mouse** — click task buttons, in-task buttons, Back, and the phone.
+- **Space** — throttle (Street) / launch & shift (Race). **Esc** — quit.
 
 ## Data layout
 

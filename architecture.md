@@ -3,22 +3,21 @@
 ## Stage flow
 
 ```
-mk7_gti_tuner.py  ->  configure_panda3d()  ->  MK7Tuner3D (ShowBase)
-                                                   |
-   boot  ->  UnlockStage (cinematic)  ->  ModeSelectStage  ->  Garage (tabbed game)
-                on_complete=start_mode_select   on_pick=enter_garage
+mk7_gti_tuner.py -> configure_panda3d() -> MK7Tuner3D (ShowBase: shell + GameState)
+       |
+  UnlockStage (cinematic) --on_complete--> GarageStage (3D hub)
+                                              | on_pick(key)        ^ on_back
+                                              v                     |
+                                           <Task>.enter()  ----  <Task>.exit()
 ```
 
-`MK7Tuner3D` (`library/game/app.py`) is the single root app. It owns the ShowBase, lights, the
-glTF render setup, and the existing tabbed "garage" game. On boot it does **not**
-build the garage — it launches `UnlockStage`. Each stage is a standalone object
-that takes the ShowBase plus a callback, draws into its own `render`/`aspect2d`
-sub-nodes, and fully cleans up (nodes, tasks, events, intervals) when it exits.
-
-> Trade-off: `MK7Tuner3D` is both the shell and the garage stage (the garage build
-> is just deferred to `enter_garage`). This avoids rewriting the working 600-line
-> garage. A future refactor could split a thin `GameShell(ShowBase)` from a plain
-> `GarageStage`.
+`MK7Tuner3D` (`library/game/app.py`) is a thin shell: it owns the window, lights,
+glTF render setup, the mono font, the `GameState` model, and **one active stage**.
+`set_stage(stage)` calls `self.stage.exit()` then `stage.enter()`. Every stage owns
+its own `aspect2d` sub-node (UI) and `render` sub-node (scene) and removes them on
+`exit()` — so a task never renders over the hub (the old tab/back overlap bug). There
+is no tab bar: the **GarageStage** hub (the GTI on a turntable) launches one task at
+a time, and each task's **Back** button (bottom-left, Simon-pill style) returns to it.
 
 ## Layout
 
@@ -29,9 +28,10 @@ the root. Assets stay at the root in `data/`.
 mk7_gti_tuner.py            entry point
 library/
   core/      constants.py utils.py panda_config.py assets.py
-  game/      app.py geometry.py tuning.py simos.py
-  stages/    unlock_stage.py mode_select_stage.py phone_screen.py
-             character.py picker.py progress_bar.py
+  game/      app.py game_state.py geometry.py tuning.py simos.py
+  stages/    hud.py task_base.py garage_stage.py simon_panel.py
+             unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
+    tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
 data/        models/*.glb  images/*.png
 ```
@@ -52,21 +52,26 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   and the mode list. The single source of tunable values.
 - `utils.py` — `clamp`, `pick`, `rgba`.
 
-### `library/stages` — cinematic unlock (the new work)
-- `unlock_stage.py` — `UnlockStage`: builds the scene (ground/car/character/phone/obd),
-  sets the driver-side camera, and runs a phase machine
-  **plug → phone → flash → done** using `direct.interval` sequences for delays,
-  progress, and posing. The FLASH portion (PhoneScreen + ProgressBar + `UNLOCK_FLASH_STEPS`)
-  is self-contained so the BENCH tab can later reuse it to flash staged maps.
-- `character.py` — `Character`: resolves the posable joints of `character.glb` and
-  returns `pose_interval(name, t)` lerps from `constants.CHARACTER_POSES`
-  (rest / reach / hold_phone / cheer); reparents the phone prop to the right hand.
-- `phone_screen.py` — `PhoneScreen`: the SimosTools 2D overlay (status bar, app
-  header, streaming ECU log, FLASH button, progress, completion check).
-- `picker.py` — `Picker`: camera-ray click picking of tagged 3D nodes (the OBD port
-  and the phone prop). Reusable.
-- `progress_bar.py` — `ProgressBar`: left-anchored fill bar (phone + link progress).
-- `mode_select_stage.py` — `ModeSelectStage`: full-screen mode menu built from `MODES`.
+### `library/stages` — navigation + shared widgets
+- `hud.py` — `Hud(DirectObject)`: a tracked node tree under `aspect2d` plus the draw
+  helpers (`label`/`frame`/`button`/`image`/`pill`), the shared `draw_header(game)`,
+  and `back_button(cmd)`. `destroy()` removes the whole tree. Base for screens.
+- `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node + a
+  `SimonPanel`; `enter()` sets the camera, builds scene/UI, binds keys, and runs a
+  per-frame `_update` (calls `tick(dt)` + flame update + a `dirty`/live redraw);
+  `exit()` tears it all down. Subclasses set `title`/`key`/`live` and override
+  `build_scene`/`build_ui`/`bind_keys`/`tick`. Provides `add_garage_scene()`,
+  `panel_pair()`, `bind()` (run action + mark dirty), and exhaust `spawn_flames`.
+- `garage_stage.py` — `GarageStage(Hud)`: the home hub — ground + glb GTI on a slow
+  turntable, header, a row of task buttons from `MODES`, and Simon. `on_pick(key)`.
+- `simon_panel.py` — `SimonPanel(Hud)`: the reusable Ask-Simon pill + roast/tip popup
+  (own node tree, toggles independently of the host screen), fed by `simos`.
+
+### `library/stages` — cinematic unlock + its pieces
+- `unlock_stage.py` — `UnlockStage`: plug → phone → flash → done via `direct.interval`
+  (self-managed cleanup; calls `on_complete` to reach the hub).
+- `character.py`, `phone_screen.py`, `picker.py`, `progress_bar.py` — posable rig,
+  SimonTools phone overlay, camera-ray picking, and the fill bar (also used by tasks).
 
 ### `library/assetgen` — asset pipeline (offline, not bundled in the exe)
 - `glb_builder.py` — `GlbScene`: a tiny procedural glTF writer over `pygltflib`
@@ -77,14 +82,19 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   `asset_obd.py` — each a `build(out_dir)` **function** that composes one `.glb`.
   Data-driven (parts tables / side loops), no class.
 - `asset_images.py` — PNG generation via Panda's `PNMImage` (no PIL): phone
-  wallpaper, app icon, completion check, logo.
+  wallpaper, app icon, completion check, logo, the Simon face/panel/pill, and the
+  emoji HUD icons (cred / Karen faces, pops burst, fire, cash).
 - `generate_assets.py` — orchestrator that writes everything into `data/`
   (run via `python -m library.assetgen.generate_assets`).
 
-### `library/game` — existing garage game (unchanged logic)
-- `geometry.py` — box/grid/simple-car builders for the garage scene.
+### `library/game` — model + math
+- `game_state.py` — `GameState`: **all** career data + pure logic (flash/preset/slots,
+  shop, dyno, pops cred/Karen, the quarter-mile race). No scene code — tasks own the
+  3D and feed time into `step_race`/`dyno_done`.
+- `app.py` — `MK7Tuner3D`: the ShowBase shell + stage manager + `TASK_CLASSES`.
+- `geometry.py` — box/grid builders (the exhaust-flame cubes).
 - `tuning.py` — tune math: `compute_tune`, `dyno_curve`, grading, pops, rep.
-- `simos.py` — "Ask Simon" roast/tip rules engine (table of rules).
+- `simos.py` — "Ask Simon" roast/tip rules engine; `build_context(game, tab)`.
 
 ## Key conventions
 
@@ -95,9 +105,11 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   `LerpHprInterval` drive every delay, progress fill, and pose, so timings come
   straight from the tables in `constants.py`.
 - **Picking:** 3D hotspots are tagged (`setTag("pick", …)`) and resolved by a camera
-  ray; 2D buttons (FLASH, Continue, mode cards, tabs) use DirectGui commands.
-- **Cleanup:** each stage removes its scene/UI roots, stops intervals, and destroys
-  its `Picker`/`PhoneScreen` on exit, so stages don't leak into one another.
+  ray; 2D buttons (task buttons, Back, FLASH, Continue) use DirectGui commands.
+- **Cleanup:** `set_stage` exits the current stage before entering the next; each
+  stage removes its UI + scene roots, its per-frame task, its SimonPanel/intervals,
+  and `ignoreAll()`s — so nothing leaks or renders over the next stage.
+- **Mono UI:** `Hud` draws with `app.mono_font` (Consolas on Windows, else default).
 
 ## Packaging (PyInstaller)
 
@@ -111,8 +123,9 @@ path works from source and from the exe. The committed `.spec` mirrors this
 ## Verifying changes
 
 1. `python -m library.assetgen.generate_assets` — rebuild assets (offline, no window).
-2. `python mk7_gti_tuner.py` — play: OBD2 → phone → FLASH → Continue → pick a mode
-   → garage. For quick visual checks you can render the scene to a PNG in an
-   `window-type offscreen` ShowBase and `saveScreenshot` after a few `renderFrame`s.
+2. `python mk7_gti_tuner.py` — unlock cinematic → garage hub → open each task → Back
+   → open another (no overlay left behind); throttle/pops on STREET, a dyno pull, a
+   race all run. For quick visual checks render in a `window-type offscreen` ShowBase
+   and `saveScreenshot` (drive a task's `_update` with `taskMgr.step()`).
 3. `build.bat` then run `dist/MK7-GTI-Tuner.exe` — confirm the packaged build loads
    its assets (the bundled `data/`).

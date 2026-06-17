@@ -97,13 +97,13 @@ RIVALS = [
 ]
 
 REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"), (340, "Wanted by the HOA")]
-TABS = [("bench", "BENCH"), ("maps", "MAPS"), ("dyno", "DYNO"), ("street", "STREET"), ("race", "RACE"), ("shop", "SHOP")]
 
-CAMERA_BY_TAB = {
-    "default": {"pos": (0, -16, 5.8), "look_at": (0, 0, 1.0)},
-    "street": {"pos": (0, -18, 4.3), "look_at": (0, 4, 0.7)},
-    "race": {"pos": (0, -20, 7), "look_at": (0, 5, 0.5)},
-    "shop": {"pos": (5, -13, 5), "look_at": (0, 0, 0.7)},
+# Garage hub + task cameras (glb car faces +Y, ~4 m long, driver side -X).
+GARAGE_CAMERA = {"pos": (5.6, -7.6, 3.0), "look_at": (-0.2, 0.4, 0.7), "fov": 42}
+TASK_CAMERAS = {
+    "street": {"pos": (-6.2, -5.6, 2.2), "look_at": (-0.4, 1.2, 0.7), "fov": 50},
+    "race": {"pos": (0.0, -9.5, 3.4), "look_at": (0.0, 7.0, 0.6), "fov": 55},
+    "dyno": {"pos": (6.6, -3.2, 1.9), "look_at": (0.0, 0.2, 0.7), "fov": 45},
 }
 
 # --------------------------------------------------------------------------
@@ -129,6 +129,11 @@ IMAGE_FILES = {
     "simon_panel": "simon_panel.png",
     "simon_button": "simon_button.png",
     "tip_bulb": "tip_bulb.png",
+    "emoji_cred": "emoji_cred.png",
+    "emoji_karen": "emoji_karen.png",
+    "emoji_pops": "emoji_pops.png",
+    "emoji_fire": "emoji_fire.png",
+    "emoji_cash": "emoji_cash.png",
 }
 
 # --------------------------------------------------------------------------

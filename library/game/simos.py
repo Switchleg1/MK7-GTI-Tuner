@@ -5,7 +5,7 @@ from library.game.tuning import compute_tune
 from library.core.utils import pick
 
 
-def build_context(game) -> dict:
+def build_context(game, tab: str = "") -> dict:
     tune = game.flashed_tune if game.flashed and game.flashed_tune else game.tune
     result = compute_tune(tune, game.mods)
     owned_mods = [name for name, owned in game.mods.items() if owned]
@@ -16,7 +16,7 @@ def build_context(game) -> dict:
         "flashed": game.flashed,
         "switch_patch": game.switch_patch,
         "dirty": game.dirty,
-        "tab": game.tab,
+        "tab": tab,
         "tune": tune,
         "result": result,
         "cash": game.cash,
@@ -29,7 +29,6 @@ def build_context(game) -> dict:
         "unlocked_rival": game.unlocked_rival,
         "race_active": game.race_active(),
         "grade": game.grade,
-        "rpm": game.rpm,
         "active_slot": game.active_slot,
     }
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 
 from panda3d.core import Filename, PNMImage
@@ -118,6 +119,98 @@ def _tip_bulb(path):
     _downscale(big, s).write(Filename.fromOsSpecific(path))
 
 
+def _arc(img, cx, cy, radius, a0_deg, a1_deg, width, color, steps=48):
+    for i in range(steps + 1):
+        a = math.radians(a0_deg + (a1_deg - a0_deg) * i / steps)
+        _disc(img, round(cx + radius * math.cos(a)), round(cy + radius * math.sin(a)), width, color)
+
+
+def _emoji_face(path, face_inner, face_outer, draw_features):
+    """Round emoji face at 3x supersample; ``draw_features(big, s, cx, cy)`` adds eyes/mouth."""
+    size, scale = 192, 3
+    s = size * scale
+    big = _new(s, s, (0, 0, 0, 0))
+    cx, cy, radius = s // 2, int(s * 0.52), int(s * 0.44)
+    _radial_disc(big, cx, cy, radius, face_inner, face_outer)
+    draw_features(big, s, cx, cy)
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
+def _cred_features(big, s, cx, cy):
+    eye_y = cy - int(s * 0.02)
+    shades = (0.07, 0.08, 0.10, 1)
+    for sign in (-1, 1):
+        _ellipse(big, cx + sign * int(s * 0.155), eye_y, int(s * 0.125), int(s * 0.095), shades)
+    _thick_line(big, cx - int(s * 0.07), eye_y - int(s * 0.02), cx + int(s * 0.07), eye_y - int(s * 0.02), int(s * 0.022), shades)
+    _arc(big, cx, cy + int(s * 0.14), int(s * 0.17), 35, 145, int(s * 0.018), (0.42, 0.22, 0.04, 1))  # smile
+
+
+def _karen_features(big, s, cx, cy):
+    eye_y = cy - int(s * 0.01)
+    for sign in (-1, 1):
+        _ellipse(big, cx + sign * int(s * 0.15), eye_y, int(s * 0.07), int(s * 0.085), (1, 1, 1, 1))
+        _disc(big, cx + sign * int(s * 0.15), eye_y + int(s * 0.01), int(s * 0.035), (0.12, 0.10, 0.12, 1))
+        # angry brows: inner-low, outer-high (V toward the nose)
+        bx = cx + sign * int(s * 0.15)
+        _thick_line(big, bx - sign * int(s * 0.09), eye_y - int(s * 0.16), bx + sign * int(s * 0.07), eye_y - int(s * 0.07), int(s * 0.018), (0.42, 0.20, 0.04, 1))
+    _arc(big, cx, cy + int(s * 0.30), int(s * 0.16), 215, 325, int(s * 0.018), (0.42, 0.20, 0.04, 1))  # frown
+
+
+def _emoji_cred(path):
+    _emoji_face(path, (1.0, 0.84, 0.34), (0.93, 0.56, 0.07), _cred_features)
+
+
+def _emoji_karen(path):
+    _emoji_face(path, (1.0, 0.66, 0.40), (0.90, 0.34, 0.20), _karen_features)
+
+
+def _emoji_pops(path):
+    size, scale = 192, 3
+    s = size * scale
+    big = _new(s, s, (0, 0, 0, 0))
+    cx, cy = s // 2, s // 2
+    outer, inner = int(s * 0.46), int(s * 0.20)
+    points = 11
+    pts = []
+    for i in range(points * 2):
+        r = outer if i % 2 == 0 else inner
+        a = math.pi * i / points - math.pi / 2
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    for color, scl in (((1.0, 0.72, 0.10, 1), 1.0), ((1.0, 0.90, 0.30, 1), 0.62)):
+        for i in range(len(pts)):
+            x0, y0 = cx + (pts[i][0] - cx) * scl, cy + (pts[i][1] - cy) * scl
+            x1, y1 = cx + (pts[(i + 1) % len(pts)][0] - cx) * scl, cy + (pts[(i + 1) % len(pts)][1] - cy) * scl
+            _thick_line(big, round(x0), round(y0), round(x1), round(y1), int(s * 0.02), color)
+        _disc(big, cx, cy, int(inner * scl * 1.1), color)
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
+def _emoji_fire(path):
+    size, scale = 192, 3
+    s = size * scale
+    big = _new(s, s, (0, 0, 0, 0))
+    cx = s // 2
+    for color, rx, ry, oy, tip in (((0.92, 0.28, 0.06, 1), 0.27, 0.34, 0.58, 0.10), ((1.0, 0.74, 0.12, 1), 0.16, 0.22, 0.66, 0.26)):
+        _ellipse(big, cx, int(s * oy), int(s * rx), int(s * ry), color)
+        for sign in (-1, 1):
+            _thick_line(big, cx, int(s * tip), cx + sign * int(s * rx), int(s * (oy - ry * 0.2)), int(s * 0.02), color)
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
+def _emoji_cash(path):
+    size, scale = 192, 3
+    s = size * scale
+    big = _new(s, s, (0, 0, 0, 0))
+    _rounded_rect(big, int(s * 0.10), int(s * 0.26), int(s * 0.90), int(s * 0.74), int(s * 0.05), (0.13, 0.45, 0.26, 1))
+    _rounded_rect(big, int(s * 0.13), int(s * 0.29), int(s * 0.87), int(s * 0.71), int(s * 0.04), (0.18, 0.58, 0.33, 1))
+    _disc(big, s // 2, s // 2, int(s * 0.15), (0.85, 0.95, 0.86, 1))
+    cx, cy = s // 2, s // 2
+    _thick_line(big, cx, cy - int(s * 0.16), cx, cy + int(s * 0.16), int(s * 0.012), (0.10, 0.36, 0.20, 1))
+    _arc(big, cx, cy - int(s * 0.06), int(s * 0.06), 300, 140, int(s * 0.018), (0.10, 0.36, 0.20, 1))
+    _arc(big, cx, cy + int(s * 0.06), int(s * 0.06), 120, 320, int(s * 0.018), (0.10, 0.36, 0.20, 1))
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
 def _wallpaper(path):
     w, h = 480, 960
     img = _new(w, h, (0.04, 0.07, 0.09, 1))
@@ -179,6 +272,11 @@ def build(out_dir: str) -> list[str]:
         "simon_panel": _simon_panel,
         "simon_button": _simon_button,
         "tip_bulb": _tip_bulb,
+        "emoji_cred": _emoji_cred,
+        "emoji_karen": _emoji_karen,
+        "emoji_pops": _emoji_pops,
+        "emoji_fire": _emoji_fire,
+        "emoji_cash": _emoji_cash,
     }
     written = []
     for key, fn in builders.items():
