@@ -1,0 +1,27 @@
+we need to make sure 'bench, maps, dyno, street, race, shop' are modular classes.  we need a task base class and then derive these from the base class.
+
+each need a back button (bottom left,  same style as the simos button) which brings us back to the main screen 'garage' where we can navigate to the next task.
+-remove the old tab layout system and remove all functions that become orphans
+-back button has been added but task seems to render overtop once its been built the first time, this should be rectified once we build a task based navigation system.
+we need to add graphics to each of the tasks that more match the original game.  in the street task we can use the car model we made and add all the emojis and mechanics from the original game
+
+
+--------------------------
+
+
+I think the most important addition we need to make is asking discord for help, and you need the ability to become pro to tuner other gti’s for money to buy parts 
+And then once you do that Simon and the discord don’t answer so you need to decide which route to go, greenname pro or DIY mega tuner
+
+before becoming a green name you can
+-ask simon, ask discord, or ignore both and ask facebook (similar to the pro tuner class below we will have 10-20 members that will have different insights and chances of helping vs making matters worse including blowing up an engine)
+-and then the level of trolling you receive increases the more you use facebook but its a short cut to gain access to staged tuning quicker.  some of the advice includes what type of oil, spark plugs for each tune stage
+-when you upset the discord you just start getting random pings from like Simon and cp and some new guy named tacos making fun of you more and more
+--This adds to your emotional damage which reduces your likely hood to win races
+
+after becoming a green name you can
+-ask other pros for tips to gain access to new tuning map stages. (add a base class and make modular as we will have a 10-20 tuners eventually, start with 'Ed' and 'Dave')
+-sell tunes to dumb users to make more cash
+-sell enough tunes you learn and gain access to more map stages.
+
+
+we also need to add in a save/load workflow so we can pick up where we left off

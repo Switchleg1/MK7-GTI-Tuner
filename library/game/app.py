@@ -309,7 +309,8 @@ class MK7Tuner3D(ShowBase):
         self.ui_label(f"ECU: {self.ecu_status()}", (right - 0.86, 0, 0.875), 0.034, TEXT)
         self.ui_label(f"MAP: {self.active_slot + 1} . {self.active_tune().get('name', 'Stock')}", (right - 0.46, 0, 0.875), 0.034, TEXT)
         self.ui_label(f"REP: {rep_title(self.cred)}", (right - 0.03, 0, 0.875), 0.034, TEXT, align=TextNode.ARight)
-        self.draw_tabs(left, right)
+        #self.draw_tabs(left, right)
+        self.draw_backbutton(left)
         self.draw_main(left, right)
         self.ui_label("Parody bench sim. Real flashing can brick ECUs; street racing can lose licenses.", (0, 0, -0.965), 0.032, DIM, align=TextNode.ACenter)
         self.draw_simon(right)
@@ -436,6 +437,14 @@ class MK7Tuner3D(ShowBase):
         self.ui_frame((left, right_in, cz - 0.14, cz - 0.135), (0, 0, 0), LINE, None)
         self.ui_image("tip_bulb", (left + 0.04, 0, bottom + 0.21), 0.038)
         self.ui_label(self.simon_current["tip"], (left + 0.12, 0, bottom + 0.23), 0.036, TIP, wordwrap=25, font=font)
+        
+    def draw_backbutton(self, left):
+        font = getattr(self, "simon_font", None)
+        bx, bz = left + 0.34, -0.85
+        self.ui_image_button("simon_button", (bx, 0, bz), (0.60, 0.155), self.do_backbutton, text="Back", text_scale=0.05, text_color=VIOLET, text_pos=(0.07, -0.016), font=font)
+
+    def do_backbutton(self):
+        self.start_mode_select()
 
     def ecu_status(self):
         return "FLASHED" if self.flashed else "UNLOCKED" if self.patched else "LOCKED"
