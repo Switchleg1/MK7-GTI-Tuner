@@ -50,7 +50,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-%PY% -m PyInstaller --noconfirm --clean --onefile --windowed --collect-all panda3d --collect-all direct --name "%APP_NAME%" "%ENTRY%"
+%PY% -m PyInstaller --noconfirm --clean --onefile --windowed --add-data "data;data" --collect-all panda3d --collect-all direct --name "%APP_NAME%" "%ENTRY%"
 
 if errorlevel 1 (
     echo.

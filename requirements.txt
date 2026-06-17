@@ -1,1 +1,6 @@
+# Runtime
 panda3d==1.10.15
+panda3d-gltf>=1.3.0     # loads the generated .glb models (pulls in panda3d-simplepbr)
+
+# Asset generation (generate_assets.py)
+pygltflib>=1.16.0       # writes the procedural .glb models
