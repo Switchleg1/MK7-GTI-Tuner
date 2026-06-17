@@ -5,12 +5,15 @@ import random
 import sys
 import time
 
-from panda3d.core import AmbientLight, ClockObject, DirectionalLight, MouseButton, PerspectiveLens, TextNode, Vec3, Vec4, WindowProperties
+from panda3d.core import AmbientLight, ClockObject, DirectionalLight, Filename, MouseButton, PerspectiveLens, TextNode, TransparencyAttrib, Vec3, Vec4, WindowProperties
 
 from direct.gui import DirectGuiGlobals as DGG
 from direct.gui.DirectGui import DirectButton, DirectFrame, DirectLabel
+from direct.gui.OnscreenImage import OnscreenImage
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
+
+from library.core import assets
 
 from library.core.constants import (
     AMBER,
@@ -37,8 +40,6 @@ from library.core.constants import (
     RED,
     RIVALS,
     ROAST,
-    SIMON_BUTTON,
-    SIMON_PANEL,
     TABS,
     TEXT,
     TIP,
@@ -139,6 +140,7 @@ class MK7Tuner3D(ShowBase):
         self.car_root = self.scene_root.attachNewNode("player-car")
         self.rival_root = self.scene_root.attachNewNode("rival-car")
         self.flames = []
+        self.simon_font = self.load_mono_font()
         if self.camLens:
             self.camLens.setFov(DEFAULT_FOV_DEG)
         self.setup_scene()
@@ -155,6 +157,18 @@ class MK7Tuner3D(ShowBase):
         props.setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         props.setTitle(WINDOW_TITLE)
         return props
+
+    def load_mono_font(self):
+        """A monospace font for Simon's panel; falls back to the default font."""
+        for path in ("C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/cour.ttf"):
+            try:
+                font = self.loader.loadFont(str(Filename.fromOsSpecific(path)))
+            except Exception:  # noqa: BLE001
+                font = None
+            if font and font.isValid():
+                font.setPixelsPerUnit(64)
+                return font
+        return None
 
     def setup_lights(self):
         ambient = AmbientLight("ambient")
@@ -199,7 +213,7 @@ class MK7Tuner3D(ShowBase):
             self.ui_nodes.append(outline)
         return node
 
-    def ui_label(self, text, pos, scale=0.045, color=TEXT, parent=None, align=TextNode.ALeft, wordwrap=None):
+    def ui_label(self, text, pos, scale=0.045, color=TEXT, parent=None, align=TextNode.ALeft, wordwrap=None, font=None):
         node = DirectLabel(
             parent=parent or self.aspect2d,
             text=text,
@@ -208,9 +222,39 @@ class MK7Tuner3D(ShowBase):
             text_fg=color,
             text_align=align,
             text_wordwrap=wordwrap,
+            text_font=font,
             frameColor=(0, 0, 0, 0),
             relief=None,
         )
+        self.ui_nodes.append(node)
+        return node
+
+    def ui_image(self, key, pos, scale, parent=None):
+        node = OnscreenImage(parent=parent or self.aspect2d, image=assets.image_path(key), pos=pos, scale=scale)
+        node.setTransparency(TransparencyAttrib.MAlpha)
+        self.ui_nodes.append(node)
+        return node
+
+    def ui_image_button(self, key, pos, size, command, text="", text_scale=0.05, text_color=WHITE, text_pos=(0, 0), font=None):
+        width, height = size
+        node = DirectButton(
+            parent=self.aspect2d,
+            text=text,
+            command=(lambda cmd=command: self.run_ui_command(cmd)) if command else None,
+            pos=pos,
+            scale=1,
+            text_scale=text_scale,
+            text_fg=text_color,
+            text_align=TextNode.ACenter,
+            text_pos=text_pos,
+            text_font=font,
+            frameSize=(-width / 2, width / 2, -height / 2, height / 2),
+            frameTexture=assets.image_path(key),
+            frameColor=(1, 1, 1, 1),
+            relief=DGG.FLAT,
+            pressEffect=0,
+        )
+        node.setTransparency(TransparencyAttrib.MAlpha)
         self.ui_nodes.append(node)
         return node
 
@@ -371,18 +415,27 @@ class MK7Tuner3D(ShowBase):
             self.ui_button(label, (x, 0, y), (0.72, 0.08), lambda m=mod_id: self.buy_mod(m), not self.mods[mod_id] and self.cash >= cost)
 
     def draw_simon(self, right):
-        self.ui_button("o_O  Ask Simon", (right - 0.30, 0, -0.82), (0.54, 0.12), self.ask_simon, True, SIMON_BUTTON, 0.050)
+        font = getattr(self, "simon_font", None)
+        # "Ask Simon" pill: rounded image button + the Simon face + label.
+        bx, bz = right - 0.34, -0.85
+        self.ui_image_button("simon_button", (bx, 0, bz), (0.60, 0.155), self.ask_simon, text="Ask Simon", text_scale=0.05, text_color=VIOLET, text_pos=(0.07, -0.016), font=font)
+        self.ui_image("simon", (bx - 0.19, 0, bz), 0.058)
         if not self.simon_open or not self.simon_current:
             return
-        popup = (right - 1.50, right - 0.05, -0.56, 0.40)
-        self.ui_frame(popup, (0, 0, 0), SIMON_PANEL, VIOLET)
-        self.ui_label("o_O", (popup[0] + 0.08, 0, 0.25), 0.066, AMBER)
-        self.ui_label("SIMON", (popup[0] + 0.26, 0, 0.26), 0.058, VIOLET)
-        self.ui_label("master tuner  .  zero chill", (popup[0] + 0.26, 0, 0.18), 0.032, DIM)
-        self.ui_label(self.simon_current["roast"], (popup[0] + 0.07, 0, 0.02), 0.043, ROAST, wordwrap=28)
-        self.ui_frame((popup[0] + 0.07, popup[1] - 0.07, -0.03, -0.025), (0, 0, 0), LINE, None)
-        self.ui_label("Tip: " + self.simon_current["tip"], (popup[0] + 0.07, 0, -0.20), 0.038, TIP, wordwrap=30)
-        self.ui_button("X", (popup[1] - 0.08, 0, 0.29), (0.10, 0.10), self.close_simon, True, PANEL_DARK, 0.058)
+        pw, ph = 1.32, 1.05
+        cx, cz = right - 0.05 - pw / 2, 0.06
+        left = cx - pw / 2 + 0.10
+        right_in = cx + pw / 2 - 0.10
+        top, bottom = cz + ph / 2, cz - ph / 2
+        self.ui_image("simon_panel", (cx, 0, cz), (pw / 2, 1, ph / 2))
+        self.ui_image("simon", (left + 0.09, 0, top - 0.13), 0.085)
+        self.ui_label("SIMON", (left + 0.22, 0, top - 0.10), 0.060, VIOLET, font=font)
+        self.ui_label("master tuner . zero chill", (left + 0.22, 0, top - 0.18), 0.030, DIM, font=font)
+        self.ui_button("X", (right_in, 0, top - 0.10), (0.10, 0.10), self.close_simon, True, PANEL_DARK, 0.05)
+        self.ui_label(self.simon_current["roast"], (left, 0, cz + 0.12), 0.043, ROAST, wordwrap=23, font=font)
+        self.ui_frame((left, right_in, cz - 0.14, cz - 0.135), (0, 0, 0), LINE, None)
+        self.ui_image("tip_bulb", (left + 0.04, 0, bottom + 0.21), 0.038)
+        self.ui_label(self.simon_current["tip"], (left + 0.12, 0, bottom + 0.23), 0.036, TIP, wordwrap=25, font=font)
 
     def ecu_status(self):
         return "FLASHED" if self.flashed else "UNLOCKED" if self.patched else "LOCKED"

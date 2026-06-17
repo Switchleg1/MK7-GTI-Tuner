@@ -1,0 +1,41 @@
+# Python bytecode cache
+__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+
+# Temporary files generated during A2L parsing
+*.tmp
+A2L.tmp
+AML.tmp
+IFDATA.tmp
+
+# A2L files
+*.a2l
+*.a2ldb
+
+# CSV files
+*.csv
+
+# PyInstaller
+*.spec
+build/
+dist/
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -125,6 +125,10 @@ IMAGE_FILES = {
     "app_icon": "simostools_icon.png",
     "check": "flash_complete.png",
     "logo": "logo.png",
+    "simon": "simon.png",
+    "simon_panel": "simon_panel.png",
+    "simon_button": "simon_button.png",
+    "tip_bulb": "tip_bulb.png",
 }
 
 # --------------------------------------------------------------------------
