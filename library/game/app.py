@@ -11,6 +11,7 @@ from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_W
 from library.core.panda_config import enable_gltf
 from library.game.game import Game
 from library.stages.garage_stage import GarageStage
+from library.stages.notifications import Notifications
 from library.stages.tasks.bench_task import BenchTask
 from library.stages.tasks.dyno_task import DynoTask
 from library.stages.tasks.maps_task import MapsTask
@@ -47,6 +48,7 @@ class MK7Tuner3D(ShowBase):
         self.mono_font = self.load_mono_font()
         self.audio = GameAudio(self)
         self.game = Game()
+        self.notifications = Notifications(self, self.game)  # session-long toast/Dave overlay
         self.stage = None
         self.accept("escape", sys.exit)
         self.start_unlock()
@@ -94,6 +96,8 @@ class MK7Tuner3D(ShowBase):
 
     def enter_hub(self):
         self.game.car.mark_unlocked()
+        if self.game.unlock("first_flash", "Boot Patched, Baby"):  # once, after the cinematic
+            self.game.dave("flash")
         self.set_stage(GarageStage(self, self.game, on_pick=self.open_task))
 
     def open_task(self, key: str):

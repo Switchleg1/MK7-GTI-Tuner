@@ -1,12 +1,28 @@
 from __future__ import annotations
 
+import random
 import time
 
 from library.core.constants import MAX_LOG_LINES, MODS, TRACK_M
+from library.core.utils import pick
 from library.game.car import Car
 from library.game.car_library import CarLibrary
 from library.game.rival_green_name import RivalGreenName
 from library.game.tuner_bro import TunerBro
+
+# Dyno Dave's reactive one-liners, by event pool.
+DAVE_LINES = {
+    "flash": ["Aight, she's flashed. Try not to grenade it.", "New map's in - let's make some noise.", "Flashed clean. Go cause problems."],
+    "mapswitch": ["Stalk magic. Civilized.", "Map swap on the fly, you animal.", "Cops around? Slap it to valet."],
+    "bigbang": ["That one set off car alarms. Beautiful.", "Somewhere a Prius is crying.", "I felt that in my fillings.", "Cats? We don't do cats here."],
+    "cops": ["The whole street knows your plate now. Worth it.", "Noise complaint AND legend status. Balanced."],
+    "dyno": ["Numbers don't lie. The dyno might, but not today.", "That'll do. Send it again.", "Decent pull - chase a little more."],
+    "sgrade": ["S-grade?! Tuner of the year, baby.", "Now THAT is a tune. Frame it."],
+    "blown": ["...we don't talk about that one.", "That's a rebuild. GoFundMe time.", "Money shift. Classic. Painful."],
+    "win": ["GET THAT MONEY. Easy work.", "He never stood a chance.", "Cash money - go buy a turbo."],
+    "lose": ["Oof. Hit the shop and run it back.", "He spanked you. Tune up.", "Slower car, faster wallet... oh wait."],
+    "shop": ["Bolted on - she's meaner now.", "Good buy. Now go use it.", "Money well spent, for once."],
+}
 
 
 class Game:
@@ -22,6 +38,11 @@ class Game:
         self.logs: list[tuple[str, str]] = []
         self.race = None
         self.simon_tick = 0  # rotates Simon through his ranked insights
+        self.achievements: set[str] = set()  # unlocked ids
+        self.toast_queue: list[str] = []     # achievement labels awaiting a toast
+        self.dave_queue: list[str] = []       # Dyno Dave quips awaiting display
+        self.total_pops = 0
+        self.map_switches = 0
 
     @property
     def car(self) -> Car:
@@ -35,12 +56,41 @@ class Game:
         if result:
             self.log(*result)
 
+    # -- achievements + Dave (drained by the Notifications overlay) ---------
+    def unlock(self, key: str, label: str) -> bool:
+        if key in self.achievements:
+            return False
+        self.achievements.add(key)
+        self.toast_queue.append(label)
+        return True
+
+    def dave(self, pool: str):
+        self.dave_queue.append(pick(DAVE_LINES[pool]))
+
+    def finish_dyno(self, result: dict):
+        """Record the pull, log the grade, and fire grade-based achievements/quips."""
+        self._log_result(self.car.record_dyno(result))
+        if result["blown"]:
+            self.unlock("money_shift", "Money Shift")
+            self.dave("blown")
+        elif self.car.grade.startswith("Grade S"):
+            self.unlock("tuner_of_year", "Tuner of the Year")
+            self.dave("sgrade")
+        else:
+            self.dave("dyno")
+        if result["pop"] > 90:
+            self.unlock("cat_delete", "Cat Delete Speedrun")
+
     # -- car action facades (Car does the work, Game logs it) --------------
     def toggle_switch(self):
         self._log_result(self.car.toggle_switch())
 
     def flash_ecu(self):
         self._log_result(self.car.flash_ecu())
+        self.unlock("first_flash", "Boot Patched, Baby")
+        if self.car.tune["fuel"] == "E30" and self.car.tune["boost"] >= 24:
+            self.unlock("e30_lifestyle", "It's Not Stage 2, It's a Lifestyle")
+        self.dave("flash")
 
     def apply_preset(self, key: str):
         self._log_result(self.car.apply_preset(key))
@@ -50,12 +100,21 @@ class Game:
 
     def select_slot(self, index: int):
         self.car.select_slot(index)
+        if 0 <= index < len(self.car.slots) and self.car.slots[index]:
+            self.map_switches += 1
+            if self.map_switches >= 10:
+                self.unlock("stalk_wizard", "Stalk Wizard")
+            if random.random() < 0.4:
+                self.dave("mapswitch")
 
     def buy_mod(self, mod_id: str):
         cost = next(item[2] for item in MODS if item[0] == mod_id)
         if self.car.mods[mod_id] or not self.bro.spend(cost):
             return
         self._log_result(self.car.set_mod(mod_id))
+        if all(self.car.mods.values()):
+            self.unlock("fully_built", "Fully Built (Wallet Empty)")
+        self.dave("shop")
 
     # -- street ------------------------------------------------------------
     def register_pops(self) -> int:
@@ -63,6 +122,16 @@ class Game:
         pop = self.car.active_pop()
         self.bro.add_cred(pop / 18)
         self.bro.add_heat(pop / 18)
+        self.total_pops += 1
+        if self.total_pops >= 50:
+            self.unlock("burble_brain", "Burble Brain")
+        if pop > 90:
+            self.unlock("cat_delete", "Cat Delete Speedrun")
+        if self.bro.karen >= 100 and self.unlock("menace", "Neighborhood Menace"):
+            self.log("the neighbors filed a noise complaint - you're a legend now", "warn")
+            self.dave("cops")
+        elif random.random() < 0.18:
+            self.dave("bigbang")
         return max(4, round(pop / 10))
 
     # -- race --------------------------------------------------------------
@@ -127,8 +196,15 @@ class Game:
         if won:
             self.bro.earn(foe.purse)
             self.bro.add_cred(round(foe.purse / 5))
+            self.unlock("first_win", "Won Some Cash")
             if self.bro.selected_rival == self.bro.unlocked_rival and self.bro.unlocked_rival < len(self.rivals) - 1:
                 self.bro.unlocked_rival += 1
+                self.unlock("ladder", "Climbing the Ladder")
+            if self.bro.selected_rival == len(self.rivals) - 1:
+                self.unlock("king", "King of the Streets")
+            self.dave("win")
+        else:
+            self.dave("lose")
         self.log(("WIN" if won else "LOSS") + f" {player['et']:.2f}s @ {round(player['trap'])} mph", "ok" if won else "warn")
         self.race["active"] = False
 

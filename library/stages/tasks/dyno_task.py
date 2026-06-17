@@ -74,7 +74,7 @@ class DynoTask(TaskBase):
         if finished:
             self.pull_t = 1.0
             self.running = False
-            self.game.log(*self.game.car.record_dyno(self.result))
+            self.game.finish_dyno(self.result)  # record + grade-based toast/Dave quip
             self.dirty = True
         self._sample()
         self.spin += dt * 1700
