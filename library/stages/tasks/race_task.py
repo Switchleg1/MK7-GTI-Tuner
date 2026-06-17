@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from library.core import assets
-from library.core.constants import BLUE, GREEN_2, RIVALS, TEXT, TRACK_M
+from library.core.constants import BLUE, GREEN_2, TEXT, TRACK_M
 from library.stages.task_base import TaskBase
 
 STRIP_LENGTH = 28.0  # scene units the quarter mile maps onto
@@ -46,9 +46,9 @@ class RaceTask(TaskBase):
         game = self.game
         lbox, rbox = self.panel_pair(left, right)
         self.label("QUARTER MILE", (lbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
-        self.button("Stage & Race", (lbox[0] + 0.28, 0, 0.22), (0.40, 0.11), self.bind(game.start_race), game.flashed and not game.race_active(), GREEN_2)
+        self.button("Stage & Race", (lbox[0] + 0.28, 0, 0.22), (0.40, 0.11), self.bind(game.start_race), game.car.flashed and not game.race_active(), GREEN_2)
         self.button("Launch / Shift", (lbox[0] + 0.72, 0, 0.22), (0.40, 0.11), self.do_key, game.race_active())
         self.label(game.race_result_text(), (lbox[0] + 0.05, 0, 0.02), 0.036, TEXT, wordwrap=30)
         self.label("STREET LADDER", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
-        for index, rival in enumerate(RIVALS):
-            self.button(f"{rival['name']} ${rival['purse']}", (rbox[0] + 0.45, 0, 0.27 - index * 0.09), (0.76, 0.075), self.bind(game.select_rival, index), index <= game.unlocked_rival)
+        for index, rival in enumerate(game.rivals):
+            self.button(f"{rival.name} ${rival.purse}", (rbox[0] + 0.45, 0, 0.27 - index * 0.09), (0.76, 0.075), self.bind(game.select_rival, index), index <= game.bro.unlocked_rival)

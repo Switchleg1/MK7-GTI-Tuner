@@ -8,7 +8,7 @@ from direct.showbase.ShowBase import ShowBase
 
 from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, WINDOW_TITLE
 from library.core.panda_config import enable_gltf
-from library.game.game_state import GameState
+from library.game.game import Game
 from library.stages.garage_stage import GarageStage
 from library.stages.tasks.bench_task import BenchTask
 from library.stages.tasks.dyno_task import DynoTask
@@ -44,7 +44,7 @@ class MK7Tuner3D(ShowBase):
         enable_gltf(self)
         self.setup_lights()
         self.mono_font = self.load_mono_font()
-        self.game = GameState()
+        self.game = Game()
         self.stage = None
         self.accept("escape", sys.exit)
         self.start_unlock()
@@ -91,7 +91,7 @@ class MK7Tuner3D(ShowBase):
         self.unlock = UnlockStage(self, on_complete=self.enter_hub)
 
     def enter_hub(self):
-        self.game.mark_unlocked()
+        self.game.car.mark_unlocked()
         self.set_stage(GarageStage(self, self.game, on_pick=self.open_task))
 
     def open_task(self, key: str):

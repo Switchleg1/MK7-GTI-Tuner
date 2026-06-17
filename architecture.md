@@ -28,7 +28,8 @@ the root. Assets stay at the root in `data/`.
 mk7_gti_tuner.py            entry point
 library/
   core/      constants.py utils.py panda_config.py assets.py
-  game/      app.py game_state.py geometry.py tuning.py simos.py
+  game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
+             geometry.py tuning.py simos.py
   stages/    hud.py task_base.py garage_stage.py simon_panel.py
              unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
@@ -87,14 +88,28 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `generate_assets.py` — orchestrator that writes everything into `data/`
   (run via `python -m library.assetgen.generate_assets`).
 
-### `library/game` — model + math
-- `game_state.py` — `GameState`: **all** career data + pure logic (flash/preset/slots,
-  shop, dyno, pops cred/Karen, the quarter-mile race). No scene code — tasks own the
-  3D and feed time into `step_race`/`dyno_done`.
+### `library/game` — model tree + math
+A save-ready object tree (each node has `to_dict`/`from_dict`; serialization itself is
+a later step). Display reads go straight to `game.bro`/`game.car`; cross-node actions
+are orchestrated on `Game`.
+- `game.py` — `Game`: root/session. Holds `bro: TunerBro`, `rivals: [RivalGreenName]`,
+  `cars: CarLibrary`, transient `logs`/`race`, a `car` property, and the orchestration
+  that spans nodes (`buy_mod`, `register_pops`, the quarter-mile race, log).
+- `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress
+  (`spend`/`earn`/`add_cred`/`add_heat`). Room for emotional damage / route / skills.
+- `rival_green_name.py` — `RivalGreenName`: a bad-guy ladder rival (from `RIVALS`).
+- `car.py` — `Car`: ECU state, tune/slots/mods, last dyno; state-change methods return
+  `(message, kind)` so `Game` logs them. `car_perf`/`compute` feed the dyno + race.
+- `car_library.py` — `CarLibrary`: the bro's car(s) + active index (`active()`).
 - `app.py` — `MK7Tuner3D`: the ShowBase shell + stage manager + `TASK_CLASSES`.
 - `geometry.py` — box/grid builders (the exhaust-flame cubes).
 - `tuning.py` — tune math: `compute_tune`, `dyno_curve`, grading, pops, rep.
-- `simos.py` — "Ask Simon" roast/tip rules engine; `build_context(game, tab)`.
+- `simos.py` — "Ask Simon" rules engine; `build_context(game, tab)` reads bro + car.
+
+The **DynoTask** (`library/stages/tasks/dyno_task.py`) is SimosTools-style: a pull
+sweeps RPM idle→redline (`tick`), driving gauge **tiles** (scale, big value, `min:max`,
+unit, green fill + red danger band, from `constants.DYNO_GAUGES`) and a live power-vs-RPM
+`LineSegs` graph, then records the peak + `grade_for_result` on the `Car`.
 
 ## Key conventions
 

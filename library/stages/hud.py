@@ -8,7 +8,6 @@ from panda3d.core import TextNode, TransparencyAttrib, Vec4
 
 from library.core import assets
 from library.core.constants import DIM, GREEN, GREEN_2, LINE, PANEL, TEXT, VIOLET, WHITE
-from library.game.tuning import rep_title
 
 
 class Hud(DirectObject):
@@ -85,7 +84,7 @@ class Hud(DirectObject):
         self.label("MK7 GTI TUNER", (left + 0.05, 0, 0.89), 0.05, GREEN)
         self.label("EA888  .  SIMOS18.1  .  POPS & BANGS  .  CAREER", (left + 0.05, 0, 0.835), 0.026, DIM)
         self.image("emoji_cash", (right - 1.16, 0, 0.872), 0.028)
-        self.label(f"${game.cash}", (right - 1.11, 0, 0.858), 0.036, GREEN)
-        self.label(f"ECU {game.ecu_status()}", (right - 0.80, 0, 0.858), 0.032, TEXT)
-        self.label(f"MAP {game.active_slot + 1} {game.active_tune().get('name', 'Stock')}", (right - 0.46, 0, 0.858), 0.030, TEXT)
-        self.label(f"REP {rep_title(game.cred)}", (right - 0.03, 0, 0.858), 0.030, TEXT, align=TextNode.ARight)
+        self.label(f"${round(game.bro.cash)}", (right - 1.11, 0, 0.858), 0.036, GREEN)
+        self.label(f"ECU {game.car.ecu_status()}", (right - 0.80, 0, 0.858), 0.032, TEXT)
+        self.label(f"MAP {game.car.active_slot + 1} {game.car.active_tune().get('name', 'Stock')}", (right - 0.46, 0, 0.858), 0.030, TEXT)
+        self.label(f"REP {game.bro.rep()}", (right - 0.03, 0, 0.858), 0.030, TEXT, align=TextNode.ARight)

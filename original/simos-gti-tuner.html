@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMOS BENCH — MK7 GTI Tuner (Pops & Bangs Edition)</title>
+<style>
+  :root{
+    --bg:#070a0d;--panel:#11161b;--panel2:#161d24;--line:#22303b;--txt:#cfe3ee;--dim:#7d93a3;
+    --grn:#36e07a;--grn2:#0f7a3e;--amb:#ffb338;--red:#ff4d52;--blu:#4fb6ff;--vio:#b58bff;
+    --mono:'Consolas','SF Mono','Roboto Mono',monospace;
+  }
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:
+      radial-gradient(1200px 700px at 70% -15%,#16242f 0%,rgba(0,0,0,0) 55%),
+      repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 2px,transparent 2px 4px),var(--bg);
+    color:var(--txt);font:14px/1.45 var(--mono);-webkit-font-smoothing:antialiased;padding:14px}
+  h1,h2,h3{margin:0;font-weight:700;letter-spacing:.5px}
+  .wrap{max-width:1100px;margin:0 auto}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid var(--line);border-radius:14px;
+    padding:12px 16px;margin-bottom:12px;background:linear-gradient(180deg,var(--panel2),var(--panel));box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .logo{font-size:19px;color:var(--grn);text-shadow:0 0 16px rgba(54,224,122,.45)}
+  .logo small{color:var(--dim);font-size:10px;display:block;letter-spacing:2.5px}
+  .badges{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .badge{font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);background:#0c1217;color:var(--dim);white-space:nowrap}
+  .badge b{color:var(--txt)}.badge.ok{border-color:var(--grn2);color:var(--grn)}.badge.warn{border-color:#7a5a0f;color:var(--amb)}
+  .badge.err{border-color:#7a1417;color:var(--red)}.badge.cash{border-color:#0f7a3e;color:#7ef0a8}
+  .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .tab{flex:1;min-width:104px;text-align:center;cursor:pointer;user-select:none;border:1px solid var(--line);
+    background:var(--panel);border-radius:10px;padding:9px;color:var(--dim);transition:.15s;font-weight:700;letter-spacing:.5px}
+  .tab .n{display:block;font-size:9px;color:#41535f}
+  .tab:hover{border-color:#33495a;color:var(--txt)}
+  .tab.active{color:var(--grn);border-color:var(--grn2);background:#0e1a14;box-shadow:inset 0 0 18px rgba(54,224,122,.12)}
+  .tab.lock{opacity:.4;cursor:not-allowed}
+  .panel{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 6px 26px rgba(0,0,0,.32)}
+  .panel h2{font-size:13px;color:var(--blu);letter-spacing:2px;margin-bottom:10px;text-transform:uppercase}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+  .view{display:none}.view.active{display:block}
+  button{font-family:var(--mono);cursor:pointer;border-radius:9px;border:1px solid var(--line);background:#16222b;color:var(--txt);
+    padding:10px 14px;font-weight:700;letter-spacing:.5px;transition:.12s}
+  button:hover:not(:disabled){border-color:var(--grn2);color:var(--grn)}button:disabled{opacity:.35;cursor:not-allowed}
+  button.primary{background:linear-gradient(180deg,#13934b,#0b5e30);border-color:#13934b;color:#eafff2}
+  button.primary:hover:not(:disabled){filter:brightness(1.13);color:#fff}
+  button.sel{background:#0e1a14;border-color:var(--grn2);color:var(--grn)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
+  #console{background:#060809;border:1px solid var(--line);border-radius:9px;height:210px;overflow:auto;padding:10px;font-size:12.5px;white-space:pre-wrap}
+  #console .l{margin:1px 0}#console .t{color:#3c4d59}
+  .ok{color:var(--grn)}.warn{color:var(--amb)}.err{color:var(--red)}.info{color:var(--blu)}.vio{color:var(--vio)}.dim{color:var(--dim)}
+  .ctrl{margin:12px 0}.ctrl .lab{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+  .ctrl .lab .name{color:var(--txt);font-weight:700}.ctrl .lab .val{color:var(--amb);font-weight:700}
+  .ctrl .hint{font-size:11px;color:var(--dim);margin-top:3px}
+  input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:6px;background:#1c2730;outline:none;margin:4px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--grn);
+    cursor:pointer;box-shadow:0 0 10px rgba(54,224,122,.6);border:2px solid #0a0d10}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}.seg button{flex:1;min-width:64px;padding:8px}
+  .pill{display:inline-block;background:#0c1217;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--dim)}
+  .flashreq{color:var(--amb);font-size:12px}
+  .stat{background:#0c1217;border:1px solid var(--line);border-radius:11px;padding:12px;text-align:center}
+  .stat .k{font-size:10px;color:var(--dim);letter-spacing:1px}.stat .v{font-size:26px;font-weight:800;margin-top:2px}
+  .meter{height:9px;border-radius:6px;background:#1c2730;overflow:hidden;margin-top:8px}.meter>i{display:block;height:100%;border-radius:6px;transition:width .4s}
+  canvas{display:block;width:100%}
+  .scene{position:relative;width:100%;border-radius:14px;overflow:hidden;border:1px solid var(--line);
+    background:radial-gradient(120% 80% at 50% 120%,#1b2a33 0%,#0a1015 60%,#05080a 100%);aspect-ratio:760/330;will-change:transform}
+  .scene .stars{position:absolute;inset:0;opacity:.5;background-image:
+    radial-gradient(1px 1px at 20% 18%,#6f8aa0 99%,transparent),radial-gradient(1px 1px at 70% 12%,#56708a 99%,transparent),
+    radial-gradient(1px 1px at 44% 26%,#4f6378 99%,transparent),radial-gradient(1px 1px at 86% 22%,#6f8aa0 99%,transparent)}
+  .scene svg,.scene canvas{position:absolute;inset:0;width:100%;height:100%}.scene canvas{pointer-events:none}
+  .copflash{position:absolute;inset:0;pointer-events:none;opacity:0;mix-blend-mode:screen}
+  .copflash.on{animation:cops .55s linear infinite}
+  @keyframes cops{0%{box-shadow:inset 60px 0 90px -20px rgba(255,40,40,.9);opacity:1}50%{box-shadow:inset -60px 0 90px -20px rgba(40,90,255,.9);opacity:1}100%{box-shadow:inset 60px 0 90px -20px rgba(255,40,40,.9);opacity:1}}
+  .hud{position:absolute;top:10px;left:12px;font-weight:800;text-shadow:0 2px 6px #000}
+  .hud .rpm{font-size:30px;color:#cfe3ee;line-height:1}.hud .rpm b{font-size:13px;color:var(--dim);font-weight:700}
+  .hud .gear{font-size:13px;color:var(--amb)}.hud .rbar{width:200px;height:8px;background:#0008;border:1px solid #2a3a45;border-radius:5px;margin-top:5px;overflow:hidden}
+  .hud .rbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#36e07a,#ffb338 70%,#ff4d52)}
+  .meters{position:absolute;top:10px;right:12px;width:190px;font-size:10px;letter-spacing:1px}
+  .meters .m{margin-bottom:6px}.meters .m .lab{display:flex;justify-content:space-between;color:#c7d8e4;text-shadow:0 1px 3px #000;margin-bottom:2px}
+  .meters .bar{height:9px;background:#0009;border:1px solid #2a3a45;border-radius:5px;overflow:hidden}.meters .bar i{display:block;height:100%;width:0;transition:width .35s}
+  .dave{position:absolute;left:12px;bottom:10px;display:flex;align-items:flex-end;gap:8px;max-width:80%}
+  .dave .face{width:42px;height:42px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:24px;background:#0c1217;border:1px solid var(--line);box-shadow:0 4px 12px #000}
+  .dave .bubble{background:#0d141a;border:1px solid var(--line);border-radius:12px 12px 12px 3px;padding:7px 11px;font-size:12.5px;color:#dcebf4;box-shadow:0 6px 18px #000;max-width:520px}
+  .dave .bubble .nm{font-size:9px;letter-spacing:2px;color:var(--dim)}
+  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:640px){.slots{grid-template-columns:repeat(2,1fr)}}
+  .slot{border:1px solid var(--line);border-radius:11px;padding:10px;background:#0c1217;cursor:pointer;transition:.12s}
+  .slot:hover{border-color:#33495a}.slot.active{border-color:var(--grn);background:#0e1a14;box-shadow:inset 0 0 16px rgba(54,224,122,.15)}
+  .slot .si{font-size:10px;color:var(--dim);letter-spacing:1px}.slot .sn{font-weight:800;margin:3px 0}.slot .sd{font-size:11px;color:var(--dim)}
+  .help{font-size:12px;color:var(--dim)}.help b{color:var(--txt)}
+  kbd{background:#0c1217;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--txt);font-size:11px}
+  .big-result{text-align:center;padding:14px}.grade{font-size:72px;font-weight:900;line-height:1;text-shadow:0 0 30px currentColor}.hidden{display:none}
+  #toasts{position:fixed;top:14px;right:14px;z-index:50;display:flex;flex-direction:column;gap:8px}
+  .toast{background:linear-gradient(180deg,#1a2630,#0e151b);border:1px solid var(--grn2);border-left:4px solid var(--grn);border-radius:10px;
+    padding:9px 13px;box-shadow:0 10px 30px #000;animation:tin .35s ease,tout .4s ease 4.6s forwards;min-width:230px}
+  .toast .th{font-size:10px;letter-spacing:2px;color:var(--grn)}.toast .tt{font-weight:800;margin-top:2px}
+  @keyframes tin{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes tout{to{transform:translateX(120%);opacity:0}}
+  /* ask simon */
+  #ask-simon{position:fixed;right:14px;bottom:14px;z-index:60;border-radius:24px;padding:12px 16px;cursor:pointer;
+    background:linear-gradient(180deg,#3a2a52,#241636);border:1px solid #6b4fa0;color:#e6dcff;font-weight:800;
+    font-family:var(--mono);box-shadow:0 8px 24px #000;letter-spacing:.5px;animation:simonpulse 3s ease-in-out infinite}
+  #ask-simon:hover{filter:brightness(1.18);color:#fff;border-color:#9a7ad0}
+  @keyframes simonpulse{0%,100%{box-shadow:0 8px 24px #000}50%{box-shadow:0 8px 30px rgba(154,122,208,.5)}}
+  #simon-pop{position:fixed;right:14px;bottom:66px;z-index:60;width:344px;max-width:calc(100vw - 28px);
+    background:linear-gradient(180deg,#181f27,#0c1117);border:1px solid #6b4fa0;border-radius:14px;padding:14px;box-shadow:0 18px 54px #000}
+  #simon-close{position:absolute;top:8px;right:8px;padding:1px 8px;border-radius:8px;background:#0c1217;border:1px solid var(--line)}
+  .simon-head{display:flex;gap:10px;align-items:center;margin-bottom:9px}
+  .simon-head .av{font-size:30px}.simon-head .nm{font-weight:900;letter-spacing:2px;color:#b58bff}
+  .simon-head .role{font-size:10px;color:var(--dim);letter-spacing:1px}
+  .simon-roast{color:#ffd0a0;font-size:13px;line-height:1.5;margin-bottom:9px}
+  .simon-tip{color:#9fe9bf;font-size:12.5px;line-height:1.5;border-top:1px solid var(--line);padding-top:9px}
+  /* shop */
+  .shopgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}@media(max-width:680px){.shopgrid{grid-template-columns:1fr}}
+  .mod{border:1px solid var(--line);border-radius:12px;padding:12px;background:#0c1217;display:flex;flex-direction:column;gap:6px}
+  .mod.owned{border-color:var(--grn2);background:#0e1a14}
+  .mod .mn{font-weight:800;display:flex;justify-content:space-between;align-items:center}
+  .mod .price{color:#7ef0a8}.mod .md{font-size:11.5px;color:var(--dim);flex:1}
+  /* race */
+  .ladder{display:flex;flex-direction:column;gap:6px}
+  .rival{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#0c1217;cursor:pointer}
+  .rival:hover{border-color:#33495a}.rival.sel{border-color:var(--grn);background:#0e1a14}.rival.lock{opacity:.4;cursor:not-allowed}
+  .rival .em{font-size:22px}.rival .info{flex:1}.rival .nm{font-weight:800}.rival .sd{font-size:11px;color:var(--dim)}
+  .rival .purse{color:#7ef0a8;font-weight:800}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<button id="ask-simon" title="Ask Simon for brutally honest advice">🧐 Ask Simon</button>
+<div id="simon-pop" class="hidden">
+  <button id="simon-close">✕</button>
+  <div class="simon-head"><span class="av">🧐</span><div><div class="nm">SIMON</div><div class="role">master tuner · zero chill</div></div></div>
+  <div class="simon-roast" id="simon-roast"></div>
+  <div class="simon-tip" id="simon-tip"></div>
+</div>
+<div class="wrap">
+  <header>
+    <div class="logo">SIMOS&nbsp;BENCH<small>MK7 GTI · EA888 · SIMOS18.1 · POPS &amp; BANGS · CAREER</small></div>
+    <div class="badges">
+      <span class="badge cash" id="b-cash">💵 <b>$750</b></span>
+      <span class="badge" id="b-ecu">ECU: <b>LOCKED</b></span>
+      <span class="badge" id="b-map">MAP: <b>1 · Stock</b></span>
+      <span class="badge" id="b-rep">REP: <b>Civic Bait</b></span>
+      <span class="badge" id="b-sound">🔊 <b>off</b></span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="bench"><span class="n">STEP 1</span>🔌 BENCH</div>
+    <div class="tab lock" data-tab="maps"><span class="n">STEP 2</span>🗺️ MAPS</div>
+    <div class="tab lock" data-tab="dyno"><span class="n">STEP 3</span>📈 DYNO</div>
+    <div class="tab lock" data-tab="drive"><span class="n">STEP 4</span>🔥 STREET</div>
+    <div class="tab lock" data-tab="race"><span class="n">EARN</span>🏁 RACE</div>
+    <div class="tab lock" data-tab="shop"><span class="n">SPEND</span>🛠️ SHOP</div>
+  </div>
+
+  <!-- BENCH -->
+  <section class="view active" id="view-bench">
+    <div class="grid2">
+      <div class="panel">
+        <h2>SimosTools — Flash Sequence</h2>
+        <p class="help">Plug into OBD, slurp the cal, unlock writing with the <b>ECM3 boot patch</b>, then flash. Flip the <b>switch patch</b> on for 4 stalk-selectable maps.</p>
+        <div class="btnrow" style="margin:12px 0">
+          <button id="btn-connect" class="primary">① Connect OBD</button>
+          <button id="btn-read" disabled>② Read ECU</button>
+          <button id="btn-patch" disabled>③ Boot Patch</button>
+        </div>
+        <div class="btnrow" style="margin:6px 0">
+          <button id="btn-switchpatch" disabled>switch patch: OFF</button>
+          <span class="help" style="align-self:center">4 stalk maps</span>
+        </div>
+        <div class="btnrow" style="margin-top:14px"><button id="btn-flash" class="primary" disabled style="flex:1">④ FLASH ECU ⚡</button></div>
+        <p class="flashreq hidden" id="flashreq">⚠ Unsaved map changes — re-flash to apply, hero.</p>
+      </div>
+      <div class="panel"><h2>Bench Log</h2><div id="console"></div></div>
+    </div>
+  </section>
+
+  <!-- MAPS -->
+  <section class="view" id="view-maps">
+    <div class="panel"><h2>Quick Presets</h2>
+      <div class="seg">
+        <button data-preset="stock">😴 Stock</button><button data-preset="stage1">😎 Stage 1 · 93</button>
+        <button data-preset="stage2">🤤 Stage 2 · E30</button><button data-preset="crackle">🔥 Crackle Monster</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>Power Maps</h2>
+        <div class="ctrl"><div class="lab"><span class="name">Boost Target</span><span class="val" id="v-boost">20.0 psi</span></div>
+          <input type="range" id="s-boost" min="16" max="28" step="0.5" value="20">
+          <div class="hint">Stock peak ≈18 psi. Past ~24 the lil' IS38 is a hairdryer (unless you buy a bigger one in the shop).</div></div>
+        <div class="ctrl"><div class="lab"><span class="name">Ignition Timing (peak °)</span><span class="val" id="v-timing">12°</span></div>
+          <input type="range" id="s-timing" min="6" max="18" step="0.5" value="12">
+          <div class="hint">More advance = more power, until knock sensors pull <span class="warn">KR</span> and your pistons file for divorce.</div></div>
+        <div class="ctrl"><div class="lab"><span class="name">Lambda Target (λ)</span><span class="val" id="v-lambda">0.83</span></div>
+          <input type="range" id="s-lambda" min="0.78" max="0.90" step="0.005" value="0.83">
+          <div class="hint">Rich = cool &amp; safe. Lean = power &amp; heat — too lean is an expensive "tink."</div></div>
+        <div class="ctrl"><div class="lab"><span class="name">Fuel</span></div>
+          <div class="seg" id="seg-fuel"><button data-fuel="91">91</button><button data-fuel="93" class="sel">93</button>
+            <button data-fuel="E30">E30</button><button data-fuel="E85">E85</button></div>
+          <div class="hint">Corn = knock headroom + cooler charge. Also: many gas stations in your future.</div></div>
+      </div>
+      <div class="panel"><h2>🎆 Pops &amp; Bangs <span class="pill">overrun / decel</span></h2>
+        <p class="help">The whole reason you're here. On lift-off the ECU dumps fuel &amp; yanks spark so it lights off in the exhaust. Crank for fireworks — but your <span class="warn">cats &amp; turbo</span> will glow.</p>
+        <div class="ctrl"><div class="lab"><span class="name">Overrun Fueling</span><span class="val" id="v-of">35%</span></div><input type="range" id="s-of" min="0" max="100" step="1" value="35"><div class="hint">Fuel dumped on decel — the <span class="amb">pop</span>.</div></div>
+        <div class="ctrl"><div class="lab"><span class="name">Overrun Spark Cut</span><span class="val" id="v-or">30%</span></div><input type="range" id="s-or" min="0" max="100" step="1" value="30"><div class="hint">Cut/late spark fires downstream — the <span class="red">BANG</span>.</div></div>
+        <div class="ctrl"><div class="lab"><span class="name">Throttle Plate Hold</span><span class="val" id="v-th">25%</span></div><input type="range" id="s-th" min="0" max="100" step="1" value="25"><div class="hint">Keeps air moving — crackle duration.</div></div>
+        <div class="stat" style="margin-top:8px"><div class="k">PREDICTED BURBLE INDEX</div><div class="v" id="popidx" style="color:var(--amb)">—</div><div class="meter"><i id="popbar" style="width:0;background:var(--amb)"></i></div></div>
+        <div class="btnrow" style="margin-top:10px"><button id="btn-preview">▶ Preview burble (audio)</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DYNO -->
+  <section class="view" id="view-dyno">
+    <div class="panel"><h2>Dyno Pull</h2>
+      <div class="btnrow" style="margin-bottom:10px"><button id="btn-dyno" class="primary">▶ Strap it down &amp; PULL</button>
+        <span class="help" style="align-self:center" id="dyno-state">Flash a tune, then pull.</span></div>
+      <canvas id="dyno" width="1000" height="380"></canvas>
+    </div>
+    <div class="grid3">
+      <div class="stat"><div class="k">PEAK POWER</div><div class="v" id="r-hp">—</div><div class="hint" id="r-hprpm"></div></div>
+      <div class="stat"><div class="k">PEAK TORQUE</div><div class="v" id="r-tq">—</div><div class="hint" id="r-tqrpm"></div></div>
+      <div class="stat"><div class="k">KNOCK RETARD</div><div class="v" id="r-kr">—</div><div class="hint">degrees pulled</div></div>
+      <div class="stat"><div class="k">EGT</div><div class="v" id="r-egt">—</div><div class="hint">pre-turbo</div></div>
+      <div class="stat"><div class="k">RELIABILITY</div><div class="v" id="r-rel">—</div><div class="meter"><i id="relbar" style="width:0"></i></div></div>
+      <div class="stat"><div class="k">BURBLE</div><div class="v" id="r-pop" style="color:var(--amb)">—</div><div class="hint">sound score</div></div>
+    </div>
+    <div class="panel big-result hidden" id="resultcard"><div class="grade" id="grade">—</div>
+      <h2 style="color:var(--txt);margin-top:8px" id="grade-title"></h2>
+      <p class="help" id="grade-note" style="max-width:660px;margin:6px auto 0"></p></div>
+  </section>
+
+  <!-- STREET -->
+  <section class="view" id="view-drive">
+    <div class="panel"><h2>🔥 The Street <span class="pill" id="sp-state">switch patch off</span></h2>
+      <div class="scene" id="scene">
+        <div class="stars"></div>
+        <svg id="carsvg" viewBox="0 0 760 330" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="bodyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff3b41"/><stop offset=".5" stop-color="#e01b22"/><stop offset="1" stop-color="#a30f15"/></linearGradient>
+            <linearGradient id="glassg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3d49"/><stop offset="1" stop-color="#0c161c"/></linearGradient>
+            <radialGradient id="rimg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e9eef2"/><stop offset=".6" stop-color="#9aa6ae"/><stop offset="1" stop-color="#4a545b"/></radialGradient>
+          </defs>
+          <ellipse cx="430" cy="276" rx="250" ry="16" fill="#000" opacity=".45"/>
+          <path d="M200 214 L198 192 Q198 176 214 168 L240 156 Q250 140 272 128 Q285 121 305 119 L466 116 Q486 117 498 132 L520 150 L624 162 Q650 164 662 176 Q672 184 672 196 L668 214 Z" fill="url(#bodyg)" stroke="#7d0d12" stroke-width="2"/>
+          <rect x="206" y="206" width="460" height="10" rx="3" fill="#15171a"/>
+          <path d="M262 150 L304 126 L460 123 L500 150 Z" fill="url(#glassg)"/>
+          <rect x="383" y="124" width="6" height="27" fill="#a30f15"/>
+          <path d="M270 148 L302 129 L318 129 Z" fill="#3b5360" opacity=".7"/>
+          <rect x="350" y="166" width="20" height="4" rx="2" fill="#7d0d12"/><rect x="430" y="166" width="20" height="4" rx="2" fill="#7d0d12"/>
+          <text x="408" y="200" font-family="Consolas,monospace" font-weight="900" font-size="15" fill="#fff" opacity=".92">GTI</text>
+          <path d="M640 166 L666 172 L664 182 L640 180 Z" fill="#dff3ff"/><circle cx="652" cy="174" r="2.5" fill="#7fd0ff"/>
+          <rect x="636" y="184" width="34" height="5" fill="#ff3b41"/><rect x="636" y="190" width="34" height="14" fill="#111"/>
+          <g fill="#2a2a2a"><circle cx="642" cy="194" r="1.3"/><circle cx="648" cy="194" r="1.3"/><circle cx="654" cy="194" r="1.3"/><circle cx="660" cy="194" r="1.3"/><circle cx="666" cy="194" r="1.3"/><circle cx="645" cy="199" r="1.3"/><circle cx="651" cy="199" r="1.3"/><circle cx="657" cy="199" r="1.3"/><circle cx="663" cy="199" r="1.3"/></g>
+          <path d="M199 178 L210 176 L210 196 L200 196 Z" fill="#5e0a0d"/><rect x="201" y="182" width="8" height="4" fill="#ff5a5f"/>
+          <ellipse cx="194" cy="205" rx="11" ry="6" fill="#0a0d0f" stroke="#c8d2d8" stroke-width="2.5"/><ellipse cx="194" cy="205" rx="6" ry="3" fill="#1a1d20"/>
+          <g><circle cx="320" cy="214" r="47" fill="#0c0e10"/><circle cx="320" cy="214" r="30" fill="url(#rimg)"/>
+            <path d="M320 214 m-30 0 a30 30 0 0 1 60 0" fill="none" stroke="#e7232b" stroke-width="5" opacity=".9"/>
+            <g stroke="#5c666d" stroke-width="3"><line x1="320" y1="214" x2="320" y2="186"/><line x1="320" y1="214" x2="347" y2="222"/><line x1="320" y1="214" x2="337" y2="238"/><line x1="320" y1="214" x2="303" y2="238"/><line x1="320" y1="214" x2="293" y2="222"/></g>
+            <circle cx="320" cy="214" r="6" fill="#2a3036"/></g>
+          <g><circle cx="585" cy="214" r="47" fill="#0c0e10"/><circle cx="585" cy="214" r="30" fill="url(#rimg)"/>
+            <path d="M585 214 m-30 0 a30 30 0 0 1 60 0" fill="none" stroke="#e7232b" stroke-width="5" opacity=".9"/>
+            <g stroke="#5c666d" stroke-width="3"><line x1="585" y1="214" x2="585" y2="186"/><line x1="585" y1="214" x2="612" y2="222"/><line x1="585" y1="214" x2="602" y2="238"/><line x1="585" y1="214" x2="568" y2="238"/><line x1="585" y1="214" x2="558" y2="222"/></g>
+            <circle cx="585" cy="214" r="6" fill="#2a3036"/></g>
+          <path d="M271 214 a49 49 0 0 1 98 0" fill="none" stroke="#8e1118" stroke-width="6"/>
+          <path d="M536 214 a49 49 0 0 1 98 0" fill="none" stroke="#8e1118" stroke-width="6"/>
+        </svg>
+        <canvas id="scene-fx" width="760" height="330"></canvas>
+        <div class="copflash" id="copflash"></div>
+        <div class="hud"><div class="rpm" id="hud-rpm">850 <b>RPM</b></div><div class="gear" id="hud-gear">N</div><div class="rbar"><i id="hud-rbar"></i></div></div>
+        <div class="meters">
+          <div class="m"><div class="lab"><span>STREET CRED</span><span id="cred-v">0</span></div><div class="bar"><i id="cred-bar" style="background:linear-gradient(90deg,#36e07a,#4fb6ff)"></i></div></div>
+          <div class="m"><div class="lab"><span>🚔 KAREN-O-METER</span><span id="karen-v">0%</span></div><div class="bar"><i id="karen-bar" style="background:linear-gradient(90deg,#ffb338,#ff4d52)"></i></div></div>
+        </div>
+        <div class="dave"><div class="face" id="dave-face">🧔</div><div class="bubble"><div class="nm">DYNO DAVE</div><span id="dave-text">Aight, plug 'er in. Let's wake the neighbors.</span></div></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>Throttle</h2>
+        <p class="help">Hold the loud pedal to climb the revs, then <b>let off</b> — the lift is where the magic happens. Spectators tip cash for big bangs.</p>
+        <button id="btn-throttle" class="primary" style="width:100%;padding:26px;font-size:18px;margin:6px 0">HOLD THROTTLE&nbsp;&nbsp;(or hold <kbd>SPACE</kbd>)</button>
+        <div class="btnrow"><button id="btn-blip">Auto blip 🔥</button><button id="btn-launch">2-step launch 🚀</button></div>
+      </div>
+      <div class="panel"><h2>Switch Patch — Live Maps</h2>
+        <p class="help">Tap a slot (or <kbd>1</kbd>–<kbd>4</kbd>) to swap calibrations. <b>Assign</b> drops your bench tune into the active slot.</p>
+        <div class="slots" id="slots"></div>
+        <div class="btnrow" style="margin-top:10px"><button id="btn-assign">Assign current tune → active slot</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RACE -->
+  <section class="view" id="view-race">
+    <div class="panel"><h2>🏁 1/4 Mile — Friday Night</h2>
+      <p class="help"><b>SPACE</b> (or the buttons): first press = LAUNCH on green, then tap to SHIFT near redline. Beat the rival's ET to bank the purse. Don't red-light, and don't money-shift a fragile motor.</p>
+      <canvas id="drag" width="760" height="260" style="border:1px solid var(--line);border-radius:10px;background:#070d12"></canvas>
+      <div class="btnrow" style="margin-top:10px">
+        <button id="btn-stage" class="primary">🚦 Stage &amp; Race</button>
+        <button id="btn-launchshift">LAUNCH / SHIFT (SPACE)</button>
+        <span class="help" style="align-self:center" id="race-state">Pick a rival below.</span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>Opponents</h2><div class="ladder" id="ladder"></div></div>
+      <div class="panel"><h2>Your Car</h2><div id="carstats" class="help">Flash a tune first.</div>
+        <div class="panel big-result hidden" id="race-result" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SHOP -->
+  <section class="view" id="view-shop">
+    <div class="panel"><h2>🛠️ Dyno Dave's Speed Shop <span class="pill" id="shop-cash">$750</span></h2>
+      <p class="help">Bolt-ons raise your power ceiling, cool the charge, and make you faster on the strip. The <b>catless downpipe</b> is the loudest thing money can buy — and the fastest way to meet the local PD.</p>
+      <div class="shopgrid" id="shopgrid"></div>
+    </div>
+  </section>
+
+  <p class="help" style="text-align:center;opacity:.7;margin:20px 0">
+    Parody bench sim. Real Simos18 flashing can brick an ECU, overrun fueling genuinely melts cats &amp; turbos, and street racing is a great way to lose your license. Don't tune from a webpage. 🔧
+  </p>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[(Math.random()*a.length)|0];
+
+/* ===== AUDIO — layered turbo-4 synth ===== */
+const Audio={
+  ctx:null,out:null,comp:null,reverb:null,wet:null,reverbSend:null,engineBus:null,
+  oscMain:null,oscSub:null,tone:null,rasp:null,driveIn:null,intakeBP:null,intakeGain:null,
+  turbo:null,turboGain:null,noiseBuf:null,bangCurve:null,rpm:850,load:0,on:false,
+  init(){
+    if(this.ctx)return;const AC=window.AudioContext||window.webkitAudioContext;this.ctx=new AC();const c=this.ctx;
+    // ---- master bus: everything -> compressor -> out -> speakers ----
+    this.out=c.createGain();this.out.gain.value=.9;
+    this.comp=c.createDynamicsCompressor();
+    this.comp.threshold.value=-15;this.comp.knee.value=22;this.comp.ratio.value=4;this.comp.attack.value=.003;this.comp.release.value=.25;
+    this.comp.connect(this.out);this.out.connect(c.destination);
+    // ---- exhaust reverb send (gives pops/bangs space) ----
+    this.reverb=c.createConvolver();this.reverb.buffer=this._ir(.55,2.6);
+    this.reverbSend=c.createGain();this.reverbSend.gain.value=1;
+    this.wet=c.createGain();this.wet.gain.value=.25;
+    this.reverbSend.connect(this.reverb);this.reverb.connect(this.wet);this.wet.connect(this.out);
+    // shared resources
+    const n=c.sampleRate,b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<n;i++)d[i]=Math.random()*2-1;this.noiseBuf=b;
+    this.bangCurve=this._drive(4);
+    // ---- engine voice ----
+    this.engineBus=c.createGain();this.engineBus.gain.value=0;this.engineBus.connect(this.comp);
+    this.driveIn=c.createGain();this.driveIn.gain.value=1.2;
+    const shaper=c.createWaveShaper();shaper.curve=this._drive(2.6);shaper.oversample='2x';
+    const post=c.createGain();post.gain.value=.5;
+    this.tone=c.createBiquadFilter();this.tone.type='lowpass';this.tone.frequency.value=700;this.tone.Q.value=.8;
+    this.rasp=c.createBiquadFilter();this.rasp.type='peaking';this.rasp.frequency.value=1700;this.rasp.Q.value=1.4;this.rasp.gain.value=6;
+    this.driveIn.connect(shaper);shaper.connect(post);post.connect(this.tone);this.tone.connect(this.rasp);this.rasp.connect(this.engineBus);
+    // rich exhaust oscillator (custom harmonic spectrum) + sub octave
+    const imag=new Float32Array([0,1,.85,.92,.55,.6,.42,.32,.26,.2,.16,.12,.09]),real=new Float32Array(imag.length);
+    this.oscMain=c.createOscillator();this.oscMain.setPeriodicWave(c.createPeriodicWave(real,imag));
+    const mg=c.createGain();mg.gain.value=.6;this.oscMain.connect(mg);mg.connect(this.driveIn);
+    this.oscSub=c.createOscillator();this.oscSub.type='sawtooth';
+    const sg=c.createGain();sg.gain.value=.35;this.oscSub.connect(sg);sg.connect(this.driveIn);
+    // intake roar (filtered noise, scales with load)
+    const isrc=c.createBufferSource();isrc.buffer=this.noiseBuf;isrc.loop=true;
+    this.intakeBP=c.createBiquadFilter();this.intakeBP.type='bandpass';this.intakeBP.frequency.value=700;this.intakeBP.Q.value=.6;
+    this.intakeGain=c.createGain();this.intakeGain.gain.value=0;
+    isrc.connect(this.intakeBP);this.intakeBP.connect(this.intakeGain);this.intakeGain.connect(this.engineBus);
+    // turbo whistle (spools in under load)
+    this.turbo=c.createOscillator();this.turbo.type='triangle';this.turboGain=c.createGain();this.turboGain.gain.value=0;
+    this.turbo.connect(this.turboGain);this.turboGain.connect(this.comp);
+    this.oscMain.start();this.oscSub.start();isrc.start();this.turbo.start();
+    this.on=true;badge('b-sound','on','ok');this._refresh();
+  },
+  ensure(){this.init();if(this.ctx.state==='suspended')this.ctx.resume();},
+  _ir(sec,decay){const c=this.ctx,len=Math.floor(c.sampleRate*sec),buf=c.createBuffer(2,len,c.sampleRate);
+    for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);}return buf;},
+  _drive(a){const n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*2-1;c[i]=Math.tanh(x*a);}return c;},
+  _refresh(){if(!this.ctx)return;const t=this.ctx.currentTime,r=this.rpm,L=this.load,f=r/30;/* order-2 exhaust */
+    this.oscMain.frequency.setTargetAtTime(f,t,.03);this.oscSub.frequency.setTargetAtTime(f/2,t,.03);
+    this.driveIn.gain.setTargetAtTime(1+L*3,t,.05);
+    this.tone.frequency.setTargetAtTime(380+r*.5+L*1600,t,.04);
+    this.rasp.gain.setTargetAtTime(4+L*8,t,.05);
+    this.intakeBP.frequency.setTargetAtTime(500+r*.22,t,.05);this.intakeGain.gain.setTargetAtTime(L*L*.5,t,.05);
+    const spool=clamp((r-2400)/3800,0,1);
+    this.turbo.frequency.setTargetAtTime(1100+r*1.05,t,.06);this.turboGain.gain.setTargetAtTime(spool*L*.05,t,.06);},
+  setRpm(r){this.rpm=r;this._refresh();},
+  setLoad(g){this.load=clamp(g,0,1);if(this.ctx)this.engineBus.gain.setTargetAtTime(this.load*.95,this.ctx.currentTime,.04);this._refresh();},
+  _node(pan){const p=this.ctx.createStereoPanner();p.pan.value=(pan==null?rnd(-.7,.7):pan);p.connect(this.comp);p.connect(this.reverbSend);return p;},
+  _pop(t,v,pan){const c=this.ctx,P=this._node(pan==null?rnd(-.7,.7):pan);
+    const s=c.createBufferSource();s.buffer=this.noiseBuf;s.loop=true;
+    const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=rnd(1800,4200);bp.Q.value=rnd(5,11);
+    const g=c.createGain();s.connect(bp);bp.connect(g);g.connect(P);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.002);g.gain.exponentialRampToValueAtTime(.0006,t+rnd(.04,.08));s.start(t);s.stop(t+.14);
+    const o=c.createOscillator();o.type='triangle';o.frequency.setValueAtTime(rnd(260,520),t);
+    const og=c.createGain();o.connect(og);og.connect(P);og.gain.setValueAtTime(v*.5,t);og.gain.exponentialRampToValueAtTime(.0005,t+rnd(.05,.09));o.start(t);o.stop(t+.12);},
+  _bang(t,v,pan){const c=this.ctx,P=this._node(pan==null?rnd(-.45,.45):pan);
+    const o=c.createOscillator();o.type='sine';o.frequency.setValueAtTime(135,t);o.frequency.exponentialRampToValueAtTime(46,t+.2);
+    const og=c.createGain();o.connect(og);og.connect(P);og.gain.setValueAtTime(0,t);og.gain.linearRampToValueAtTime(v*1.15,t+.004);og.gain.exponentialRampToValueAtTime(.0006,t+.26);o.start(t);o.stop(t+.4);
+    const s=c.createBufferSource();s.buffer=this.noiseBuf;s.loop=true;const sh=c.createWaveShaper();sh.curve=this.bangCurve;
+    const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=rnd(700,1500);bp.Q.value=1.2;
+    const g=c.createGain();s.connect(sh);sh.connect(bp);bp.connect(g);g.connect(P);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.002);g.gain.exponentialRampToValueAtTime(.0006,t+.12);s.start(t);s.stop(t+.2);
+    const r=c.createOscillator();r.type='triangle';r.frequency.setValueAtTime(rnd(150,230),t);
+    const rg=c.createGain();r.connect(rg);rg.connect(P);rg.gain.setValueAtTime(v*.6,t);rg.gain.exponentialRampToValueAtTime(.0005,t+.18);r.start(t);r.stop(t+.26);
+    const ns=c.createBufferSource();ns.buffer=this.noiseBuf;ns.loop=true;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=240;
+    const ng=c.createGain();ns.connect(lp);lp.connect(ng);ng.connect(P);ng.gain.setValueAtTime(v*.4,t);ng.gain.exponentialRampToValueAtTime(.0005,t+.3);ns.start(t);ns.stop(t+.4);},
+  bov(){this.ensure();const c=this.ctx,t=c.currentTime,s=c.createBufferSource();s.buffer=this.noiseBuf;s.loop=true;
+    const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.setValueAtTime(1500,t);bp.frequency.exponentialRampToValueAtTime(360,t+.28);bp.Q.value=.8;
+    const g=c.createGain();s.connect(bp);bp.connect(g);g.connect(this.comp);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.2,t+.02);g.gain.exponentialRampToValueAtTime(.0005,t+.3);s.start(t);s.stop(t+.4);},
+  overrun(intensity,durMs=900,onPop){this.ensure();if(intensity<=2)return;
+    const t0=this.ctx.currentTime+.02,I=intensity/100,dur=durMs/1000*(.5+I*.9),count=Math.round(4+I*34);
+    for(let i=0;i<count;i++){const t=t0+Math.random()*dur*Math.pow(Math.random(),.6);const isBang=Math.random()<I*.55,vol=(isBang?.55:.36)*(.5+I*.9);
+      if(isBang)this._bang(t,vol);else this._pop(t,vol);if(onPop)setTimeout(()=>onPop(isBang),Math.max(0,(t-this.ctx.currentTime)*1000));}}
+};
+
+/* ===== STATE ===== */
+const FUEL={'91':{head:0,pwr:0},'93':{head:2,pwr:6},'E30':{head:5,pwr:18},'E85':{head:8.5,pwr:32}};
+const G={connected:false,read:false,patched:false,flashed:false,switchPatch:false,dirty:false,
+  tune:{boost:20,timing:12,lambda:.83,fuel:'93',of:35,or:30,th:25},flashedTune:null,
+  slots:[null,null,null,null],activeSlot:0,cred:0,karen:0,bangs:0,switches:0,copsActive:false,throttleLock:false,
+  cash:750,mods:{intake:false,dp:false,fmic:false,clutch:false,wheels:false,fuel:false,turbo:false},unlocked:0};
+const PRESETS={
+  stock:{boost:18,timing:10,lambda:.85,fuel:'91',of:8,or:6,th:5,name:'Stock'},
+  stage1:{boost:22,timing:13,lambda:.83,fuel:'93',of:30,or:28,th:25,name:'Stage 1'},
+  stage2:{boost:24.5,timing:14,lambda:.82,fuel:'E30',of:45,or:42,th:40,name:'Stage 2 E30'},
+  crackle:{boost:23,timing:13,lambda:.84,fuel:'E30',of:95,or:92,th:85,name:'Crackle Monster'}};
+const MODS=[
+  {id:'intake',name:'Cold Air Intake',cost:120,desc:'+6 whp, quicker spool.'},
+  {id:'dp',name:'Catless Downpipe',cost:250,desc:'+12 whp & MUCH louder bangs. Cops notice fast (catless).'},
+  {id:'fmic',name:'Front-Mount Intercooler',cost:300,desc:'Cooler charge: +knock headroom, lower EGT, more reliable.'},
+  {id:'clutch',name:'Stage 2 Clutch + LSD',cost:450,desc:'Hooks hard off the line — big drag launch bonus.'},
+  {id:'wheels',name:'Lightweight Wheels',cost:200,desc:'Less rotating weight — quicker everywhere.'},
+  {id:'fuel',name:'Port Injection + LPFP',cost:700,desc:'Feeds E85 at high boost safely — kills the lean-blowup risk.'},
+  {id:'turbo',name:'Hybrid Turbo (IS38+)',cost:900,desc:'Raises the boost ceiling — monster top-end, less stress.'}];
+const RIVALS=[
+  {name:'Stock Civic',whp:158,weight:1280,grip:.9,awd:false,purse:120,em:'🚗',color:'#9fb3c0'},
+  {name:'Civic Si',whp:208,weight:1300,grip:.92,awd:false,purse:230,em:'🚙',color:'#e6e6e6'},
+  {name:'WRX STI',whp:300,weight:1520,grip:1.18,awd:true,purse:480,em:'🚘',color:'#3a6ad6'},
+  {name:'BMW M2',whp:385,weight:1560,grip:1.0,awd:false,purse:850,em:'🏎️',color:'#222'},
+  {name:'Rival Shop Mk7',whp:365,weight:1370,grip:1.06,awd:false,purse:1600,em:'🚗',color:'#e7232b'}];
+
+/* ===== UI HELPERS ===== */
+function badge(id,val,cls){const e=$('#'+id);if(!e)return;e.querySelector('b').textContent=val;e.className='badge'+(cls?' '+cls:'');}
+function updateCash(){$('#b-cash').querySelector('b').textContent='$'+G.cash;$('#shop-cash').textContent='$'+G.cash;renderShop();}
+function addCash(n,why){G.cash=Math.max(0,Math.round(G.cash+n));updateCash();}
+function log(msg,cls='dim',delay=0){return new Promise(r=>{setTimeout(()=>{const c=$('#console');
+  const t=new Date().toLocaleTimeString('en-GB',{hour12:false});const l=document.createElement('div');l.className='l';
+  l.innerHTML=`<span class="t">${t} </span><span class="${cls}">${msg}</span>`;c.appendChild(l);c.scrollTop=c.scrollHeight;r();},delay);});}
+const ACH=new Set();
+function achieve(label){if(ACH.has(label))return;ACH.add(label);const t=document.createElement('div');t.className='toast';
+  t.innerHTML=`<div class="th">🏆 ACHIEVEMENT</div><div class="tt">${label}</div>`;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),5200);}
+const DAVE={faces:{chill:'🧔',hype:'🤩',worried:'😬',cops:'😱',rich:'🤑',dead:'💀'},
+  set(mood,text){$('#dave-face').textContent=this.faces[mood]||'🧔';$('#dave-text').textContent=text;
+    const f=$('#dave-face');f.animate([{transform:'scale(1.25)'},{transform:'scale(1)'}],{duration:200});}};
+const DLINES={bigbang:['That set off three car alarms. Beautiful.','Somewhere a Prius driver is crying.','I felt that in my fillings.','Cats? We don\'t do cats here.','My ears are ringing and I love it.'],
+  lift:['There she is.','Burble city, population: you.','Nice. Do it again.','The street tax is paid.'],
+  mapswitch:['Stalk magic. Civilized.','Map swap on the fly, you maniac.','Cops behind you? Slap it to valet.'],
+  win:['GET THAT MONEY. Easy work.','He never stood a chance.','Cash money, baby. Buy a turbo.','Clean win. Crowd loved it.'],
+  lose:['Oof. We don\'t talk about that one.','He spanked you. Go buy parts.','That\'s a paddlin\'. Hit the shop.','Slower car, faster wallet — go spend it... oh wait, you lost.'],
+  foul:['RED LIGHT, rookie. Auto-loss.','You left before green. Bold. Wrong.','Itchy trigger finger costs money.']};
+function dave(pool,mood,chance=1){if(Math.random()<chance)DAVE.set(mood,pick(DLINES[pool]));}
+
+/* ===== TABS ===== */
+function unlockTab(n){const t=$(`.tab[data-tab="${n}"]`);if(t)t.classList.remove('lock');}
+function go(n){const tab=$(`.tab[data-tab="${n}"]`);if(tab.classList.contains('lock'))return;
+  $$('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));
+  $$('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+n));
+  if(Audio.ctx){Audio.setLoad(0);Audio.setRpm(850);}
+  driveActive=(n==='drive');raceActive=(n==='race');
+  if(driveActive)startDrive();
+  if(raceActive){renderLadder();renderCarStats();drawDrag();}}
+$$('.tab').forEach(t=>t.addEventListener('click',()=>go(t.dataset.tab)));
+
+/* ===== BENCH ===== */
+$('#btn-connect').addEventListener('click',async e=>{Audio.ensure();e.target.disabled=true;
+  await log('macchina A0 detected on COM5','info');await log('handshake … UDS 0x10 0x03','dim',350);
+  await log('VIN WVWZZZAUZHW••••• · 138k mi (lol)','ok',500);await log('SA2 seed/key … access granted','ok',450);
+  G.connected=true;badge('b-conn','linked','ok');$('#btn-read').disabled=false;});
+$('#btn-read').addEventListener('click',async e=>{e.target.disabled=true;
+  await log('reading ASW + CAL (0x80800000)…','info');await log('████████░░ 78%','dim',500);
+  await log('calibration dumped · 4.0 MB · CRC ok','ok',650);await log('stock map archived. you will never open it again.','dim',300);
+  G.read=true;$('#btn-patch').disabled=false;});
+$('#btn-patch').addEventListener('click',async e=>{e.target.disabled=true;
+  await log('applying ECM3 boot patch (cboot)…','vio');await log('disabling sample monitoring …','warn',500);
+  await log('write access UNLOCKED. with great power…','ok',600);
+  G.patched=true;badge('b-ecu','UNLOCKED','warn');$('#btn-flash').disabled=false;$('#btn-switchpatch').disabled=false;
+  unlockTab('maps');achieve('Boot Patched, Baby');await log('Maps tab unlocked → go build something stupid.','info',150);});
+$('#btn-switchpatch').addEventListener('click',e=>{G.switchPatch=!G.switchPatch;
+  e.target.textContent='switch patch: '+(G.switchPatch?'ON':'OFF');e.target.classList.toggle('sel',G.switchPatch);
+  $('#sp-state').textContent=G.switchPatch?'switch patch ON · 4 maps':'switch patch off';
+  log('switch patch '+(G.switchPatch?'ENABLED — cruise stalk picks maps 1-4':'disabled'),G.switchPatch?'ok':'dim');});
+$('#btn-flash').addEventListener('click',flashECU);
+async function flashECU(){if(!G.patched)return;const btn=$('#btn-flash');btn.disabled=true;$('#btn-dyno').disabled=true;
+  await log('────── FLASH START ──────','vio');await log('⚠ DO NOT yank the cable, do NOT sneeze','warn',150);
+  for(const[m,c,d]of[['erasing ASW…','dim',450],['writing ASW · 0x36','dim',520],['erasing CAL…','dim',420],
+    ['writing CAL (your masterpiece) · 0x36','info',560],[G.switchPatch?'injecting switch-patch table (4 slots)…':'single-map calibration…',G.switchPatch?'vio':'dim',430],
+    ['recalculating ECM3 checksum…','dim',480],['verify 0x37 · CRC match','ok',520],['reset ECU · 0x11','dim',380]])await log(m,c,d);
+  await log('────── FLASH OK · ECU lives ──────','ok',150);
+  const first=!G.flashed;G.flashed=true;G.dirty=false;G.flashedTune={...G.tune};badge('b-ecu','FLASHED','ok');$('#flashreq').classList.add('hidden');
+  if(G.switchPatch){if(G.slots.every(s=>s===null)){G.slots[0]={...PRESETS.stock,name:'Valet'};G.slots[1]={...G.tune,name:'Your Tune'};
+      G.slots[2]={...PRESETS.stage2};G.slots[3]={...PRESETS.crackle};G.activeSlot=1;}}
+  else{G.slots=[{...G.tune,name:'Your Tune'},null,null,null];G.activeSlot=0;}
+  if(G.tune.fuel==='E30'&&G.tune.boost>=24)achieve("It's Not Stage 2, It's a Lifestyle");
+  renderSlots();renderMapBadge();unlockTab('dyno');unlockTab('drive');unlockTab('race');unlockTab('shop');
+  $('#btn-dyno').disabled=false;$('#dyno-state').textContent='Loaded. Send it.';btn.disabled=false;renderCarStats();
+  if(first)await log('Dyno, Street, Race & Shop unlocked. Go be a menace.','info',150);}
+
+/* ===== MAPS ===== */
+function markDirty(){if(!G.flashed)return;G.dirty=true;$('#flashreq').classList.remove('hidden');}
+function bindSlider(id,key,vid,f){const s=$('#'+id),v=$('#'+vid);const u=()=>{const val=parseFloat(s.value);
+  G.tune[key]=val;v.textContent=f(val);if(['of','or','th'].includes(key))updatePop();markDirty();};s.addEventListener('input',u);u();}
+bindSlider('s-boost','boost','v-boost',x=>x.toFixed(1)+' psi');bindSlider('s-timing','timing','v-timing',x=>x+'°');
+bindSlider('s-lambda','lambda','v-lambda',x=>x.toFixed(3));bindSlider('s-of','of','v-of',x=>x+'%');
+bindSlider('s-or','or','v-or',x=>x+'%');bindSlider('s-th','th','v-th',x=>x+'%');
+$$('#seg-fuel button').forEach(b=>b.addEventListener('click',()=>{$$('#seg-fuel button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');G.tune.fuel=b.dataset.fuel;markDirty();}));
+$$('[data-preset]').forEach(b=>b.addEventListener('click',()=>{const p=PRESETS[b.dataset.preset];applyTune(p);log('preset loaded: '+p.name,'info');}));
+function applyTune(p){G.tune={boost:p.boost,timing:p.timing,lambda:p.lambda,fuel:p.fuel,of:p.of,or:p.or,th:p.th};
+  $('#s-boost').value=p.boost;$('#v-boost').textContent=p.boost.toFixed(1)+' psi';$('#s-timing').value=p.timing;$('#v-timing').textContent=p.timing+'°';
+  $('#s-lambda').value=p.lambda;$('#v-lambda').textContent=p.lambda.toFixed(3);$('#s-of').value=p.of;$('#v-of').textContent=p.of+'%';
+  $('#s-or').value=p.or;$('#v-or').textContent=p.or+'%';$('#s-th').value=p.th;$('#v-th').textContent=p.th+'%';
+  $$('#seg-fuel button').forEach(x=>x.classList.toggle('sel',x.dataset.fuel===p.fuel));updatePop();markDirty();}
+function popScore(t){return clamp(t.of*.42+t.or*.42+t.th*.16,0,100);}
+function popMult(){return G.mods.dp?1.4:1;}
+function updatePop(){const p=popScore(G.tune);$('#popidx').textContent=Math.round(p);$('#popbar').style.width=p+'%';}
+$('#btn-preview').addEventListener('click',()=>{Audio.ensure();Audio.setLoad(.7);Audio.setRpm(4200);
+  setTimeout(()=>{Audio.setLoad(.05);Audio.setRpm(2600);Audio.overrun(popScore(G.tune),1000);},380);
+  setTimeout(()=>{Audio.setLoad(0);Audio.setRpm(850);},1500);});
+
+/* ===== SIM ===== */
+function compute(t){const f=FUEL[t.fuel];const head=f.head+(G.mods.fmic?2:0)+(G.mods.fuel?3:0);
+  const knockIdx=(t.boost-18)*.85+(t.timing-9)*1.25+(t.lambda-.82)*14-head;
+  const KR=Math.max(0,knockIdx)*1.1,effTiming=Math.max(2,t.timing-KR);
+  let whp=210+(t.boost-18)*7.6+(effTiming-9)*3.8+f.pwr-Math.abs(t.lambda-.83)*40+(G.mods.intake?6:0)+(G.mods.dp?12:0)+(G.mods.turbo?(t.boost-18)*2.5:0);
+  whp=clamp(whp,160,640);
+  const egt=720+(t.boost-18)*9+KR*12+(t.lambda-.82)*220+t.of*1.4+t.or*1.7-(G.mods.fmic?45:0)-(G.mods.turbo?25:0);
+  const pop=popScore(t);
+  let rel=100-Math.max(0,knockIdx)*6-Math.max(0,t.boost-(G.mods.turbo?27:24))*5-Math.max(0,egt-950)*.13
+    -Math.max(0,(t.lambda-.86))*(G.mods.fuel?40:140)-pop*.16+(G.mods.fmic?6:0);
+  rel=clamp(rel,0,100);
+  const blown=(knockIdx>7&&t.lambda>.86&&!G.mods.fuel)||egt>1085||(t.boost>(G.mods.turbo?29:26.5)&&rel<22);
+  return{whp,KR,knockIdx,egt,rel,pop,blown};}
+function curve(peak){const pts=[];let mx=0;for(let r=2200;r<=6800;r+=100){const sp=clamp((r-2100)/1300,0,1),
+  mid=Math.exp(-Math.pow((r-4300)/2400,2)),top=clamp(1-(r-5600)/3600,.55,1);const tq=100*sp*(.55+.55*mid)*top,pw=tq*r/5252;
+  pts.push({rpm:r,tq,pw});if(pw>mx)mx=pw;}const k=peak/mx;pts.forEach(p=>{p.pw*=k;p.tq*=k;});return pts;}
+
+/* ===== DYNO ===== */
+const dcv=$('#dyno'),dctx=dcv.getContext('2d');let lastPts=null;
+function drawDyno(pts,prog,res){const W=dcv.width,H=dcv.height,pL=52,pR=52,pT=18,pB=34;dctx.clearRect(0,0,W,H);dctx.fillStyle='#060809';dctx.fillRect(0,0,W,H);
+  const x0=pL,x1=W-pR,y0=H-pB,y1=pT,rmin=2200,rmax=6800;const mH=Math.max(...pts.map(p=>p.pw),300)*1.08,mT=Math.max(...pts.map(p=>p.tq),300)*1.08;
+  const X=r=>x0+(r-rmin)/(rmax-rmin)*(x1-x0),YH=h=>y0-(h/mH)*(y0-y1),YT=q=>y0-(q/mT)*(y0-y1);
+  dctx.strokeStyle='#15202a';dctx.fillStyle='#3c4d59';dctx.font='10px Consolas';dctx.lineWidth=1;
+  for(let r=2000;r<=6800;r+=1000){dctx.beginPath();dctx.moveTo(X(r),y0);dctx.lineTo(X(r),y1);dctx.stroke();dctx.fillText(r,X(r)-10,y0+16);}
+  if(res&&res.KR>.3){dctx.fillStyle='rgba(255,77,82,.10)';dctx.fillRect(X(5200),y1,x1-X(5200),y0-y1);dctx.fillStyle='#ff4d52';dctx.fillText('KR '+res.KR.toFixed(1)+'°',X(5400),y1+14);}
+  const cut=Math.floor(pts.length*prog);const ln=(key,Y,c)=>{dctx.strokeStyle=c;dctx.lineWidth=2.4;dctx.beginPath();
+    for(let i=0;i<=cut&&i<pts.length;i++){const p=pts[i],x=X(p.rpm),y=Y(p[key]);i===0?dctx.moveTo(x,y):dctx.lineTo(x,y);}dctx.stroke();};
+  ln('tq',YT,'#36e07a');ln('pw',YH,'#ffb338');
+  if(prog<1&&cut<pts.length){const p=pts[cut]||pts[pts.length-1];dctx.strokeStyle='rgba(255,255,255,.25)';dctx.beginPath();dctx.moveTo(X(p.rpm),y0);dctx.lineTo(X(p.rpm),y1);dctx.stroke();}
+  dctx.fillStyle='#ffb338';dctx.fillText('■ power (whp)',x1-150,y1+12);dctx.fillStyle='#36e07a';dctx.fillText('■ torque',x1-150,y1+26);}
+$('#btn-dyno').addEventListener('click',runDyno);
+function runDyno(){Audio.ensure();const t=G.flashedTune||G.tune,res=compute(t),pts=curve(res.whp);lastPts=pts;
+  $('#btn-dyno').disabled=true;$('#dyno-state').textContent='pulling…';$('#resultcard').classList.add('hidden');Audio.setLoad(.92);
+  const dur=2600,t0=performance.now();(function f(now){const prog=clamp((now-t0)/dur,0,1);Audio.setRpm(2200+(6800-2200)*prog);drawDyno(pts,prog,res);
+    if(prog<1)requestAnimationFrame(f);else finishDyno(res,t);})(t0);}
+function finishDyno(res,t){Audio.setLoad(.05);Audio.setRpm(3200);Audio.overrun(res.pop,1100);setTimeout(()=>{Audio.setLoad(0);Audio.setRpm(850);},1300);
+  const pHP=Math.max(...lastPts.map(p=>p.pw)),hpR=lastPts.find(p=>p.pw===pHP).rpm,pTQ=Math.max(...lastPts.map(p=>p.tq)),tqR=lastPts.find(p=>p.tq===pTQ).rpm;
+  $('#r-hp').textContent=Math.round(res.blown?pHP*.3:pHP);$('#r-hprpm').textContent='whp @ '+hpR;
+  $('#r-tq').textContent=Math.round(res.blown?pTQ*.3:pTQ);$('#r-tqrpm').textContent='lb-ft @ '+tqR;
+  $('#r-kr').textContent=res.KR.toFixed(1)+'°';$('#r-kr').style.color=res.KR>3?'#ff4d52':res.KR>.5?'#ffb338':'#36e07a';
+  $('#r-egt').textContent=Math.round(res.egt)+'°C';$('#r-egt').style.color=res.egt>980?'#ff4d52':res.egt>900?'#ffb338':'#36e07a';
+  $('#r-rel').textContent=Math.round(res.rel)+'%';const rb=$('#relbar');rb.style.width=res.rel+'%';rb.style.background=res.rel>70?'#36e07a':res.rel>40?'#ffb338':'#ff4d52';$('#r-rel').style.color=rb.style.background;
+  $('#r-pop').textContent=Math.round(res.pop);renderCarStats();
+  if(res.pop>90)achieve('Cat Delete Speedrun');if(res.blown)achieve('Money Shift');
+  const powerScore=clamp((res.whp-210)/(420-210)*100,0,100),overall=res.blown?6:.40*powerScore+.35*res.pop+.25*res.rel;
+  const card=$('#resultcard');card.classList.remove('hidden');let g,note,col;
+  if(res.blown){g='💀';col='#ff4d52';note='Catastrophic failure. '+(res.egt>1085?'EGTs turned your turbo into a fancy paperweight.':'Detonation grenaded a rod.')+' GoFundMe time.';
+    Audio.overrun(100,400);if(Audio.ctx)setTimeout(()=>Audio._bang(Audio.ctx.currentTime,.9),180);}
+  else if(overall>=85){g='S';col='#36e07a';note='Big power, glorious bangs, still starts tomorrow. Tuner of the year.';achieve('Tuner of the Year');}
+  else if(overall>=72){g='A';col='#36e07a';note='Strong all-rounder. Fast, loud, barely legal. Chef\'s kiss.';}
+  else if(overall>=58){g='B';col='#ffb338';note='Solid. There\'s more in the maps if you\'ve got the spine.';}
+  else if(overall>=42){g='C';col='#ffb338';note='It runs. Either timid or rattling — commit to a bit.';}
+  else{g='D';col='#ff4d52';note='Knock, heat, or no fun. Load a preset and rethink.';}
+  $('#grade').textContent=g;$('#grade').style.color=col;$('#grade-title').textContent=res.blown?'ENGINE FAILURE':'Grade '+g+' · '+Math.round(overall)+' pts';
+  const w=[];if(res.KR>3)w.push('serious knock retard');if(res.egt>980)w.push('EGTs in orbit');if(res.rel<40&&!res.blown)w.push('reliability is grim');if(res.pop>70)w.push('the cats are glowing');
+  $('#grade-note').textContent=note+(w.length?'  ⚠ '+w.join(', ')+'.':'');
+  $('#btn-dyno').disabled=false;$('#dyno-state').textContent='done — tweak & re-flash to chase more.';}
+drawDyno(curve(210),1,null);
+
+/* ===== SWITCH SLOTS ===== */
+function renderSlots(){const wrap=$('#slots');wrap.innerHTML='';const n=G.switchPatch?4:1;
+  for(let i=0;i<n;i++){const t=G.slots[i],d=document.createElement('div');d.className='slot'+(i===G.activeSlot?' active':'');const p=t?popScore(t):0;
+    d.innerHTML=`<div class="si">SLOT ${i+1}</div><div class="sn">${t?(t.name||'Map '+(i+1)):'— empty —'}</div><div class="sd">${t?`${t.boost} psi · ${t.fuel} · burble ${Math.round(p)}`:'assign a tune'}</div>`;
+    d.addEventListener('click',()=>{if(G.slots[i])selectSlot(i,true);});wrap.appendChild(d);}}
+function selectSlot(i,human){if(!G.slots[i])return;G.activeSlot=i;renderSlots();renderMapBadge();
+  if(human){G.switches++;log('stalk → map '+(i+1)+' ('+(G.slots[i].name||'')+')','ok');dave('mapswitch','chill',.6);if(G.switches>=10)achieve('Stalk Wizard');}}
+function renderMapBadge(){const t=G.slots[G.activeSlot];badge('b-map',(G.activeSlot+1)+' · '+(t?(t.name||'Map'):'—'),'ok');}
+$('#btn-assign').addEventListener('click',()=>{G.slots[G.activeSlot]={...G.tune,name:'Your Tune'};renderSlots();renderMapBadge();log('current tune dropped into slot '+(G.activeSlot+1),'info');});
+
+/* ===== STREET SCENE / FX ===== */
+const scv=$('#scene-fx'),sctx=scv.getContext('2d'),SW=760,SH=330,EX={x:184,y:206};
+let particles=[],driveActive=false,raceActive=false,rpm=850,throttle=0,targetRpm=850,twoStep=false,shake=0,lastT=performance.now();
+function spawnFlames(isBang,strength){if(!driveActive)return;const n=isBang?Math.round(rnd(16,26)):Math.round(rnd(4,8)),power=(isBang?1.6:1)*strength;
+  for(let i=0;i<n;i++){const ang=Math.PI+rnd(-.5,.5),sp=rnd(2,7)*power;
+    particles.push({x:EX.x+rnd(-3,3),y:EX.y+rnd(-3,3),vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-rnd(.2,1.4),life:rnd(.35,.7)*(isBang?1.3:1),max:.7,size:rnd(5,12)*(isBang?1.4:1),type:'flame'});}
+  for(let i=0;i<(isBang?6:2);i++)particles.push({x:EX.x+rnd(-4,4),y:EX.y,vx:-rnd(.5,2.5),vy:-rnd(.6,2),life:rnd(.9,1.6),max:1.6,size:rnd(8,16),type:'smoke'});
+  for(let i=0;i<(isBang?14:3);i++){const a=Math.PI+rnd(-.8,.8),s=rnd(4,11)*power;particles.push({x:EX.x,y:EX.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-rnd(0,2),life:rnd(.3,.6),max:.6,size:rnd(1,2.5),type:'spark'});}
+  if(isBang){shake=Math.min(14,shake+rnd(5,9));reaction(true);}else reaction(false);}
+function reaction(isBang){const cred=isBang?pick(['🔥','😎','🤘','💯','📸']):pick(['😮','🤙','👀']),karen=isBang?pick(['😡','📞','🙉','🤬']):pick(['😤','🙄']);
+  particles.push({x:rnd(420,640),y:rnd(150,210),vx:rnd(-.4,.4),vy:-rnd(.8,1.6),life:1.4,max:1.4,type:'emoji',char:cred,size:26});
+  if(G.karen>30||isBang)particles.push({x:rnd(40,180),y:rnd(60,140),vx:rnd(-.3,.3),vy:-rnd(.8,1.6),life:1.4,max:1.4,type:'emoji',char:karen,size:24});}
+function renderScene(){sctx.setTransform(1,0,0,1,0,0);sctx.clearRect(0,0,SW,SH);if(shake>.3)sctx.setTransform(1,0,0,1,rnd(-shake,shake),rnd(-shake,shake));
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=1/60;p.x+=p.vx;p.y+=p.vy;
+    if(p.type==='flame'){p.vy+=.04;p.vx*=.97;p.size*=.965;}else if(p.type==='smoke'){p.vy-=.01;p.size*=1.02;p.vx*=.98;}else if(p.type==='spark'){p.vy+=.22;}else if(p.type==='emoji'){p.vy-=.004;}
+    if(p.life<=0){particles.splice(i,1);continue;}const f=p.life/p.max;
+    if(p.type==='flame'){let c=f>.75?'rgba(255,248,210,':f>.5?'rgba(255,210,63,':f>.28?'rgba(255,122,24,':'rgba(214,40,40,';sctx.fillStyle=c+(f*.95)+')';sctx.beginPath();sctx.arc(p.x,p.y,Math.max(.5,p.size),0,7);sctx.fill();}
+    else if(p.type==='smoke'){sctx.fillStyle='rgba(120,128,135,'+(f*.18)+')';sctx.beginPath();sctx.arc(p.x,p.y,p.size,0,7);sctx.fill();}
+    else if(p.type==='spark'){sctx.fillStyle='rgba(255,'+((180+f*60)|0)+',120,'+f+')';sctx.fillRect(p.x,p.y,p.size,p.size);}
+    else if(p.type==='emoji'){sctx.globalAlpha=clamp(f*1.2,0,1);sctx.font=p.size+'px serif';sctx.fillText(p.char,p.x,p.y);sctx.globalAlpha=1;}}
+  if(particles.length>500)particles.splice(0,particles.length-500);}
+const REPS=[[0,'Civic Bait'],[60,'Cars & Coffee Regular'],[160,'Local Legend'],[340,'Wanted by the HOA']];
+function repTitle(c){let t='Civic Bait';for(const[v,n]of REPS)if(c>=v)t=n;return t;}
+function updateMeters(){$('#cred-bar').style.width=clamp(G.cred/4,0,100)+'%';$('#cred-v').textContent=Math.round(G.cred);
+  $('#karen-bar').style.width=G.karen+'%';$('#karen-v').textContent=Math.round(G.karen)+'%';badge('b-rep',repTitle(G.cred),G.cred>=160?'ok':'');}
+function bangScore(isBang){const g=(isBang?4:1.4)*popMult();G.cred+=g;G.karen=clamp(G.karen+(isBang?4:1.5)*popMult(),0,100);
+  if(isBang){G.bangs++;addCash(rnd(1,3));}else addCash(rnd(0,1));
+  if(G.bangs>=50)achieve('Burble Brain');if(G.cred>=340)achieve('Wanted by the HOA');
+  if(G.karen>=100&&!G.copsActive)cops();updateMeters();}
+function firePop(isBang){const s=clamp(activePop()/100*(.7+rpm/7200*.8),.15,1.8)*popMult();spawnFlames(isBang,s);bangScore(isBang);if(isBang)dave('bigbang','hype',.18);}
+function activePop(){const t=G.slots[G.activeSlot]||G.flashedTune||G.tune;return popScore(t);}
+function cops(){G.copsActive=true;G.throttleLock=true;G.karen=100;$('#copflash').classList.add('on');
+  DAVE.set('cops','🚔 KAREN CALLED THE COPS. Be cool. BE COOL.');log('🚔 noise complaint — units dispatched','err');
+  const fine=150+(G.mods.dp?100:0);addCash(-fine);log('💸 noise citation: -$'+fine,'err');
+  setTimeout(()=>{G.copsActive=false;G.throttleLock=false;G.karen=42;G.cred+=40;$('#copflash').classList.remove('on');
+    DAVE.set('rich','Cited you and asked for a build sheet. +40 cred, -$'+fine+'. Worth it.');achieve('Neighborhood Menace');updateMeters();},3800);updateMeters();}
+function startDrive(){lastT=performance.now();renderSlots();renderMapBadge();updateMeters();requestAnimationFrame(driveLoop);}
+function driveLoop(now){if(!driveActive)return;const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
+  if(twoStep&&throttle>.5)targetRpm=4200+Math.sin(now/40)*350;else targetRpm=850+throttle*(7000-850);
+  const rate=targetRpm>rpm?(throttle>.4?5.5:3.5):4.5;rpm+=(targetRpm-rpm)*clamp(dt*rate,0,1);rpm=clamp(rpm,700,7200);
+  Audio.setRpm(rpm);Audio.setLoad(throttle<.02?.12:.2+throttle*.8);
+  if(twoStep&&throttle>.5&&Math.random()<.32){const b=Math.random()<.6;Audio[b?'_bang':'_pop'](Audio.ctx.currentTime,b?.45:.3);firePop(b);}
+  shake*=.86;$('#scene').style.transform=shake>.3?`translate(${rnd(-shake,shake).toFixed(1)}px,${rnd(-shake,shake).toFixed(1)}px)`:'';
+  if(!G.copsActive&&throttle<.1)G.karen=clamp(G.karen-dt*5,0,100);
+  renderScene();updateMeters();
+  const gear=rpm<1200?'N':['1','2','2','3','3','4'][Math.min(5,Math.floor(rpm/1300))];
+  $('#hud-rpm').innerHTML=Math.round(rpm)+' <b>RPM</b>';$('#hud-gear').textContent=(twoStep&&throttle>.5?'2-STEP':'GEAR '+gear);
+  $('#hud-rbar').style.width=clamp(rpm/7200,0,1)*100+'%';requestAnimationFrame(driveLoop);}
+function setThrottle(v){Audio.ensure();if(G.throttleLock)v=0;const was=throttle;throttle=v;
+  if(was>.25&&v===0&&rpm>3000){Audio.bov();const intensity=clamp(activePop()*(.6+rpm/7200*.7),0,100);Audio.overrun(intensity,1000,b=>firePop(b));dave('lift','hype',.3);}}
+const tb=$('#btn-throttle');tb.addEventListener('pointerdown',e=>{e.preventDefault();setThrottle(1);});
+tb.addEventListener('pointerup',e=>{e.preventDefault();setThrottle(0);});tb.addEventListener('pointerleave',()=>{if(throttle>0)setThrottle(0);});
+$('#btn-blip').addEventListener('click',()=>{Audio.ensure();setThrottle(1);setTimeout(()=>setThrottle(0),420);});
+$('#btn-launch').addEventListener('click',e=>{twoStep=!twoStep;e.target.classList.toggle('sel',twoStep);e.target.textContent=twoStep?'2-step ARMED 🚀':'2-step launch 🚀';
+  DAVE.set(twoStep?'hype':'chill',twoStep?'2-step armed. Hold it, let the dump pipe scream.':'2-step off. Boring.');});
+
+/* ===== SHOP ===== */
+function renderShop(){const g=$('#shopgrid');if(!g)return;g.innerHTML='';
+  MODS.forEach(m=>{const owned=G.mods[m.id],afford=G.cash>=m.cost;const d=document.createElement('div');d.className='mod'+(owned?' owned':'');
+    d.innerHTML=`<div class="mn"><span>${m.name}</span><span class="price">${owned?'✓ owned':'$'+m.cost}</span></div><div class="md">${m.desc}</div>`;
+    const b=document.createElement('button');b.textContent=owned?'Installed':(afford?'Buy & Install':'Need $'+(m.cost-G.cash)+' more');
+    b.disabled=owned||!afford;if(!owned&&afford)b.className='primary';
+    b.addEventListener('click',()=>buyMod(m));d.appendChild(b);g.appendChild(d);});}
+function buyMod(m){if(G.mods[m.id]||G.cash<m.cost)return;G.cash-=m.cost;G.mods[m.id]=true;updateCash();renderCarStats();
+  DAVE.set('rich',`Bolted on the ${m.name}. She's meaner now.`);log('🛠️ installed '+m.name+' (-$'+m.cost+')','ok');
+  if(Object.values(G.mods).every(Boolean))achieve('Fully Built (Wallet Empty)');}
+
+/* ===== DRAG RACE ===== */
+const gcv=$('#drag'),gx=gcv.getContext('2d'),DW=760,DH=260,TRACK=402.336,ratios=[3.6,2.1,1.43,1.03,0.84,0.69],FINAL=3.65,CIRC=1.96;
+let dragP=[];
+const race={active:false,phase:'idle',rivalIdx:0,treeStart:0,greenAt:0,rivalLaunch:0,
+  p:{d:0,v:0,gear:1,rpm:850,launched:false,foul:false,done:false,et:0,trap:0,penUntil:0,penVal:1,blown:false},
+  r:{d:0,v:0,done:false,et:0,trap:0}};
+let selRival=0,lastDrag=performance.now();
+function renderLadder(){const L=$('#ladder');L.innerHTML='';
+  RIVALS.forEach((r,i)=>{const locked=i>G.unlocked;const d=document.createElement('div');d.className='rival'+(i===selRival?' sel':'')+(locked?' lock':'');
+    d.innerHTML=`<div class="em">${r.em}</div><div class="info"><div class="nm">${r.name} ${locked?'🔒':''}</div><div class="sd">${r.whp} whp · ${r.weight}kg ${r.awd?'· AWD':''}</div></div><div class="purse">$${r.purse}</div>`;
+    if(!locked)d.addEventListener('click',()=>{selRival=i;renderLadder();$('#race-state').textContent='Selected '+r.name+'. Hit Stage & Race.';});L.appendChild(d);});}
+function carPerf(){const r=compute(G.flashedTune||G.tune);return{whp:r.whp,weight:1400*(G.mods.wheels?.965:1),grip:.92+(G.mods.clutch?.18:0),rel:r.rel,blown:r.blown};}
+function renderCarStats(){const el=$('#carstats');if(!G.flashed){el.innerHTML='Flash a tune first.';return;}const c=carPerf();
+  el.innerHTML=`<b>${Math.round(c.whp)} whp</b> · ${Math.round(c.weight)} kg · grip ${c.grip.toFixed(2)} · reliability ${Math.round(c.rel)}%
+    <div class="help" style="margin-top:6px">Mods: ${Object.entries(G.mods).filter(([k,v])=>v).map(([k])=>k).join(', ')||'none yet'}</div>
+    ${c.rel<35?'<div class="warn" style="margin-top:6px">⚠ Low reliability — a hard money-shift could grenade it.</div>':''}`;}
+function startRace(){if(!G.flashed){$('#race-state').textContent='Flash a tune first!';return;}Audio.ensure();
+  const c=carPerf();if(c.blown){$('#race-state').textContent='Your tune is a grenade — fix it on the dyno first.';return;}
+  race.active=true;race.phase='tree';race.rivalIdx=selRival;race.treeStart=performance.now();race.greenAt=race.treeStart+1900;
+  race.rivalLaunch=race.greenAt+rnd(120,340);
+  race.p={d:0,v:0,gear:1,rpm:850,launched:false,foul:false,done:false,et:0,trap:0,penUntil:0,penVal:1,blown:false};
+  race.r={d:0,v:0,done:false,et:0,trap:0};dragP=[];$('#race-result').classList.add('hidden');
+  $('#btn-stage').disabled=true;$('#race-state').textContent='Stage… watch the tree!';lastDrag=performance.now();requestAnimationFrame(dragLoop);}
+function step(car,whp,weight,grip,dt,eff){const P=whp*745.7,g=9.81,tract=weight*g*grip;const F=Math.min(tract,P/Math.max(car.v,2));
+  const drag=.5*1.2*.62*car.v*car.v;let a=(F-drag)/weight*eff;car.v=Math.max(0,car.v+a*dt);car.d+=car.v*dt;}
+function dragShift(){if(!race.active||race.phase!=='run'||!race.p.launched||race.p.done)return;const p=race.p;if(p.gear>=6)return;
+  const rr=p.rpm;p.gear++;let q;if(rr>=6300&&rr<=7050)q='perfect';else if(rr>=5500)q='good';else q='early';
+  if(q==='good'){p.penUntil=performance.now()+300;p.penVal=.92;}else if(q==='early'){p.penUntil=performance.now()+400;p.penVal=.78;}
+  const c=carPerf();dragPop(true);
+  if((q==='perfect')&&c.rel<32&&Math.random()<.18){p.blown=true;p.done=true;p.et=0;Audio.overrun(100,400);if(Audio.ctx)Audio._bang(Audio.ctx.currentTime,.9);
+    achieve('Money Shift');$('#race-state').textContent='💀 You money-shifted a fragile motor.';}}
+function dragPop(isBang){if(Audio.ctx)Audio[isBang?'_bang':'_pop'](Audio.ctx.currentTime,isBang?.4:.28);
+  const ex=carScreenX(race.p.d)-14,ey=200;for(let i=0;i<(isBang?10:4);i++){const a=Math.PI+rnd(-.5,.5),s=rnd(2,6);
+    dragP.push({x:ex,y:ey,vx:Math.cos(a)*s-2,vy:Math.sin(a)*s-rnd(.2,1),life:rnd(.3,.55),max:.55,size:rnd(3,8)});}}
+function carScreenX(d){return 46+(d/TRACK)*(DW-92);}
+function dragLoop(now){if(!race.active)return;const dt=Math.min(.04,(now-lastDrag)/1000);lastDrag=now;const p=race.p,r=race.r,riv=RIVALS[race.rivalIdx];
+  if(race.phase==='tree'&&now>=race.greenAt)race.phase='run';
+  if(race.phase==='run'){const eff=(now<p.penUntil?p.penVal:1)*(p.rpm>=7050&&p.gear<6?.4:1);
+    if(p.launched&&!p.done){const c=carPerf();step(p,c.whp,c.weight,c.grip,dt,eff);
+      p.rpm=clamp(p.v/CIRC*ratios[p.gear-1]*FINAL*60,850,7300);
+      if(p.rpm>=7050&&p.gear<6&&Math.random()<.25)dragPop(false);
+      if(p.d>=TRACK&&!p.done){p.done=true;p.et=(now-race.greenAt)/1000;p.trap=p.v*2.237;dragPop(true);}}
+    if(now>=race.rivalLaunch&&!r.done){step(r,riv.whp,riv.weight,riv.awd?riv.grip:riv.grip,dt,1);
+      if(r.d>=TRACK){r.done=true;r.et=(now-race.greenAt)/1000;r.trap=r.v*2.237;}}
+    if((p.done||p.blown)&&r.done)resolveRace();}
+  // particles
+  for(let i=dragP.length-1;i>=0;i--){const q=dragP[i];q.life-=1/60;q.x+=q.vx;q.y+=q.vy;q.vy+=.05;q.size*=.95;if(q.life<=0)dragP.splice(i,1);}
+  if(Audio.ctx){Audio.setRpm(p.rpm);Audio.setLoad(p.launched&&!p.done?.95:.14);}
+  drawDrag();requestAnimationFrame(dragLoop);}
+function drawMini(ctx,x,y,color,flame){ctx.save();ctx.translate(x,y);
+  if(flame){for(let i=0;i<3;i++){ctx.fillStyle=['#fff6c8','#ffd23f','#ff7a18'][i];ctx.beginPath();ctx.arc(-26-i*5,2,6-i*1.6,0,7);ctx.fill();}}
+  ctx.fillStyle='#000';ctx.globalAlpha=.35;ctx.beginPath();ctx.ellipse(0,16,26,5,0,0,7);ctx.fill();ctx.globalAlpha=1;
+  ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(-24,8);ctx.lineTo(-24,0);ctx.quadraticCurveTo(-14,-14,2,-15);ctx.lineTo(18,-6);ctx.lineTo(26,-4);ctx.lineTo(26,8);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#0c161c';ctx.beginPath();ctx.moveTo(-12,-4);ctx.lineTo(-4,-12);ctx.lineTo(8,-12);ctx.lineTo(14,-5);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#111';[-13,15].forEach(wx=>{ctx.beginPath();ctx.arc(wx,9,7,0,7);ctx.fill();});
+  ctx.fillStyle='#9aa6ae';[-13,15].forEach(wx=>{ctx.beginPath();ctx.arc(wx,9,3,0,7);ctx.fill();});ctx.restore();}
+function drawDrag(){gx.clearRect(0,0,DW,DH);gx.fillStyle='#070d12';gx.fillRect(0,0,DW,DH);
+  // road
+  gx.fillStyle='#10171d';gx.fillRect(30,60,DW-60,160);
+  gx.strokeStyle='#2a3a45';gx.lineWidth=1;gx.beginPath();gx.moveTo(30,140);gx.lineTo(DW-30,140);gx.stroke();
+  // finish line
+  const fx=DW-46;for(let i=0;i<10;i++){gx.fillStyle=i%2?'#0a0d0f':'#d8e2e8';gx.fillRect(fx,62+i*16,8,16);}
+  // tree
+  const el=performance.now()-race.treeStart;const lamp=(yy,on,col)=>{gx.fillStyle=on?col:'#1a2228';gx.beginPath();gx.arc(40,yy,6,0,7);gx.fill();if(on){gx.shadowColor=col;gx.shadowBlur=10;gx.beginPath();gx.arc(40,yy,6,0,7);gx.fill();gx.shadowBlur=0;}};
+  if(race.phase==='tree'||race.phase==='idle'){lamp(28,el>0,'#ffd23f');lamp(44,el>400,'#ffb338');lamp(60,el>900,'#ffb338');lamp(76,el>1400,'#ffb338');lamp(92,el>1900,'#36e07a');}
+  else{lamp(92,true,'#36e07a');}
+  // cars
+  drawMini(gx,carScreenX(race.r.d),95,RIVALS[race.rivalIdx]?RIVALS[race.rivalIdx].color:'#888',false);
+  const onLimiter=race.p.rpm>=7050&&race.p.gear<6;drawMini(gx,carScreenX(race.p.d),175,'#e7232b',onLimiter||(performance.now()<race.p.penUntil));
+  // drag particles
+  for(const q of dragP){const f=q.life/q.max;gx.fillStyle=(f>.6?'rgba(255,246,200,':f>.3?'rgba(255,170,40,':'rgba(214,40,40,')+f+')';gx.beginPath();gx.arc(q.x,q.y,Math.max(.5,q.size),0,7);gx.fill();}
+  // HUD
+  gx.fillStyle='#cfe3ee';gx.font='bold 13px Consolas';
+  gx.fillText('YOU  '+(race.p.gear>0?'G'+race.p.gear:'')+'  '+(race.p.v*2.237|0)+' mph',46,238);
+  gx.fillText((RIVALS[race.rivalIdx]?RIVALS[race.rivalIdx].name:'')+'  '+(race.r.v*2.237|0)+' mph',46,54);
+  // rpm bar (player)
+  const bx=DW-230,by=232,bw=190,bh=12;gx.strokeStyle='#2a3a45';gx.strokeRect(bx,by,bw,bh);
+  const fr=clamp((race.p.rpm-850)/(7050-850),0,1);gx.fillStyle=fr>.9?'#ff4d52':fr>.75?'#ffb338':'#36e07a';gx.fillRect(bx,by,bw*fr,bh);
+  gx.fillStyle='#7d93a3';gx.font='10px Consolas';gx.fillText('SHIFT @ redline',bx,by-3);
+  gx.fillStyle='#36e07a';gx.fillRect(bx+bw*.9,by,bw*.1,bh);}
+function resolveRace(){race.active=false;race.phase='done';$('#btn-stage').disabled=false;if(Audio.ctx){Audio.setLoad(0);Audio.setRpm(850);}const p=race.p,r=race.r,riv=RIVALS[race.rivalIdx];
+  let won=false,head;
+  if(p.foul){head='🚨 RED LIGHT — DISQUALIFIED';dave('foul','worried');}
+  else if(p.blown){head='💀 ENGINE LET GO';DAVE.set('dead','Money-shifted it. That\'s a rebuild.');}
+  else if(p.et&&(!r.et||p.et<r.et)){won=true;head='🏆 WIN! '+p.et.toFixed(2)+'s @ '+Math.round(p.trap)+' mph';}
+  else{head='❌ LOSS — '+ (p.et?p.et.toFixed(2)+'s':'DNF');}
+  if(won){const purse=riv.purse;addCash(purse);G.cred+=Math.round(purse/5);updateMeters();dave('win','rich');
+    Audio.overrun(80,900);if(race.rivalIdx===G.unlocked&&G.unlocked<RIVALS.length-1){G.unlocked++;achieve('Climbing the Ladder');}
+    if(race.rivalIdx===RIVALS.length-1)achieve('King of the Streets');achieve('Won Some Cash');renderLadder();}
+  else if(!p.foul&&!p.blown)dave('lose','worried');
+  const rc=$('#race-result');rc.classList.remove('hidden');
+  rc.innerHTML=`<div class="grade" style="font-size:30px;color:${won?'#36e07a':'#ff4d52'}">${head}</div>
+    <p class="help" style="margin-top:8px">You: ${p.et?p.et.toFixed(2)+'s @ '+Math.round(p.trap)+' mph':'DNF'} &nbsp;·&nbsp; ${riv.name}: ${r.et?r.et.toFixed(2)+'s @ '+Math.round(r.trap)+' mph':'—'}
+    ${won?'<br>💵 +$'+riv.purse+' & +'+Math.round(riv.purse/5)+' cred':''}</p>`;
+  $('#race-state').textContent=won?'Winner winner. Go spend it in the shop.':'Tune up, buy parts, run it back.';}
+$('#btn-stage').addEventListener('click',startRace);
+function raceKey(){if(!race.active)return;const p=race.p,now=performance.now();
+  if(!p.launched){if(now<race.greenAt){p.foul=true;p.launched=true;}else{p.launched=true;}return;}
+  if(race.phase==='run')dragShift();}
+$('#btn-launchshift').addEventListener('click',raceKey);
+
+/* ===== KEYBOARD ===== */
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){if(driveActive){e.preventDefault();if(throttle<1)setThrottle(1);}else if(raceActive){e.preventDefault();raceKey();}}
+  if(driveActive&&/^Digit[1-4]$/.test(e.code)){const i=+e.code.slice(5)-1;if((G.switchPatch||i===0)&&G.slots[i])selectSlot(i,true);}});
+window.addEventListener('keyup',e=>{if(e.code==='Space'&&driveActive){e.preventDefault();setThrottle(0);}});
+
+/* ===== ASK SIMON ===== */
+const SIMON={tick:0};
+function simonInsights(){
+  const t=G.flashed?(G.flashedTune||G.tune):G.tune,res=compute(t),L=[];
+  const nMods=Object.values(G.mods).filter(Boolean).length;
+  const add=(sev,roasts,tips)=>L.push({sev,roast:pick(roasts),tip:pick(tips)});
+  if(!G.connected) add(10,
+    ["You haven't even plugged the cable in. Bold of you to ask me anything.","Step one says 'Connect OBD'. You're at step zero. Inspiring.","I can't roast a car that isn't talking to the laptop. Plug in, genius."],
+    ["Bench tab → ① Connect OBD. The cable goes in the car. Revolutionary.","Follow the little numbers: Connect → Read → Boot Patch → Flash."]);
+  else if(!G.flashed) add(9,
+    ["All that handshaking and not one byte written. Commitment issues?","You're 'unlocked' and bone stock. That's a gym membership you never use.","Read the ECU and then chickened out. A flash has never bricked a car out of fear."],
+    ["Build a map on the Maps tab, then smash ④ FLASH. The ECU won't tune itself.","Finish the sequence — Read → Boot Patch → Flash. Or stay slow. Your call."]);
+  if(res.blown) add(10,
+    ["You turned a perfectly good GTI into modern art. The medium is shrapnel.","That's not a tune, it's a crime scene with a voided warranty.","I've seen E85 do many things. 'Become a flare' is a new one. Congrats."],
+    ["Richen lambda toward 0.80, pull boost & timing, and fit the Intercooler + Port Injection. Then re-flash.","Drop timing 2-3°, add ethanol, buy the FMIC. Then it might survive a Tuesday."]);
+  if(res.KR>3) add(8,
+    [`You're yanking ${res.KR.toFixed(1)}° of knock retard. The engine is literally flinching.`,`${res.KR.toFixed(1)}° of KR — it makes power in spite of you, not because of you.`],
+    ["Drop peak timing 2°, or step up a fuel (93→E30→E85) for headroom. The FMIC helps too.","Less timing or more corn. Pick one before the pistons pick for you."]);
+  if(t.lambda>0.87&&!G.mods.fuel) add(9,
+    [`λ ${t.lambda.toFixed(2)} on stock fueling is how you turn a turbo into a kebab.`,"That mixture is leaner than my patience right now."],
+    ["Richen to ~0.82, or buy Port Injection + LPFP in the Shop to run it lean safely.","Fatten the lambda or fund the fuel system. Lean + boost = the bad kind of bang."]);
+  if(res.egt>980) add(7,
+    [`${Math.round(res.egt)}°C pre-turbo. Your downpipe glows like a mood ring.`,"You could forge steel in that exhaust manifold."],
+    ["Ease the overrun sliders, richen up, or fit the Intercooler. Heat is the enemy.","Trim the pops-and-bangs a touch and add the FMIC — cats prefer not being lava."]);
+  if(res.rel<40&&!res.blown) add(7,
+    [`Reliability ${Math.round(res.rel)}%. One cold morning from a tow truck.`,"That build has the lifespan of a mayfly."],
+    ["Cool it: FMIC, a little less boost, richer lambda. Engines that finish win races.","Buy the Intercooler and ease the boost. A running engine beats a fast paperweight."]);
+  if(res.pop<30) add(6,
+    [`Burble index ${Math.round(res.pop)}? That's not a GTI, it's a sewing machine.`,"Where are the bangs? I came for fireworks and got a polite cough.","Your exhaust is quieter than a library. For shame."],
+    ["Maps tab: crank Overrun Fueling AND Overrun Spark Cut. Bolt on the Catless Downpipe to really wake it.","Load the 'Crackle Monster' preset, slam the bang sliders, add the downpipe."]);
+  if(t.boost>24&&!G.mods.turbo) add(5,
+    [`${t.boost} psi out of the stock IS38? You're flogging a dead snail.`,"You're asking the little turbo for big-turbo numbers. Hear it wheeze?"],
+    ["Buy the Hybrid Turbo (IS38+) — it lifts the whole boost ceiling and adds top-end.","Past ~24 psi the stocker's done. Hybrid turbo, then chase the boost."]);
+  if(G.cash<150) add(5,
+    [`$${G.cash} to your name. Can't afford an air freshener, let alone a turbo.`,"You're broker than a project car on Marketplace."],
+    ["Race tab: beat the Civic for the purse. Even your tune can take a Civic.","Win a 1/4 mile — launch on green, shift at redline, collect."]);
+  if(G.cash>900&&nMods<2) add(4,
+    [`$${G.cash} banked and a near-stock car. Saving for retirement?`,"Hoarding cash like it makes horsepower. It doesn't. Parts do."],
+    ["Shop tab. Downpipe for noise, Intercooler for safety, Hybrid Turbo for power. Spend it.","Stop counting money. The Catless Downpipe alone is worth the trip."]);
+  if(G.karen>80) add(4,
+    ["The whole street has your plate memorized. The Karen meter's basically a countdown.","You're three bangs from a citation and a starring role on someone's Ring cam."],
+    ["Assign a quiet 'Valet' map to a slot and switch to it (keys 1-4) before the cops roll up.","Let the Karen meter cool, or swap to a tame map. Or don't — cred is cred."]);
+  if(G.flashed&&!G.switchPatch) add(3,
+    ["Running one map like it's 2009. Live a little.","No switch patch — so you can't go full valet when the cops appear. Brave."],
+    ["Re-flash with the Switch Patch ON (Bench tab) for 4 stalk maps: valet, daily, and full Crackle Monster.","Flip the switch patch on so you can swap to a quiet map on demand."]);
+  if(res.rel>70&&res.pop>60&&res.whp>320&&res.KR<1) add(2,
+    [`Fine. ${Math.round(res.whp)} whp, ${Math.round(res.rel)}% reliable, and it bangs. I hate that it's good.`,"Annoyingly competent. I was really hoping to roast you harder."],
+    ["Now go take the Rival Shop Mk7's lunch money on the strip.","Sneak a touch more timing if knock allows, then win the top bracket."]);
+  L.sort((a,b)=>b.sev-a.sev);
+  if(!L.length) add(1,
+    ["Eh. It's a car. It moves. Thrilling.","Nothing's actively on fire. Low bar, but you cleared it.","I've seen worse. I've also seen much, much better."],
+    ["Chase power on the dyno, bangs in the maps, cash on the strip. In that order.","Re-flash, run the dyno, tune for an S grade — then make it loud."]);
+  return L;
+}
+function askSimon(){const l=simonInsights(),it=l[SIMON.tick%l.length];SIMON.tick++;
+  $('#simon-roast').textContent=it.roast;$('#simon-tip').innerHTML='💡 '+it.tip;
+  const p=$('#simon-pop');p.classList.remove('hidden');
+  p.animate([{opacity:0,transform:'translateY(10px) scale(.98)'},{opacity:1,transform:'none'}],{duration:160});}
+$('#ask-simon').addEventListener('click',askSimon);
+$('#simon-close').addEventListener('click',()=>$('#simon-pop').classList.add('hidden'));
+
+/* ===== BOOT ===== */
+renderShop();
+(async function(){await log('SimosTools bench — MK7 GTI · Pops & Bangs Edition','vio');
+  await log('Step 1: connect → read → patch. Then build maps & flash.','info',200);
+  await log('Then RACE for cash and SPEND it in the shop. Get loud.','dim',200);})();
+</script>
+</body>
+</html>

@@ -6,30 +6,31 @@ from library.core.utils import pick
 
 
 def build_context(game, tab: str = "") -> dict:
-    tune = game.flashed_tune if game.flashed and game.flashed_tune else game.tune
-    result = compute_tune(tune, game.mods)
-    owned_mods = [name for name, owned in game.mods.items() if owned]
+    car, bro = game.car, game.bro
+    tune = car.flashed_tune if car.flashed and car.flashed_tune else car.tune
+    result = compute_tune(tune, car.mods)
+    owned_mods = [name for name, owned in car.mods.items() if owned]
     return {
-        "connected": game.connected,
-        "read": game.read,
-        "patched": game.patched,
-        "flashed": game.flashed,
-        "switch_patch": game.switch_patch,
-        "dirty": game.dirty,
+        "connected": car.connected,
+        "read": car.read,
+        "patched": car.patched,
+        "flashed": car.flashed,
+        "switch_patch": car.switch_patch,
+        "dirty": car.dirty,
         "tab": tab,
         "tune": tune,
         "result": result,
-        "cash": game.cash,
-        "mods": game.mods,
+        "cash": bro.cash,
+        "mods": car.mods,
         "owned_mods": owned_mods,
         "mod_count": len(owned_mods),
-        "karen": game.karen,
-        "cred": game.cred,
-        "selected_rival": game.selected_rival,
-        "unlocked_rival": game.unlocked_rival,
+        "karen": bro.karen,
+        "cred": bro.cred,
+        "selected_rival": bro.selected_rival,
+        "unlocked_rival": bro.unlocked_rival,
         "race_active": game.race_active(),
-        "grade": game.grade,
-        "active_slot": game.active_slot,
+        "grade": car.grade,
+        "active_slot": car.active_slot,
     }
 
 
