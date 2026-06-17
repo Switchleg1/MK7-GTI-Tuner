@@ -43,6 +43,8 @@ class StreetTask(TaskBase):
             if self._peak_rpm > 1800:
                 self.app.audio.bov()
                 self.app.audio.overrun(self.game.car.active_pop(), 0.9)
+                self.spawn_flames(self.car, self.game.register_pops())  # cred + Karen + flames
+                self.dirty = True  # refresh the cred / Karen readout now
             self._peak_rpm = 0.0
 
     def do_throttle(self):
