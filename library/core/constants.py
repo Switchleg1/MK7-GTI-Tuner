@@ -133,6 +133,7 @@ DYNO_GRID = rgba("#1c2630")
 DATA_DIR = "data"
 MODELS_DIR = "data/models"
 IMAGES_DIR = "data/images"
+AUDIO_DIR = "data/audio"
 
 MODEL_FILES = {
     "ground": "ground.glb",
@@ -155,6 +156,42 @@ IMAGE_FILES = {
     "emoji_pops": "emoji_pops.png",
     "emoji_fire": "emoji_fire.png",
     "emoji_cash": "emoji_cash.png",
+}
+
+# --------------------------------------------------------------------------
+# Audio (procedural .wav synthesized offline by assetgen/asset_audio.py).
+# The engine loop is rendered at engine_base_rpm and pitched in-game with
+# setPlayRate; pops/bangs are one-shots played from a pool so bursts overlap.
+# --------------------------------------------------------------------------
+SOUND_FILES = {
+    "engine": "engine_loop.wav",
+    "intake": "intake_loop.wav",
+    "turbo": "turbo_loop.wav",
+    "pop_1": "pop_1.wav",
+    "pop_2": "pop_2.wav",
+    "pop_3": "pop_3.wav",
+    "bang_1": "bang_1.wav",
+    "bang_2": "bang_2.wav",
+    "bang_3": "bang_3.wav",
+    "bov": "bov.wav",
+}
+
+AUDIO = {
+    "engine_base_rpm": 3000.0,   # rpm the engine_loop.wav is rendered at (rate 1.0)
+    "engine_volume": 0.55,       # master gain for the engine note at full load
+    "intake_volume": 0.35,       # induction roar, scaled by load^2
+    "turbo_volume": 0.22,        # spool whistle, scaled by spool*load
+    "pop_volume": 0.30,          # base one-shot gain for a pop
+    "bang_volume": 0.52,         # base one-shot gain for a bang
+    "bov_volume": 0.40,          # blow-off "pshhh"
+    "idle_load": 0.12,           # engine load floor when idling
+    "pull_load": 0.95,           # engine load on a WOT dyno pull / launch
+    "pool_size": 4,              # overlapping instances loaded per one-shot file
+    "concurrent_limit": 32,      # max simultaneous sounds (pops stack up)
+    "rate_min": 0.35,            # clamp for engine playRate (idle)
+    "rate_max": 3.2,             # clamp for engine playRate (redline)
+    "overrun_min_rpm": 3000,     # below this a throttle lift won't crackle
+    "overrun_count": 24,         # max pops/bangs in a full-intensity burst
 }
 
 # --------------------------------------------------------------------------

@@ -6,6 +6,7 @@ from panda3d.core import AmbientLight, DirectionalLight, Filename, PerspectiveLe
 
 from direct.showbase.ShowBase import ShowBase
 
+from library.core.audio import GameAudio
 from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, WINDOW_TITLE
 from library.core.panda_config import enable_gltf
 from library.game.game import Game
@@ -44,6 +45,7 @@ class MK7Tuner3D(ShowBase):
         enable_gltf(self)
         self.setup_lights()
         self.mono_font = self.load_mono_font()
+        self.audio = GameAudio(self)
         self.game = Game()
         self.stage = None
         self.accept("escape", sys.exit)

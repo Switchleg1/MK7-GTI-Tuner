@@ -47,6 +47,9 @@ class TaskBase(Hud):
 
     def exit(self):
         self.app.taskMgr.remove(self._tick_name)
+        audio = getattr(self.app, "audio", None)
+        if audio:
+            audio.silence()  # stop the engine note from droning into the next stage
         if self.simon:
             self.simon.destroy()
         self.scene.removeNode()

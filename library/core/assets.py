@@ -5,7 +5,7 @@ import sys
 
 from panda3d.core import Filename, NodePath
 
-from library.core.constants import IMAGE_FILES, IMAGES_DIR, MODEL_FILES, MODELS_DIR
+from library.core.constants import AUDIO_DIR, IMAGE_FILES, IMAGES_DIR, MODEL_FILES, MODELS_DIR, SOUND_FILES
 
 
 def data_root() -> str:
@@ -36,3 +36,8 @@ def load_model(key: str) -> NodePath:
 def image_path(key: str) -> str:
     """Panda-style path string for a generated .png (OnscreenImage/TexturePool)."""
     return str(Filename.fromOsSpecific(_abs(os.path.join(IMAGES_DIR, IMAGE_FILES[key]))))
+
+
+def sound_path(key: str) -> str:
+    """Panda-style path string for a generated .wav in constants.SOUND_FILES."""
+    return str(Filename.fromOsSpecific(_abs(os.path.join(AUDIO_DIR, SOUND_FILES[key]))))

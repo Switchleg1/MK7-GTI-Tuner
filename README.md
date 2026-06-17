@@ -32,8 +32,10 @@ Models and images are committed under `data/`, but you can rebuild them any time
 python -m library.assetgen.generate_assets
 ```
 
-This writes `data/models/*.glb` and `data/images/*.png`. All geometry is built
-procedurally in Panda's Z-up convention and loaded with `skip_axis_conversion=True`.
+This writes `data/models/*.glb`, `data/images/*.png`, and `data/audio/*.wav`. All
+geometry is built procedurally in Panda's Z-up convention and loaded with
+`skip_axis_conversion=True`; the sound effects are synthesized with the standard
+library (no extra deps) by `library/assetgen/asset_audio.py`.
 
 ## Build a standalone .exe (Windows)
 
@@ -72,6 +74,7 @@ or the project root when run from source (see `library/core/assets.py`).
 data/
   models/   ground.glb car.glb character.glb phone.glb obd.glb   (.glb, glTF binary)
   images/   phone_wallpaper.png simostools_icon.png flash_complete.png logo.png
+  audio/    engine_loop.wav intake_loop.wav turbo_loop.wav pop_*.wav bang_*.wav bov.wav
 ```
 
 Standard formats for now; a packed custom format may come later.

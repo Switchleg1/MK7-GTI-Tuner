@@ -4,6 +4,7 @@ from panda3d.core import LineSegs, TextNode
 
 from library.core.constants import (
     AMBER,
+    AUDIO,
     DIM,
     DYNO_GAUGES,
     DYNO_GRID,
@@ -66,9 +67,11 @@ class DynoTask(TaskBase):
 
     def tick(self, dt):
         if not self.running:
+            self.app.audio.idle()
             return
         self.pull_t += dt / DYNO_PULL_SECONDS
-        if self.pull_t >= 1.0:
+        finished = self.pull_t >= 1.0
+        if finished:
             self.pull_t = 1.0
             self.running = False
             self.game.log(*self.game.car.record_dyno(self.result))
@@ -77,6 +80,10 @@ class DynoTask(TaskBase):
         self.spin += dt * 1700
         for wheel in self.wheels:
             wheel.setP(self.spin)
+        self.app.audio.set_engine(self.values["rpm"], AUDIO["pull_load"])
+        if finished:  # lift off at redline -> overrun crackle
+            self.app.audio.bov()
+            self.app.audio.overrun(self.game.car.active_pop(), 1.1)
         self._draw_graph()
 
     def _sample(self):

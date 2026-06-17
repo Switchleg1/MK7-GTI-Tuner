@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from library.core import assets
-from library.core.constants import BLUE, GREEN_2, TEXT, TRACK_M
+from library.core.constants import AUDIO, BLUE, FINAL_DRIVE, GEAR_RATIOS, GREEN_2, TEXT, TIRE_CIRC, TRACK_M
+from library.core.utils import clamp
 from library.stages.task_base import TaskBase
 
 STRIP_LENGTH = 28.0  # scene units the quarter mile maps onto
@@ -30,8 +31,15 @@ class RaceTask(TaskBase):
     def tick(self, dt):
         if self.game.race_active():
             self.game.step_race(dt)
-            self._place(self.player_car, -2.2, self.game.race["p"]["d"])
+            player = self.game.race["p"]
+            self._place(self.player_car, -2.2, player["d"])
             self._place(self.rival_car, 2.2, self.game.race["r"]["d"])
+            gear = min(max(player["gear"], 1), len(GEAR_RATIOS))
+            rpm = clamp(player["v"] / TIRE_CIRC * GEAR_RATIOS[gear - 1] * FINAL_DRIVE * 60, 850, 7200)
+            load = AUDIO["pull_load"] if player["launched"] and not player["done"] else 0.2
+            self.app.audio.set_engine(rpm, load)
+        else:
+            self.app.audio.idle(900)
 
     def bind_keys(self):
         self.accept("space", self.do_key)
@@ -40,6 +48,9 @@ class RaceTask(TaskBase):
         event = self.game.race_key()
         if event in ("launch", "shift"):
             self.spawn_flames(self.player_car, 2)
+        if event == "shift":  # bang + a quick crackle on each upshift
+            self.app.audio.bang()
+            self.app.audio.overrun(28, 0.3)
         self.dirty = True
 
     def build_ui(self, left, right):

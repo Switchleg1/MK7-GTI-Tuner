@@ -27,14 +27,14 @@ the root. Assets stay at the root in `data/`.
 ```
 mk7_gti_tuner.py            entry point
 library/
-  core/      constants.py utils.py panda_config.py assets.py
+  core/      constants.py utils.py panda_config.py assets.py audio.py
   game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
              geometry.py tuning.py simos.py
   stages/    hud.py task_base.py garage_stage.py simon_panel.py
              unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
-data/        models/*.glb  images/*.png
+data/        models/*.glb  images/*.png  audio/*.wav
 ```
 
 Modules import each other by absolute path (`from library.<sub>.<mod> import …`).
@@ -52,6 +52,11 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   camera/placements, phase prompts, flash-step / ECU-readout / character-pose tables,
   and the mode list. The single source of tunable values.
 - `utils.py` — `clamp`, `pick`, `rgba`.
+- `audio.py` — `GameAudio`: the runtime sound service on the shell. A looping engine
+  note (+ intake roar + turbo whistle) pitched by RPM via `setPlayRate` and leveled by
+  throttle load, plus pooled pop/bang/blow-off one-shots so overrun bursts overlap.
+  No-ops if Panda has no audio backend; tasks drive it via `app.audio` and it is
+  silenced on `TaskBase.exit()`. Sounds resolve via `assets.sound_path(key)`.
 
 ### `library/stages` — navigation + shared widgets
 - `hud.py` — `Hud(DirectObject)`: a tracked node tree under `aspect2d` plus the draw
@@ -85,6 +90,9 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `asset_images.py` — PNG generation via Panda's `PNMImage` (no PIL): phone
   wallpaper, app icon, completion check, logo, the Simon face/panel/pill, and the
   emoji HUD icons (cred / Karen faces, pops burst, fire, cash).
+- `asset_audio.py` — WAV synthesis with the standard library (no numpy): a seamless
+  harmonic engine loop (+ tanh grit), an intake-noise loop, a turbo whistle, and short
+  pop / bang / blow-off one-shots. Deterministic (seeded); writes `data/audio/*.wav`.
 - `generate_assets.py` — orchestrator that writes everything into `data/`
   (run via `python -m library.assetgen.generate_assets`).
 
@@ -128,8 +136,9 @@ unit, green fill + red danger band, from `constants.DYNO_GAUGES`) and a live pow
 
 ## Packaging (PyInstaller)
 
-`build.bat` builds a one-file windowed exe with
-`--add-data "data;data"` so the generated models/images ship inside the bundle.
+`build.bat` builds a one-file windowed exe with `--add-data "data;data"` so the
+generated models/images/audio ship inside the bundle, and `--collect-all panda3d`
+pulls in the OpenAL audio plugin so sound works in the frozen build.
 At runtime `assets.data_root()` returns `sys._MEIPASS` when frozen (where the
 bundled `data/` is extracted) and the project root otherwise — so the same code
 path works from source and from the exe. The committed `.spec` mirrors this

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import time
 
-from library.core.constants import AMBER, DIM, GREEN, GREEN_2, PANEL, RED, TEXT
+from library.core.constants import AMBER, AUDIO, DIM, GREEN, GREEN_2, PANEL, RED, TEXT
 from library.core.utils import clamp
 from library.stages.task_base import TaskBase
 
@@ -21,6 +21,7 @@ class StreetTask(TaskBase):
         self.wheels = list(self.car.findAllMatches("**/tire_*")) + list(self.car.findAllMatches("**/rim_*"))
         self.rpm = 850.0
         self.throttle = 0.0
+        self.prev_throttle = 0.0
         self.spin = 0.0
 
     def bind_keys(self):
@@ -33,6 +34,12 @@ class StreetTask(TaskBase):
         for wheel in self.wheels:
             wheel.setP(self.spin)
         self.car.setH(math.sin(time.perf_counter() * 1.3) * 1.3)
+        self.app.audio.set_engine(self.rpm, 0.12 + 0.88 * self.throttle)
+        # Lifting off the throttle at speed is where the overrun crackle lives.
+        if self.prev_throttle > 0.25 and self.throttle <= 0.06 and self.rpm > AUDIO["overrun_min_rpm"]:
+            self.app.audio.bov()
+            self.app.audio.overrun(self.game.car.active_pop(), 0.9)
+        self.prev_throttle = self.throttle
 
     def do_throttle(self):
         if not self.game.car.flashed:
@@ -45,6 +52,8 @@ class StreetTask(TaskBase):
             return
         count = self.game.register_pops()
         self.spawn_flames(self.car, count)
+        self.app.audio.bov()
+        self.app.audio.overrun(self.game.car.active_pop(), 1.0)
         self.dirty = True
 
     def build_ui(self, left, right):
