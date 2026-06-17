@@ -92,12 +92,18 @@ class MK7Tuner3D(ShowBase):
     def start_unlock(self):
         # UnlockStage self-manages its own cleanup before calling on_complete.
         self.stage = None
-        self.unlock = UnlockStage(self, on_complete=self.enter_hub)
+        self.unlock = UnlockStage(self, on_complete=self.on_unlocked)
+
+    def on_unlocked(self):
+        # Runs once, when the cinematic finishes: the ECU is now flashed/unlocked.
+        # Kept OUT of enter_hub so returning to the hub from a task doesn't re-run
+        # mark_unlocked() and wipe the player's flashed tune + switch-patch slots.
+        self.game.car.mark_unlocked()
+        if self.game.unlock("first_flash", "Boot Patched, Baby"):
+            self.game.dave("flash")
+        self.enter_hub()
 
     def enter_hub(self):
-        self.game.car.mark_unlocked()
-        if self.game.unlock("first_flash", "Boot Patched, Baby"):  # once, after the cinematic
-            self.game.dave("flash")
         self.set_stage(GarageStage(self, self.game, on_pick=self.open_task))
 
     def open_task(self, key: str):
