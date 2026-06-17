@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import time
 
+from panda3d.core import TextNode
+
 from library.core import assets
 from library.core.constants import AMBER, AUDIO, BLUE, DIM, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, RED, TEXT, TIRE_CIRC, TRACK_M
 from library.core.utils import clamp
@@ -90,21 +92,22 @@ class RaceTask(TaskBase):
                 f"Rival ran {rival['et']:.2f}s. Tune up or buy parts, then run it back.")
 
     def build_ui(self, left, right):
+        # No full-screen panels here: the 3D cars race up the centre of the screen,
+        # so the UI hugs the edges (status top-left, ladder top-right, buttons low)
+        # and leaves the middle clear instead of covering the strip.
         game = self.game
-        lbox, rbox = self.panel_pair(left, right)
-        self.label("QUARTER MILE", (lbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
         text, color, hint = self._race_status()
-        self.status = self.label(text, (lbox[0] + 0.05, 0, 0.25), 0.050, color, wordwrap=24)
-        self.hint = self.label(hint, (lbox[0] + 0.05, 0, 0.11), 0.030, DIM, wordwrap=34)
+        self.status = self.label(text, (left + 0.05, 0, 0.54), 0.052, color, wordwrap=20)
+        self.hint = self.label(hint, (left + 0.05, 0, 0.43), 0.030, DIM, wordwrap=28)
         staged = game.race_active()
         launching = (not staged) or not game.race["p"]["launched"]
-        self.button("Stage & Race", (lbox[0] + 0.30, 0, -0.14), (0.44, 0.11),
+        self.button("Stage & Race", (-0.34, 0, -0.80), (0.42, 0.10),
                     self.bind(game.start_race), game.car.flashed and not staged, GREEN_2)
-        self.button(("Launch" if launching else "Shift") + " (SPACE)", (lbox[0] + 0.30, 0, -0.34),
-                    (0.44, 0.11), self.do_key, staged)
-        self.label("SKREETS LADDER", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
+        self.button(("Launch" if launching else "Shift") + " (SPACE)", (0.34, 0, -0.80),
+                    (0.42, 0.10), self.do_key, staged)
+        self.label("SKREETS LADDER", (right - 0.05, 0, 0.54), 0.032, BLUE, align=TextNode.ARight)
         for index, rival in enumerate(game.rivals):
             sel = index == game.bro.selected_rival
-            self.button(f"{rival.name}  ${rival.purse}", (rbox[0] + 0.45, 0, 0.27 - index * 0.10), (0.80, 0.08),
+            self.button(f"{rival.name}  ${rival.purse}", (right - 0.42, 0, 0.44 - index * 0.095), (0.74, 0.078),
                         self.bind(game.select_rival, index), index <= game.bro.unlocked_rival,
-                        GREEN_2 if sel else None, 0.034)
+                        GREEN_2 if sel else None, 0.030)
