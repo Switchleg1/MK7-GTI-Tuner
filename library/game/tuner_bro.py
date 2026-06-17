@@ -19,6 +19,7 @@ class TunerBro:
         self.simon_tick = 0
         self.selected_rival = 0
         self.unlocked_rival = 0
+        self.unlocked_maps: list[str] = []  # community map keys earned via Discord
 
     def rep(self) -> str:
         return rep_title(self.cred)
@@ -35,14 +36,24 @@ class TunerBro:
     def earn(self, amount: float):
         self.cash += amount
 
+    def pay_repair(self, amount: float):
+        """Forced spend (broken parts) -- never goes below zero."""
+        self.cash = max(0, self.cash - amount)
+
     def add_cred(self, amount: float):
-        self.cred += amount
+        self.cred = max(0.0, self.cred + amount)  # losing clients can't go below zero
 
     def add_heat(self, amount: float):
         self.karen = clamp(self.karen + amount, 0, 100)
 
+    def unlock_map(self, key: str) -> bool:
+        if key in self.unlocked_maps:
+            return False
+        self.unlocked_maps.append(key)
+        return True
+
     def to_dict(self) -> dict:
-        return {k: getattr(self, k) for k in ("name", "cash", "cred", "karen", "simon_tick", "selected_rival", "unlocked_rival")}
+        return {k: getattr(self, k) for k in ("name", "cash", "cred", "karen", "simon_tick", "selected_rival", "unlocked_rival", "unlocked_maps")}
 
     def from_dict(self, data: dict):
         for key, value in data.items():

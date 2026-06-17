@@ -4,10 +4,13 @@ from direct.gui import DirectGuiGlobals as DGG
 from direct.gui.DirectGui import DirectButton, DirectFrame, DirectLabel, DirectSlider
 from direct.gui.OnscreenImage import OnscreenImage
 from direct.showbase.DirectObject import DirectObject
-from panda3d.core import TextNode, TransparencyAttrib, Vec4
+from panda3d.core import TextNode, TransparencyAttrib
 
 from library.core import assets
-from library.core.constants import DIM, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, TEXT, VIOLET, WHITE
+from library.core.constants import (
+    BOX_LINE, BTN_DISABLED_FILL, BTN_DISABLED_TEXT, BTN_LINE, DIM, GREEN, GREEN_2,
+    LINE, PANEL, PANEL_DARK, TEXT, VIOLET, WHITE,
+)
 
 
 class Hud(DirectObject):
@@ -41,19 +44,29 @@ class Hud(DirectObject):
         self.nodes.append(node)
         return node
 
-    def frame(self, frame_size, pos=(0, 0, 0), color=PANEL, border=LINE):
-        node = DirectFrame(parent=self.root, frameSize=frame_size, frameColor=color, pos=pos, relief=DGG.FLAT)
+    def _glass(self, parent, frame_size, color, texture="ui_box"):
+        """A translucent rounded rectangle (ui_box) or its outline (ui_ring),
+        tinted by ``color``. The texture supplies the rounded alpha shape."""
+        node = DirectFrame(parent=parent, frameSize=frame_size, frameColor=color, relief=DGG.FLAT, frameTexture=assets.image_path(texture))
+        node.setTransparency(TransparencyAttrib.MAlpha)
+        return node
+
+    def frame(self, frame_size, pos=(0, 0, 0), color=PANEL, border=BOX_LINE):
+        node = self._glass(self.root, frame_size, color)
+        node.setPos(*pos)
         self.nodes.append(node)
         if border:
-            outline = DirectFrame(parent=node, frameSize=frame_size, frameColor=border, relief=DGG.RIDGE, borderWidth=(0.006, 0.006))
-            self.nodes.append(outline)
+            self._glass(node, frame_size, border, texture="ui_ring")  # child: freed with node
         return node
 
     def button(self, text, pos, size, command, enabled=True, color=None, text_scale=0.044):
         width, height = size
-        fill = color or (GREEN_2 if enabled else Vec4(0.05, 0.08, 0.10, 0.92))
-        fg = WHITE if enabled else Vec4(0.32, 0.39, 0.43, 1)
-        node = DirectButton(parent=self.root, text=text, command=command if (enabled and command) else None, pos=pos, scale=1, text_scale=text_scale, text_fg=fg, text_align=TextNode.ACenter, text_font=self.font, frameSize=(-width / 2, width / 2, -height / 2, height / 2), frameColor=fill, relief=DGG.FLAT, pressEffect=0)
+        fill = color or (GREEN_2 if enabled else BTN_DISABLED_FILL)
+        fg = WHITE if enabled else BTN_DISABLED_TEXT
+        fs = (-width / 2, width / 2, -height / 2, height / 2)
+        node = DirectButton(parent=self.root, text=text, command=command if (enabled and command) else None, pos=pos, scale=1, text_scale=text_scale, text_fg=fg, text_align=TextNode.ACenter, text_font=self.font, frameSize=fs, frameColor=fill, relief=DGG.FLAT, frameTexture=assets.image_path("ui_box"), pressEffect=0)
+        node.setTransparency(TransparencyAttrib.MAlpha)
+        self._glass(node, fs, BTN_LINE if enabled else LINE, texture="ui_ring")  # rounded border
         self.nodes.append(node)
         return node
 
@@ -64,13 +77,18 @@ class Hud(DirectObject):
         return node
 
     def slider(self, pos, value_range, value, width=0.5, command=None):
-        """A tracked horizontal DirectSlider. Set ``command`` after building all
-        sliders (or pass it here) -- it fires with no args; read ``node['value']``."""
+        """A tracked horizontal DirectSlider with a round knob thumb (knob.png) on
+        a rounded translucent track. Set ``command`` after building all sliders (or
+        pass it here) -- it fires with no args; read ``node['value']``."""
+        box = assets.image_path("ui_box")
         node = DirectSlider(
             parent=self.root, pos=pos, scale=1, range=value_range, value=value, command=command,
-            frameColor=PANEL_DARK, frameSize=(-width / 2, width / 2, -0.018, 0.018), relief=DGG.FLAT,
-            thumb_frameColor=GREEN, thumb_frameSize=(-0.02, 0.02, -0.034, 0.034), thumb_relief=DGG.FLAT,
+            frameColor=PANEL_DARK, frameSize=(-width / 2, width / 2, -0.016, 0.016), relief=DGG.FLAT, frameTexture=box,
+            thumb_frameColor=(1, 1, 1, 1), thumb_frameSize=(-0.032, 0.032, -0.032, 0.032),
+            thumb_relief=DGG.FLAT, thumb_frameTexture=assets.image_path("knob"),
         )
+        node.setTransparency(TransparencyAttrib.MAlpha)
+        node.thumb.setTransparency(TransparencyAttrib.MAlpha)
         self.nodes.append(node)
         return node
 

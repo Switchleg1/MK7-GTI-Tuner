@@ -7,6 +7,7 @@ from library.core.constants import MAX_LOG_LINES, MODS, TRACK_M
 from library.core.utils import pick
 from library.game.car import Car
 from library.game.car_library import CarLibrary
+from library.game.discord import Discord
 from library.game.rival_green_name import RivalGreenName
 from library.game.tuner_bro import TunerBro
 
@@ -35,6 +36,7 @@ class Game:
         self.bro = TunerBro()
         self.rivals = RivalGreenName.ladder()
         self.cars = CarLibrary()
+        self.discord = Discord()
         self.logs: list[tuple[str, str]] = []
         self.race = None
         self.simon_tick = 0  # rotates Simon through his ranked insights
@@ -133,6 +135,31 @@ class Game:
         elif random.random() < 0.18:
             self.dave("bigbang")
         return max(4, round(pop / 10))
+
+    # -- discord -----------------------------------------------------------
+    def ask_discord(self, text: str) -> dict:
+        """Submit a #help request: the Discord resolves it (text + who's online +
+        chance), then we apply the outcome to the bro/car and log it. Returns the
+        outcome so the panel can show the replies."""
+        ctx = {"cred": self.bro.cred, "unlocked_maps": list(self.bro.unlocked_maps)}
+        outcome = self.discord.resolve(text, ctx)
+        self._apply_discord(outcome)
+        return outcome
+
+    def _apply_discord(self, outcome: dict):
+        effect, amount = outcome["effect"], outcome["amount"]
+        if effect == "cash":
+            self.bro.earn(amount)
+        elif effect == "cred":
+            self.bro.add_cred(amount)
+        elif effect == "map":
+            self.bro.unlock_map(outcome["map_key"])
+            self.unlock("community_map", "Community Map Plug")
+        elif effect == "part":
+            self.bro.pay_repair(amount)
+        elif effect == "clients":
+            self.bro.add_cred(-amount)
+        self.log(outcome["summary"], "ok" if outcome["kind"] == "good" else "warn")
 
     # -- race --------------------------------------------------------------
     def race_active(self) -> bool:

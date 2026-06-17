@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import AMBER, BLUE, DIM, GREEN_2, TEXT
+from library.core.constants import AMBER, BLUE, COMMUNITY_MAPS, DIM, GREEN, GREEN_2, TEXT
 from library.game.tuning import pop_score
 from library.stages.task_base import TaskBase
 
@@ -47,7 +47,14 @@ class MapsTask(TaskBase):
             self.button(pname, (lbox[0] + 0.21 + index * 0.30, 0, z), (0.27, 0.085),
                         self.bind(self.game.apply_preset, pkey))
         self.lbl_dirty = self.label("Flash required for changed tune." if car.dirty else "",
-                                    (lbox[0] + 0.06, 0, z - 0.16), 0.030, AMBER)
+                                    (lbox[0] + 0.06, 0, z - 0.13), 0.030, AMBER)
+        maps = self.game.bro.unlocked_maps
+        if maps:
+            cz = z - 0.24
+            self.label("COMMUNITY MAPS (via Discord)", (lbox[0] + 0.06, 0, cz + 0.05), 0.026, GREEN)
+            for index, key in enumerate(maps[:3]):
+                self.button(COMMUNITY_MAPS[key]["name"], (lbox[0] + 0.40, 0, cz - index * 0.082), (0.74, 0.072),
+                            self.bind(self.game.apply_preset, key))
 
         # -- right panel: pops & bangs + switch slots --------------------
         self.label("POPS & BANGS", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)

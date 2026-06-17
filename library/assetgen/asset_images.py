@@ -68,6 +68,13 @@ def _downscale(big, size):
     return out
 
 
+def _downscale_to(big, w, h):
+    out = PNMImage(w, h)
+    out.addAlpha()
+    out.quickFilterFrom(big)
+    return out
+
+
 def _simon(path):
     """Skeptical 'clippy'-style face: round orange head, one raised eyebrow."""
     size, scale = 256, 3
@@ -211,6 +218,56 @@ def _emoji_cash(path):
     _downscale(big, size).write(Filename.fromOsSpecific(path))
 
 
+def _ui_box(path):
+    """Solid white rounded rectangle, anti-aliased. Tinted via frameColor at
+    runtime to make every translucent glass panel / button fill."""
+    w = h = 256
+    ss = 3
+    big = _new(w * ss, h * ss, (0, 0, 0, 0))
+    _rounded_rect(big, 0, 0, w * ss, h * ss, int(26 * ss), (1, 1, 1, 1))
+    _downscale_to(big, w, h).write(Filename.fromOsSpecific(path))
+
+
+def _ui_ring(path):
+    """White rounded-rectangle outline (transparent centre). Tinted to a colour
+    it becomes the rounded border drawn over a ui_box fill."""
+    w = h = 256
+    ss = 3
+    big = _new(w * ss, h * ss, (0, 0, 0, 0))
+    r = int(26 * ss)
+    _rounded_rect(big, 0, 0, w * ss, h * ss, r, (1, 1, 1, 1))
+    bw = int(9 * ss)
+    _rounded_rect(big, bw, bw, w * ss - bw, h * ss - bw, max(2, r - bw), (0, 0, 0, 0))
+    _downscale_to(big, w, h).write(Filename.fromOsSpecific(path))
+
+
+def _knob(path):
+    """Round slider thumb: shaded disc with a rim and a highlight. Placeholder
+    chrome -- intentionally simple so it's easy to redraw later."""
+    size, scale = 96, 3
+    s = size * scale
+    big = _new(s, s, (0, 0, 0, 0))
+    cx = cy = s // 2
+    _disc(big, cx, cy, int(s * 0.46), (0.16, 0.22, 0.27, 1.0))           # dark rim
+    _radial_disc(big, cx, cy, int(s * 0.40), (0.93, 0.97, 1.0), (0.55, 0.66, 0.74))
+    _disc(big, cx - int(s * 0.10), cy - int(s * 0.10), int(s * 0.09), (1.0, 1.0, 1.0, 0.55))  # highlight
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
+def _avatar(path):
+    """Default round avatar (light disc + head/shoulders silhouette). Tinted per
+    user with setColorScale so the roster reads as distinct faces."""
+    size, scale = 96, 3
+    s = size * scale
+    big = _new(s, s, (0, 0, 0, 0))
+    cx, cy = s // 2, s // 2
+    _disc(big, cx, cy, int(s * 0.47), (0.80, 0.84, 0.88, 1.0))
+    body = (0.42, 0.47, 0.52, 1.0)
+    _disc(big, cx, int(s * 0.40), int(s * 0.17), body)                    # head
+    _ellipse(big, cx, int(s * 0.82), int(s * 0.30), int(s * 0.24), body)  # shoulders
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
 def _wallpaper(path):
     w, h = 480, 960
     img = _new(w, h, (0.04, 0.07, 0.09, 1))
@@ -277,6 +334,10 @@ def build(out_dir: str) -> list[str]:
         "emoji_pops": _emoji_pops,
         "emoji_fire": _emoji_fire,
         "emoji_cash": _emoji_cash,
+        "ui_box": _ui_box,
+        "ui_ring": _ui_ring,
+        "knob": _knob,
+        "avatar": _avatar,
     }
     written = []
     for key, fn in builders.items():

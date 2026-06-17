@@ -56,17 +56,27 @@ or the project root when run from source (see `library/core/assets.py`).
       (VIN, ECU, software, calibration, flash size…) streams onto the screen.
    4. He celebrates → **Continue**.
 2. **Garage hub.** The GTI sits in the bay; click a task button to enter a task:
-   - **TUNE** — boost/timing/fuel presets and switch-patch map slots.
+   - **TUNE** — boost/timing/fuel presets, switch-patch map slots, and any
+     community maps you've earned from Discord.
    - **DYNO** — strap it down, run a pull, get a graded result.
-   - **STREET** — blip the throttle and preview pops for cred (mind the Karen meter).
+   - **STREET** — hold the throttle and preview pops for cred (mind the Karen meter).
    - **RACE** — quarter-mile vs the street ladder.
    - **SHOP** — spend winnings on mods. **BENCH** — re-flash the current tune.
 3. Each task has a **Back** button (bottom-left) that returns you to the garage hub.
+4. **Ask Discord** (pill, any task). Opens the *MQB Vibe Coders* chat window — a
+   server rail, the channel list, the `#ecu-tuning` thread, and a member list where
+   only a fraction of the roster is online at a time. **Type a help request and press
+   Enter**: the text (mention a datalog!), who's online, and a dice roll decide the
+   outcome — cash, a free community map, or clout if it goes well; a broken part
+   (costs cash) or lost clients (costs clout) if it doesn't. Admins help, green names
+   want money, and the troll will gladly ruin your day.
 
 ### Controls
 
-- **Mouse** — click task buttons, in-task buttons, Back, and the phone.
-- **Space** — throttle (Street) / launch & shift (Race). **Esc** — quit.
+- **Mouse** — click task buttons, in-task buttons, Back, the phone, and Discord.
+- **Space** — **hold** to keep the throttle pinned on Street (release to crackle);
+  launch & shift on Race. **Type + Enter** in the Discord box to ask for help.
+  **Esc** — quit.
 
 ## Data layout
 
@@ -74,6 +84,7 @@ or the project root when run from source (see `library/core/assets.py`).
 data/
   models/   ground.glb car.glb character.glb phone.glb obd.glb   (.glb, glTF binary)
   images/   phone_wallpaper.png simostools_icon.png flash_complete.png logo.png
+            simon*.png emoji_*.png ui_box.png ui_ring.png knob.png avatar.png
   audio/    engine_loop.wav intake_loop.wav turbo_loop.wav pop_*.wav bang_*.wav bov.wav
 ```
 

@@ -23,14 +23,20 @@ class StreetTask(TaskBase):
         self.rpm = 850.0
         self.throttle = 0.0
         self.spin = 0.0
+        self._held = False
         self._lift_armed = False
         self._peak_rpm = 0.0
 
     def bind_keys(self):
-        self.accept("space", self.do_throttle)
+        # Hold Space to hold the throttle wide open; release to lift and crackle.
+        self.accept("space", self.hold_throttle)
+        self.accept("space-up", self.release_throttle)
 
     def tick(self, dt):
-        self.throttle = max(0.0, self.throttle - dt * 1.6)
+        if self._held:
+            self.throttle = 1.0
+        else:
+            self.throttle = max(0.0, self.throttle - dt * 1.6)
         self.rpm += (850 + self.throttle * 6200 - self.rpm) * clamp(dt * 5, 0, 1)
         self.spin += dt * (4 + self.rpm / 220) * 40
         for wheel in self.wheels:
@@ -49,7 +55,20 @@ class StreetTask(TaskBase):
                 self.dirty = True  # refresh the cred / Karen readout now
             self._peak_rpm = 0.0
 
+    def hold_throttle(self):
+        """Space pressed: peg the throttle open and arm the lift-off crackle."""
+        if not self.game.car.flashed or self._held:
+            return
+        self._held = True
+        self._lift_armed = True
+        self.spawn_flames(self.car, 3)
+
+    def release_throttle(self):
+        """Space released: let the revs fall -- tick() fires the overrun pops."""
+        self._held = False
+
     def do_throttle(self):
+        """Throttle button = a quick blip (Space is the hold)."""
         if not self.game.car.flashed:
             return
         self.throttle = 1.0
@@ -95,6 +114,7 @@ class StreetTask(TaskBase):
         self.frame((bar_x, bar_x + bar_w, -0.075, -0.05), color=PANEL, border=None)
         fill = bar_w * clamp(bro.karen / 100, 0, 1)
         self.frame((bar_x, bar_x + max(0.001, fill), -0.075, -0.05), color=RED, border=None)
-        self.button("Throttle", (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, self.game.car.flashed, GREEN_2)
+        label = "Throttle [HELD]" if self._held else "Throttle"
+        self.button(label, (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, self.game.car.flashed, GREEN if self._held else GREEN_2)
         self.button("Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, self.game.car.flashed)
-        self.label("Tap Throttle (Space) and Preview Pops for cred - but the Karen meter is watching.", (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)
+        self.label("Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.", (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)
