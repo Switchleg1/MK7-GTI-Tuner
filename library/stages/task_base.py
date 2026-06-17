@@ -10,6 +10,7 @@ from panda3d.core import ClockObject, TextNode, TransparencyAttrib, Vec3, Vec4
 from library.core import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS
 from library.game.geometry import make_box
+from library.stages.discord_panel import DiscordPanel
 from library.stages.hud import Hud
 from library.stages.simon_panel import SimonPanel
 
@@ -32,6 +33,7 @@ class TaskBase(Hud):
         self.on_back = on_back
         self.scene = app.render.attachNewNode(f"scene-{self.key}")
         self.simon = None
+        self.discord = None
         self.dirty = True
         self.last_draw = 0.0
         self.flames = []
@@ -43,6 +45,7 @@ class TaskBase(Hud):
         self.set_camera()
         self.build_scene()
         self.simon = SimonPanel(self.app, self.game, self.key)
+        self.discord = DiscordPanel(self.app, self.game, self.key)
         self.redraw()
         self.bind_keys()
         self.app.taskMgr.add(self._update, self._tick_name)
@@ -54,6 +57,8 @@ class TaskBase(Hud):
             audio.silence()  # stop the engine note from droning into the next stage
         if self.simon:
             self.simon.destroy()
+        if self.discord:
+            self.discord.destroy()
         self.scene.removeNode()
         self.destroy()
 
