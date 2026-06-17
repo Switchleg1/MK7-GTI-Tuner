@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import random
 import time
 
 from library.core.constants import AMBER, DIM, GREEN, GREEN_2, PANEL, RED, TEXT
@@ -44,6 +45,7 @@ class StreetTask(TaskBase):
                 self.app.audio.bov()
                 self.app.audio.overrun(self.game.car.active_pop(), 0.9)
                 self.spawn_flames(self.car, self.game.register_pops())  # cred + Karen + flames
+                self._spawn_reactions()  # floating crowd / Karen emoji popups
                 self.dirty = True  # refresh the cred / Karen readout now
             self._peak_rpm = 0.0
 
@@ -61,7 +63,26 @@ class StreetTask(TaskBase):
         self.spawn_flames(self.car, count)
         self.app.audio.bov()
         self.app.audio.overrun(self.game.car.active_pop(), 1.0)
+        self._spawn_reactions()
         self.dirty = True
+
+    def _spawn_reactions(self):
+        """Float crowd-hype emojis up on the right and Karen-rage on the left,
+        scaled by the active tune's burble and the current heat (like the original)."""
+        pop = self.game.car.active_pop()
+        karen = self.game.bro.karen
+        hype = int(clamp(round(pop / 18), 1, 5))
+        anger = (1 if pop > 35 or karen > 30 else 0) + (1 if karen > 70 else 0)
+        for _ in range(hype):
+            self.spawn_reaction(random.choice(("emoji_fire", "emoji_cred")),
+                                x=random.uniform(0.25, 1.30), z=random.uniform(-0.30, 0.05),
+                                scale=random.uniform(0.05, 0.085), rise=random.uniform(0.30, 0.55),
+                                life=random.uniform(0.9, 1.3))
+        for _ in range(anger):
+            self.spawn_reaction("emoji_karen",
+                                x=random.uniform(-1.30, -0.25), z=random.uniform(-0.30, 0.05),
+                                scale=random.uniform(0.05, 0.075), rise=random.uniform(0.30, 0.50),
+                                life=random.uniform(0.9, 1.2))
 
     def build_ui(self, left, right):
         bro = self.game.bro

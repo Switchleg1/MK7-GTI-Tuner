@@ -3,8 +3,9 @@ from __future__ import annotations
 import random
 import time
 
+from direct.gui.OnscreenImage import OnscreenImage
 from direct.task import Task
-from panda3d.core import ClockObject, TextNode, Vec3, Vec4
+from panda3d.core import ClockObject, TextNode, TransparencyAttrib, Vec3, Vec4
 
 from library.core import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS
@@ -34,6 +35,7 @@ class TaskBase(Hud):
         self.dirty = True
         self.last_draw = 0.0
         self.flames = []
+        self.reactions = []
         self._tick_name = f"task-tick-{id(self)}"
 
     # -- lifecycle ---------------------------------------------------------
@@ -107,6 +109,24 @@ class TaskBase(Hud):
                 flame["node"].removeNode()
                 self.flames.remove(flame)
 
+    # -- floating emoji reactions (crowd hype / Karen rage popups) ---------
+    def spawn_reaction(self, key, x, z, scale, rise, life):
+        """A 2D emoji that floats up and fades. Parented to the screen root (not
+        tracked in self.nodes) so it survives UI redraws and is freed on exit."""
+        node = OnscreenImage(parent=self.root, image=assets.image_path(key), pos=(x, 0, z), scale=scale)
+        node.setTransparency(TransparencyAttrib.MAlpha)
+        self.reactions.append({"node": node, "life": life, "max": life, "rise": rise})
+
+    def update_reactions(self, dt):
+        for r in list(self.reactions):
+            r["life"] -= dt
+            node = r["node"]
+            node.setZ(node.getZ() + r["rise"] * dt)
+            node.setColorScale(1, 1, 1, max(0.0, min(1.0, r["life"] / r["max"] * 1.5)))
+            if r["life"] <= 0:
+                node.removeNode()
+                self.reactions.remove(r)
+
     def redraw(self):
         self.clear()
         left, right = self.bounds()
@@ -130,6 +150,7 @@ class TaskBase(Hud):
     def _update(self, task):
         dt = ClockObject.getGlobalClock().getDt()
         self.update_flames(dt)
+        self.update_reactions(dt)
         self.tick(dt)
         now = time.perf_counter()
         if self.dirty or (self.live and now - self.last_draw > UI_REFRESH_SECONDS):
