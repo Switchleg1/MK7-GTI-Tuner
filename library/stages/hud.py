@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from direct.gui import DirectGuiGlobals as DGG
-from direct.gui.DirectGui import DirectButton, DirectFrame, DirectLabel
+from direct.gui.DirectGui import DirectButton, DirectFrame, DirectLabel, DirectSlider
 from direct.gui.OnscreenImage import OnscreenImage
 from direct.showbase.DirectObject import DirectObject
 from panda3d.core import TextNode, TransparencyAttrib, Vec4
 
 from library.core import assets
-from library.core.constants import DIM, GREEN, GREEN_2, LINE, PANEL, TEXT, VIOLET, WHITE
+from library.core.constants import DIM, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, TEXT, VIOLET, WHITE
 
 
 class Hud(DirectObject):
@@ -60,6 +60,17 @@ class Hud(DirectObject):
     def image(self, key, pos, scale, parent=None):
         node = OnscreenImage(parent=parent or self.root, image=assets.image_path(key), pos=pos, scale=scale)
         node.setTransparency(TransparencyAttrib.MAlpha)
+        self.nodes.append(node)
+        return node
+
+    def slider(self, pos, value_range, value, width=0.5, command=None):
+        """A tracked horizontal DirectSlider. Set ``command`` after building all
+        sliders (or pass it here) -- it fires with no args; read ``node['value']``."""
+        node = DirectSlider(
+            parent=self.root, pos=pos, scale=1, range=value_range, value=value, command=command,
+            frameColor=PANEL_DARK, frameSize=(-width / 2, width / 2, -0.018, 0.018), relief=DGG.FLAT,
+            thumb_frameColor=GREEN, thumb_frameSize=(-0.02, 0.02, -0.034, 0.034), thumb_relief=DGG.FLAT,
+        )
         self.nodes.append(node)
         return node
 

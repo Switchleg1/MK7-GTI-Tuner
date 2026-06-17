@@ -21,6 +21,7 @@ class Game:
         self.cars = CarLibrary()
         self.logs: list[tuple[str, str]] = []
         self.race = None
+        self.simon_tick = 0  # rotates Simon through his ranked insights
 
     @property
     def car(self) -> Car:
