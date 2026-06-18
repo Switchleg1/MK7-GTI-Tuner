@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from direct.gui import DirectGuiGlobals as DGG
-from direct.gui.DirectGui import DirectEntry
+from direct.gui.DirectGui import DirectEntry, DirectFrame
 from panda3d.core import TextNode, TransparencyAttrib
 
 from library.core import assets
@@ -74,6 +74,7 @@ class DiscordPanel(Hud):
             self._window()
 
     def _window(self):
+        self._modal_shade()  # block clicks from reaching the task behind the window
         hw, hh, cz = DISCORD_WIN["half_w"], DISCORD_WIN["half_h"], DISCORD_WIN["center_z"]
         x0, x1, top, bot = -hw, hw, cz + hh, cz - hh
         self.frame((x0, x1, bot, top), (0, 0, 0), PANEL_DARK, border=BOX_LINE)
@@ -84,6 +85,17 @@ class DiscordPanel(Hud):
         self._channels(rail_x1, chan_x1, bot, top)
         self._members(mem_x0, x1, bot, top)
         self._chat(chan_x1, mem_x0, bot, top)
+
+    def _modal_shade(self):
+        """A full-screen, click-eating dim layer behind the window. ``state=NORMAL``
+        makes it grab mouse events; because the app lifts this panel to the end of
+        aspect2d (``_lift_overlays``), its region sorts above the task's widgets, so
+        clicks and slider drags can't pass through. The window's own button + entry
+        are created after this (later in the panel) so they still sit on top of it."""
+        shade = DirectFrame(parent=self.root, frameSize=(-2.2, 2.2, -1.2, 1.2),
+                            frameColor=(0.02, 0.03, 0.05, 0.5), relief=DGG.FLAT, state=DGG.NORMAL)
+        shade.setTransparency(TransparencyAttrib.MAlpha)
+        self.nodes.append(shade)
 
     def _rail(self, x0, x1, bot, top):
         self.frame((x0, x1, bot, top), (0, 0, 0), RAIL_BG, border=None)

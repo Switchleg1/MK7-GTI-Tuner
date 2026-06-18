@@ -43,6 +43,16 @@ sorts 10-50). aspect2d's DirectGui stage UI lands in `fixed` (40), so the overla
 otherwise be drawn *under* it; the higher bin keeps them on top regardless of draw
 order. `OVERLAY_SORT` orders the overlays within that bin (panel < toast < notify).
 
+That cull bin only controls what's *drawn* on top — **mouse picking** is separate. PGTop
+assigns mouse-region priority by scene-graph traversal order, and the persistent panels
+are created before each task, so the task's widgets would win clicks. `_sync_overlays`
+therefore calls **`_lift_overlays`**, which reparents the overlays to the end of
+`aspect2d` after each `set_stage`, putting their regions above the new stage's UI. The
+**Discord window** adds a full-screen `state=NORMAL` modal shade behind itself (in
+`_modal_shade`); lifted above the task, it swallows click-through (the window's own
+button + entry are created after it, so they stay interactive). ESC is intentionally
+*not* bound to quit.
+
 ## Layout
 
 All code lives under `library/` (grouped subpackages); only the entry script is at

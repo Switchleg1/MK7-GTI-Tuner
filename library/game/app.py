@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sys
-
 from panda3d.core import (
     AmbientLight, ClockObject, CullBinManager, DirectionalLight, Filename, PerspectiveLens, Vec4, WindowProperties,
 )
@@ -67,7 +65,6 @@ class MK7Tuner3D(ShowBase):
         self.discord = None                               # shared Ask-Discord panel (built at hub)
         self.stage = None
         self.taskMgr.add(self._render, "game-render")     # the single render loop
-        self.accept("escape", sys.exit)
         self.start_unlock()
 
     # -- render hierarchy --------------------------------------------------
@@ -136,12 +133,24 @@ class MK7Tuner3D(ShowBase):
         self._sync_overlays(stage)
 
     def _sync_overlays(self, stage):
-        """Point the music + shared panels at the new stage's context key."""
+        """Point the music + shared panels at the new stage's context key, then lift
+        the overlays so they sit above the freshly-built stage UI (visually AND for
+        mouse picking)."""
         key = getattr(stage, "music_key", "") or getattr(stage, "key", "")
         self.music.set_track(key)
         for panel in (self.simon, self.discord):
             if panel is not None:
                 panel.set_context(key)
+        self._lift_overlays()
+
+    def _lift_overlays(self):
+        """Reparent the overlays to the end of aspect2d so they're traversed AFTER the
+        new stage's UI. PGTop assigns mouse-region priority by scene-graph order, so
+        this is what lets the Discord modal shade actually block clicks to the task
+        behind it (the cull bin only handles what's drawn on top, not what's clicked)."""
+        for overlay in (self.notifications, self.toast, self.simon, self.discord):
+            if overlay is not None:
+                overlay.root.reparentTo(self.aspect2d)
 
     def start_unlock(self):
         # UnlockStage self-manages its own cleanup before calling on_complete.

@@ -45,6 +45,7 @@ AMBER = rgba("#ffb338")
 RED = rgba("#ff4d52")
 BLUE = rgba("#4fb6ff")
 VIOLET = rgba("#b58bff")
+MAGENTA = rgba("#c844fc")
 WHITE = rgba("#f2fbff")
 BLACK = rgba("#060809", 0.96)
 ROAST = rgba("#ffd0a0")
@@ -344,12 +345,16 @@ DISCORD_ROSTER = [
     ("simos", "Simon", "admin", "pro_tuner", 0.80, VIOLET, "0 chill",
      ["post a log or stop talking", "that map is a crime scene", "skill issue, respectfully",
       "i read your longview - it's knocking", "back off two clicks and re-log"]),
+    ("aaronc7", "Aaronc7", "admin", "good idea fairy", 0.80, MAGENTA, "good idea fairy",
+     ["I found a bug.", "lets flash that map for UNLIMITED POWAH", "to the FR!",
+      "simon i have a request...", "back off two clicks and re-log"]),
     ("cp4334", "CP4334", "admin", "boost", 0.78, AMBER, "Playing TunerPro",
      ["more boost fixes most things", "rods are merely suggestions", "send it to 26 and find out",
       "bent another one, worth it", "boost is a personality trait"]),
     ("mike", "Mike", "admin", "disaster", 0.70, RED, "buying a turbo",
      ["just bought another turbo", "who wants to street race tonight", "third IS38 this month",
-      "my problem is boost and i refuse to fix it", "raced a cop, lost the cop"]),
+      "my problem is boost and i refuse to fix it", "raced a cop, lost the cop",
+      "She fucks", "get me a corona", "flops for life"]),
     ("jc", "JC", "admin", "hates_2x4", 0.68, BLUE, None,
      ["take the 2x4 off the car", "a 2x4 is not a mod", "if i see one more 2x4 i'm leaving",
       "lower it AND remove the 2x4", "your wing is a 2x4 with extra steps"]),
@@ -424,7 +429,7 @@ DISCORD_GOOD_WORDS = ["boost", "knock", "kr", "lambda", "timing", "egt", "e85", 
 
 # Community maps unlockable via Discord (selectable in TUNE once unlocked).
 COMMUNITY_MAPS = {
-    "exley_safe": {"boost": 21.0, "timing": 12.0, "lambda": 0.82, "fuel": "93", "of": 28.0, "or": 26.0, "th": 22.0, "name": "Exley Safe 93"},
+    "exley_stage_e": {"boost": 21.0, "timing": 12.0, "lambda": 0.82, "fuel": "93", "of": 28.0, "or": 26.0, "th": 22.0, "name": "Exley Stage E"},
     "zumble_jb4": {"boost": 25.5, "timing": 11.0, "lambda": 0.83, "fuel": "93", "of": 40.0, "or": 38.0, "th": 35.0, "name": "Zumble JB4 Stack"},
     "wunder_remote": {"boost": 24.0, "timing": 14.0, "lambda": 0.81, "fuel": "E30", "of": 50.0, "or": 48.0, "th": 44.0, "name": "Wunder Remote v3"},
     "bri3d_leak": {"boost": 26.0, "timing": 15.0, "lambda": 0.80, "fuel": "E85", "of": 90.0, "or": 88.0, "th": 80.0, "name": "bri3d leaked E85"},
