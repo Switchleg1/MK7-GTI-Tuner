@@ -3,11 +3,14 @@ from __future__ import annotations
 import random
 import time
 
-from library.core.constants import MAX_LOG_LINES, MODS, TRACK_M
+from library.core.constants import (
+    DISCORD_GREEN_BRUSHOFF, GOD_PAYOUT, GREEN_NAME_CRED, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, TRACK_M, TUNE_SALE, WIZARD_CRED,
+)
 from library.core.utils import pick
 from library.game.car import Car
 from library.game.car_library import CarLibrary
 from library.game.discord import Discord
+from library.game.pro_tuner import ProTuner
 from library.game.rival_green_name import RivalGreenName
 from library.game.tuner_bro import TunerBro
 
@@ -23,6 +26,11 @@ DAVE_LINES = {
     "win": ["GET THAT MONEY. Easy work.", "He never stood a chance.", "Cash money - go buy a turbo."],
     "lose": ["Oof. Hit the shop and run it back.", "He spanked you. Tune up.", "Slower car, faster wallet... oh wait."],
     "shop": ["Bolted on - she's meaner now.", "Good buy. Now go use it.", "Money well spent, for once."],
+    "green": ["You went GREEN, baby. Verified and everything.", "Green name. Now the noobs DM you.", "You're official. Don't let it go to your head."],
+    "sell": ["Sold a tune to some poor soul. Cha-ching.", "Another satisfied (?) customer.", "You're a tune mill now."],
+    "pro": ["Talking to the pros now, huh.", "Networking. Gross. Profitable.", "Big leagues."],
+    "wizard": ["The Wizard wants a word. Don't keep him waiting.", "A secret tuner trial just dropped. Go.", "Some hooded guy DM'd you. Spooky. Click it."],
+    "god": ["GOD STATUS. Nobody can tell you anything now.", "You passed the Trial. Unreal.", "Infinite-ish money. Go nuts."],
 }
 
 
@@ -37,6 +45,7 @@ class Game:
         self.rivals = RivalGreenName.ladder()
         self.cars = CarLibrary()
         self.discord = Discord()
+        self.pros = ProTuner.roster()
         self.logs: list[tuple[str, str]] = []
         self.race = None
         self.simon_tick = 0  # rotates Simon through his ranked insights
@@ -134,6 +143,7 @@ class Game:
             self.dave("cops")
         elif random.random() < 0.18:
             self.dave("bigbang")
+        self.maybe_green()
         return max(4, round(pop / 10))
 
     # -- discord -----------------------------------------------------------
@@ -141,10 +151,22 @@ class Game:
         """Submit a #help request: the Discord resolves it (text + who's online +
         chance), then we apply the outcome to the bro/car and log it. Returns the
         outcome so the panel can show the replies."""
+        if self.bro.green_name and random.random() < 0.7:
+            return self._green_brushoff()
         ctx = {"cred": self.bro.cred, "unlocked_maps": list(self.bro.unlocked_maps)}
         outcome = self.discord.resolve(text, ctx)
         self._apply_discord(outcome)
+        self.maybe_green()
         return outcome
+
+    def _green_brushoff(self) -> dict:
+        roster = self.discord.online() or self.discord.members
+        who = pick(roster)
+        line = pick(DISCORD_GREEN_BRUSHOFF)
+        self.log("green name asked in #help: " + line, "warn")
+        return {"kind": "bad", "effect": "none", "amount": 0, "map_key": None,
+                "summary": "you're green now - they expect you to know this one",
+                "replies": [{"name": who.name, "color": who.color, "text": line}]}
 
     def _apply_discord(self, outcome: dict):
         effect, amount = outcome["effect"], outcome["amount"]
@@ -160,6 +182,75 @@ class Game:
         elif effect == "clients":
             self.bro.add_cred(-amount)
         self.log(outcome["summary"], "ok" if outcome["kind"] == "good" else "warn")
+
+    # -- green name (verified pro path) ------------------------------------
+    def maybe_green(self):
+        """Promote to verified green name once cred crosses the bar (once)."""
+        if not self.bro.green_name and self.bro.cred >= GREEN_NAME_CRED:
+            self.bro.green_name = True
+            self.unlock("green_name", "Green Name")
+            self.dave("green")
+            self.log("VERIFIED: you got the green name. the noobs DM you now.", "ok")
+        self.maybe_wizard()
+
+    def wizard_available(self) -> bool:
+        """The Bench Wizard only DMs an established green name (until you pass)."""
+        return self.bro.green_name and self.bro.cred >= WIZARD_CRED and not self.bro.god
+
+    def maybe_wizard(self):
+        if self.wizard_available() and self.unlock("wizard_summon", "A Mysterious DM"):
+            self.log("a hooded tuner DMs you a three-part Trial. prove yourself.", "violet")
+            self.dave("wizard")
+
+    def grant_god(self):
+        """Trial passed: god status + a giant one-time payout."""
+        if self.bro.god:
+            return
+        self.bro.god = True
+        self.bro.earn(GOD_PAYOUT)
+        self.unlock("god_status", "Passed the Trial")
+        self.dave("god")
+        self.log(f"TRIAL PASSED. god status granted. +${GOD_PAYOUT:,}.", "ok")
+
+    def sell_tune(self):
+        """Green-name income: flog a tune to a random user. Usually pays; sometimes
+        they brick it and leave a bad review (a cred hit)."""
+        if not self.bro.green_name:
+            return
+        if random.random() < TUNE_SALE["bad_chance"]:
+            self.bro.add_cred(-4)
+            self.log(pick(SALE_BAD), "warn")
+            return
+        whp = self.car.compute()["whp"]
+        pay = int(TUNE_SALE["base"] + max(0.0, whp - 210) * TUNE_SALE["per_whp"])
+        self.bro.earn(pay)
+        self.bro.add_cred(TUNE_SALE["cred"])
+        self.bro.tunes_sold += 1
+        self.unlock("first_sale", "Side Hustle")
+        if self.bro.tunes_sold >= 10:
+            self.unlock("tune_mill", "Tune Mill")
+        self.log(f"sold a tune for ${pay}  ({self.bro.tunes_sold} sold)", "ok")
+        self.dave("sell")
+        self.maybe_green()
+
+    def ask_pro(self, handle: str):
+        """DM a pro for a pro-only map stage. They hand it over once you've sold
+        enough tunes to be taken seriously; otherwise they tell you to earn it."""
+        if not self.bro.green_name:
+            return
+        pro = next((p for p in self.pros if p.handle == handle), None)
+        if pro is None:
+            return
+        if pro.grant_map in self.bro.unlocked_maps:
+            self.log(f"{pro.name}: you already have {PRO_MAPS[pro.grant_map]['name']}.", "info")
+        elif self.bro.tunes_sold >= pro.min_tunes:
+            self.bro.unlock_map(pro.grant_map)
+            self.unlock("pro_network", "Pro Network")
+            self.log(f"{pro.name} hooked you up: {PRO_MAPS[pro.grant_map]['name']} unlocked.", "ok")
+            self.dave("pro")
+        else:
+            need = pro.min_tunes - self.bro.tunes_sold
+            self.log(f"{pro.name}: {pro.chatter()} (sell {need} more tune{'s' if need != 1 else ''} first)", "warn")
 
     # -- race --------------------------------------------------------------
     def race_active(self) -> bool:
@@ -233,6 +324,7 @@ class Game:
         else:
             self.dave("lose")
         self.log(("WIN" if won else "LOSS") + f" {player['et']:.2f}s @ {round(player['trap'])} mph", "ok" if won else "warn")
+        self.maybe_green()
         self.race["active"] = False
 
     def race_result_text(self) -> str:

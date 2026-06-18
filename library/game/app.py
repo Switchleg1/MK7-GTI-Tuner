@@ -24,6 +24,7 @@ from library.stages.tasks.shop_task import ShopTask
 from library.stages.tasks.street_task import StreetTask
 from library.stages.toast import Toast
 from library.stages.unlock_stage import UnlockStage
+from library.stages.wizard_trial_stage import WizardTrialStage
 
 TASK_CLASSES = {
     "bench": BenchTask,
@@ -173,7 +174,10 @@ class MK7Tuner3D(ShowBase):
             self.discord = DiscordPanel(self, self.game, "garage")
             for panel in (self.simon, self.discord):
                 panel.root.setBin(OVERLAY_BIN, OVERLAY_SORT["panel"])  # over stage UI, under toasts
-        self.set_stage(GarageStage(self, self.game, on_pick=self.open_task))
+        self.set_stage(GarageStage(self, self.game, on_pick=self.open_task, on_summon=self.open_wizard))
 
     def open_task(self, key: str):
         self.set_stage(TASK_CLASSES[key](self, self.game, on_back=self.enter_hub))
+
+    def open_wizard(self):
+        self.set_stage(WizardTrialStage(self, self.game, on_done=self.enter_hub))

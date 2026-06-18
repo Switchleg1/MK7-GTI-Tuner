@@ -512,3 +512,49 @@ DISCORD_MSG_LINES = 7      # messages shown in the scrollback
 # Member-list caps so a big roster doesn't overflow the window (rest -> "+N more").
 DISCORD_ONLINE_MAX = 8
 DISCORD_OFFLINE_MAX = 5
+
+# --------------------------------------------------------------------------
+# Green Name path: cross the cred bar to go verified, then sell tunes for cash
+# and DM the pros (Ed / Dave) for pro-only map stages -- while the Discord stops
+# spoon-feeding you in #help. EDIT FREELY (handles, lines, maps).
+# --------------------------------------------------------------------------
+GREEN_NAME_CRED = 200  # cred needed before the community hands you the green name
+
+# base payout + per-whp bonus, cred gained per clean sale, chance of a bad review.
+TUNE_SALE = {"base": 50, "per_whp": 0.7, "cred": 2.5, "bad_chance": 0.16}
+
+SALE_BAD = [
+    "customer flashed it in the rain, bricked it, blamed you. -4 cred",
+    "bad review: 'tune felt lazy'. -4 cred",
+    "buyer ran 87 octane and grenaded it. guess whose fault. -4 cred",
+]
+
+# Pro-only map stages a pro can hand a verified tuner (same shape as a tune).
+PRO_MAPS = {
+    "ed_stage3": {"boost": 25.0, "timing": 14.0, "lambda": 0.82, "fuel": "E30", "of": 55.0, "or": 52.0, "th": 48.0, "name": "Ed Stage 3"},
+    "dave_e85": {"boost": 27.0, "timing": 15.5, "lambda": 0.79, "fuel": "E85", "of": 95.0, "or": 92.0, "th": 88.0, "name": "Dave's E85 Special"},
+}
+
+# Pros you can DM once green: (handle, name, granted map key, tunes you must have
+# sold first, chatter lines). Modular -- add more pros here.
+PRO_TUNERS = [
+    ("ed",   "Ed",   "ed_stage3", 2, ["send a log and some $, I'll sort you", "stage 3 isn't for tourists", "you're green now, act like it"]),
+    ("dave", "Dave", "dave_e85",  5, ["E85 or go home", "I only tune for people who tune", "earn it first"]),
+]
+
+# What #help says when a green name still crawls in asking for help.
+DISCORD_GREEN_BRUSHOFF = [
+    "you're a green name, why are you asking us lol",
+    "thought you went pro? figure it out",
+    "ask Ed, that's above our pay grade",
+    "green name in #help, couldn't be me",
+    "we don't spoon-feed green names",
+]
+
+# --------------------------------------------------------------------------
+# The Bench Wizard (secret endgame): once a pro builds enough cred, a mystery
+# tuner DMs a three-part Trial. Pass it -> god status + a giant one-time payout.
+# Pure arcade flavour.
+# --------------------------------------------------------------------------
+WIZARD_CRED = 500        # cred needed before the Wizard's DM arrives
+GOD_PAYOUT = 1_000_000   # one-time reward for passing the Trial

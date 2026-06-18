@@ -19,7 +19,10 @@ class TunerBro:
         self.simon_tick = 0
         self.selected_rival = 0
         self.unlocked_rival = 0
-        self.unlocked_maps: list[str] = []  # community map keys earned via Discord
+        self.unlocked_maps: list[str] = []  # community/pro map keys earned
+        self.green_name = False             # verified pro status
+        self.tunes_sold = 0                 # tunes sold to other users (green-name income)
+        self.god = False                    # passed the Bench Wizard's Trial
 
     def rep(self) -> str:
         return rep_title(self.cred)
@@ -53,7 +56,7 @@ class TunerBro:
         return True
 
     def to_dict(self) -> dict:
-        return {k: getattr(self, k) for k in ("name", "cash", "cred", "karen", "simon_tick", "selected_rival", "unlocked_rival", "unlocked_maps")}
+        return {k: getattr(self, k) for k in ("name", "cash", "cred", "karen", "simon_tick", "selected_rival", "unlocked_rival", "unlocked_maps", "green_name", "tunes_sold", "god")}
 
     def from_dict(self, data: dict):
         for key, value in data.items():

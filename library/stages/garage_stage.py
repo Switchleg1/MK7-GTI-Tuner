@@ -3,7 +3,7 @@ from __future__ import annotations
 from panda3d.core import ClockObject, TextNode
 
 from library.core import assets
-from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT
+from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT, VIOLET
 from library.stages.hud import Hud
 
 
@@ -14,10 +14,11 @@ class GarageStage(Hud):
 
     music_key = "garage"
 
-    def __init__(self, app, game, on_pick):
+    def __init__(self, app, game, on_pick, on_summon=None):
         super().__init__(app, "garage-hub")
         self.game = game
         self.on_pick = on_pick
+        self.on_summon = on_summon  # launch the Bench Wizard Trial when summoned
         self.scene = app.render.attachNewNode("scene-garage")
         self.car = None
 
@@ -47,6 +48,8 @@ class GarageStage(Hud):
         self.draw_header(self.game)
         self.label("GARAGE", (0, 0, 0.66), 0.06, GREEN, align=TextNode.ACenter)
         self.label("Pick a task. Ask Simon if you're stuck.", (0, 0, 0.58), 0.034, DIM, align=TextNode.ACenter)
+        if self.on_summon and self.game.wizard_available():
+            self.button("> A MYSTERIOUS DM - ANSWER IT <", (0, 0, 0.46), (1.4, 0.10), self.on_summon, True, VIOLET, 0.036)
         gap = 0.04
         count = len(MODES)
         width = (right - left - gap * (count - 1)) / count
