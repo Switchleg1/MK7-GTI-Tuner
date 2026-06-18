@@ -12,13 +12,15 @@ from library.core.utils import clamp
 from library.game.geometry import make_box
 from library.stages.task_base import TaskBase
 
-# Cockpit framing: the player car is hidden and the camera sits where the driver
-# is, so the world scrolls TOWARD you. Tunables are local because they're only
-# meaningful in this task.
+# Chase camera framed BETWEEN the two lanes so BOTH cars are visible. A
+# cockpit-only POV can't see the rival when they're side-by-side at start (they
+# sit ~4m straight off to the side, which is outside any sane FOV). The cars
+# still stay fixed and the world scrolls past, so it keeps the "world moves
+# around you" feel from a broadcast/follow camera vantage.
 SHIFT_RPM = 6500                # tach goes amber from 5500, red from here
-COCKPIT_CAM_POS = (-2.2, -0.4, 1.20)
-COCKPIT_CAM_LOOK = (-2.2, 10.0, 0.55)
-COCKPIT_FOV = 70
+CHASE_CAM_POS = (0.0, -8.0, 2.6)
+CHASE_CAM_LOOK = (0.0, 14.0, 0.5)
+CHASE_FOV = 55
 
 RIVAL_X = 2.2                   # lateral lane offset (your car stays at -2.2)
 RIVAL_GAP_SCALE = 0.18          # scene units per meter of (rival.d - player.d)
@@ -32,14 +34,15 @@ SCROLL_SCALE = 0.22             # scene units per metre of player travel
 
 
 class RaceTask(TaskBase):
-    """Quarter-mile vs the skreets ladder, first-person.
+    """Quarter-mile vs the skreets ladder, broadcast-cam style.
 
-    The player car is hidden; the camera sits where the driver is and the world
-    scrolls past via recycling lane dashes and side cones. The rival car holds the
-    opposite lane and its scene-Y is the gap in metres (so when the rival's ahead
-    you actually see them ahead). The bottom HUD is a cockpit dash: a horizontal
-    tach with green/amber/red zones and a swept needle, big digital RPM and gear,
-    an MPH readout, and a shift light that lights at SHIFT_RPM."""
+    The two cars hold fixed scene Ys; the world scrolls past via recycling lane
+    dashes and side cones, and both sets of wheels spin (TaskBase.prepare_wheels)
+    so motion sells from a chase camera. The rival car's scene-Y is the live
+    race gap in metres (so when they're ahead you actually see them ahead). The
+    bottom HUD is a cockpit dash: a horizontal tach with green/amber/red zones
+    and a swept needle, big digital RPM and gear, an MPH readout, and a shift
+    light that lights at SHIFT_RPM."""
 
     title = "RACE"
     key = "race"
@@ -50,17 +53,21 @@ class RaceTask(TaskBase):
         self.player_car = assets.load_model("car")
         self.player_car.reparentTo(self.scene)
         self.player_car.setPos(-2.2, 0, 0.0)
-        self.player_car.hide()  # cockpit: don't draw our own body
         self.rival_car = assets.load_model("car")
         self.rival_car.reparentTo(self.scene)
         self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
         self.rival_car.setPos(RIVAL_X, 0, 0.0)
+        # Wheel pivots for both cars -- spun in tick so the cars look like they're
+        # moving even though they hold their scene Y position.
+        self.player_wheels = self.prepare_wheels(self.player_car)
+        self.rival_wheels = self.prepare_wheels(self.rival_car)
+        self.spin = 0.0
         self._build_track()
-        # Cockpit camera (overrides TASK_CAMERAS["race"] for the duration of the stage).
+        # Chase camera (overrides TASK_CAMERAS["race"] for the duration of the stage).
         if self.app.camLens:
-            self.app.camLens.setFov(COCKPIT_FOV)
-        self.app.camera.setPos(*COCKPIT_CAM_POS)
-        self.app.camera.lookAt(*COCKPIT_CAM_LOOK)
+            self.app.camLens.setFov(CHASE_FOV)
+        self.app.camera.setPos(*CHASE_CAM_POS)
+        self.app.camera.lookAt(*CHASE_CAM_LOOK)
         # Cached dash widgets (rebuilt each redraw; tick checks for them).
         self.dash = {}
 
@@ -103,6 +110,9 @@ class RaceTask(TaskBase):
             self.rival_car.setY((rival["d"] - player["d"]) * RIVAL_GAP_SCALE)
             # World scroll: lane dashes/cones travel backward at the player's speed.
             self._scroll_world(-player["v"] * SCROLL_SCALE * dt)
+            # Spin each car's wheels at its own velocity (rival's may differ).
+            self._spin_wheels(self.player_wheels, player["v"], dt)
+            self._spin_wheels(self.rival_wheels, rival["v"], dt)
             gear = clamp(player["gear"], 1, len(GEAR_RATIOS))
             rpm = clamp(player["v"] / TIRE_CIRC * GEAR_RATIOS[gear - 1] * FINAL_DRIVE * 60, 850, 7300)
             mph = player["v"] * 2.237
@@ -112,6 +122,14 @@ class RaceTask(TaskBase):
         else:
             self.app.audio.idle(900)
             self._update_dash(850, 1, 0)
+
+    def _spin_wheels(self, wheels, velocity_mps, dt):
+        # Roughly: angular velocity (deg/s) = v / circumference * 360.
+        if not wheels:
+            return
+        delta = velocity_mps / TIRE_CIRC * 360.0 * dt
+        for w in wheels:
+            w.setP(w.getP() - delta)
         # Status / hint / gap labels stay smooth between periodic redraws.
         if self.dash.get("status") is not None:
             text, _, hint = self._race_status()
