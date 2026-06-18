@@ -2,23 +2,44 @@ from __future__ import annotations
 
 import time
 
-from panda3d.core import TextNode
+from panda3d.core import TextNode, Vec4
 
 from library.core import assets
-from library.core.constants import AMBER, AUDIO, BLUE, DIM, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, RED, TEXT, TIRE_CIRC, TRACK_M
+from library.core.constants import (
+    AMBER, AUDIO, BLUE, BOX_LINE, DIM, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
+)
 from library.core.utils import clamp
+from library.game.geometry import make_box
 from library.stages.task_base import TaskBase
 
-STRIP_LENGTH = 14.0  # scene units the quarter mile maps onto (keeps both cars in frame)
+# Cockpit framing: the player car is hidden and the camera sits where the driver
+# is, so the world scrolls TOWARD you. Tunables are local because they're only
+# meaningful in this task.
+SHIFT_RPM = 6500                # tach goes amber from 5500, red from here
+COCKPIT_CAM_POS = (-2.2, -0.4, 1.20)
+COCKPIT_CAM_LOOK = (-2.2, 10.0, 0.55)
+COCKPIT_FOV = 70
+
+RIVAL_X = 2.2                   # lateral lane offset (your car stays at -2.2)
+RIVAL_GAP_SCALE = 0.18          # scene units per meter of (rival.d - player.d)
+
+# Track markers (centre dashes + side cones) scroll at the player's velocity so
+# motion is visible even though the car geometry doesn't move.
+MARKER_RECYCLE_Y = 28.0
+MARKER_PAST_Y = -4.0
+DASH_SPACING_M = 7.0            # one centerline dash every ~7 metres
+SCROLL_SCALE = 0.22             # scene units per metre of player travel
 
 
 class RaceTask(TaskBase):
-    """Quarter-mile vs the skreets ladder: stage, launch on green, shift up.
+    """Quarter-mile vs the skreets ladder, first-person.
 
-    The race model lives on ``Game`` (countdown, physics, payout). This task draws it:
-    a live countdown -> GO! status, the running gap, and the win/loss + payout, plus
-    a dynamic Launch/Shift prompt. Status text is refreshed every frame in ``tick`` so
-    the countdown and distances stay smooth between the periodic full redraws."""
+    The player car is hidden; the camera sits where the driver is and the world
+    scrolls past via recycling lane dashes and side cones. The rival car holds the
+    opposite lane and its scene-Y is the gap in metres (so when the rival's ahead
+    you actually see them ahead). The bottom HUD is a cockpit dash: a horizontal
+    tach with green/amber/red zones and a swept needle, big digital RPM and gear,
+    an MPH readout, and a shift light that lights at SHIFT_RPM."""
 
     title = "RACE"
     key = "race"
@@ -28,32 +49,102 @@ class RaceTask(TaskBase):
         assets.load_model("ground").reparentTo(self.scene)
         self.player_car = assets.load_model("car")
         self.player_car.reparentTo(self.scene)
+        self.player_car.setPos(-2.2, 0, 0.0)
+        self.player_car.hide()  # cockpit: don't draw our own body
         self.rival_car = assets.load_model("car")
         self.rival_car.reparentTo(self.scene)
-        self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)  # tint the rival blue
-        self._place(self.player_car, -2.2, 0.0)
-        self._place(self.rival_car, 2.2, 0.0)
+        self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
+        self.rival_car.setPos(RIVAL_X, 0, 0.0)
+        self._build_track()
+        # Cockpit camera (overrides TASK_CAMERAS["race"] for the duration of the stage).
+        if self.app.camLens:
+            self.app.camLens.setFov(COCKPIT_FOV)
+        self.app.camera.setPos(*COCKPIT_CAM_POS)
+        self.app.camera.lookAt(*COCKPIT_CAM_LOOK)
+        # Cached dash widgets (rebuilt each redraw; tick checks for them).
+        self.dash = {}
 
-    def _place(self, car, x, distance):
-        car.setPos(x, -2.0 + (distance / TRACK_M) * STRIP_LENGTH, 0.0)
+    def _build_track(self):
+        """Two rows of lane dashes + side cones laid out along +Y. Each is a
+        plain procedural box parented to the scene, recycled in ``_scroll_world``."""
+        self.markers = []
+        y = 0.0
+        while y < MARKER_RECYCLE_Y:
+            for x in (-2.2, 2.2):  # one dash per lane
+                dash = make_box("lane", 0.18, 1.2, 0.02, Vec4(0.92, 0.92, 0.92, 1))
+                dash.setLightOff()
+                dash.reparentTo(self.scene)
+                dash.setPos(x, y, 0.02)
+                self.markers.append(dash)
+            for x in (-4.6, 4.6):  # side cones
+                cone = make_box("cone", 0.30, 0.30, 0.55, Vec4(1.0, 0.45, 0.10, 1))
+                cone.setLightOff()
+                cone.reparentTo(self.scene)
+                cone.setPos(x, y + DASH_SPACING_M * 0.5, 0.28)
+                self.markers.append(cone)
+            y += DASH_SPACING_M
 
+    def _scroll_world(self, dy):
+        """Move every recycled marker by ``dy`` (negative when the player is moving
+        forward) and wrap any that have passed behind the camera."""
+        for m in self.markers:
+            m.setY(m.getY() + dy)
+            if m.getY() < MARKER_PAST_Y:
+                m.setY(m.getY() + MARKER_RECYCLE_Y)
+
+    # -- per-frame ---------------------------------------------------------
     def tick(self, dt):
-        if self.game.race_active():
+        race = self.game.race
+        if race and race["active"]:
             self.game.step_race(dt)
-            player = self.game.race["p"]
-            self._place(self.player_car, -2.2, player["d"])
-            self._place(self.rival_car, 2.2, self.game.race["r"]["d"])
-            gear = min(max(player["gear"], 1), len(GEAR_RATIOS))
-            rpm = clamp(player["v"] / TIRE_CIRC * GEAR_RATIOS[gear - 1] * FINAL_DRIVE * 60, 850, 7200)
+            player = race["p"]
+            rival = race["r"]
+            # Rival lane position = the literal gap, in scaled scene units.
+            self.rival_car.setY((rival["d"] - player["d"]) * RIVAL_GAP_SCALE)
+            # World scroll: lane dashes/cones travel backward at the player's speed.
+            self._scroll_world(-player["v"] * SCROLL_SCALE * dt)
+            gear = clamp(player["gear"], 1, len(GEAR_RATIOS))
+            rpm = clamp(player["v"] / TIRE_CIRC * GEAR_RATIOS[gear - 1] * FINAL_DRIVE * 60, 850, 7300)
+            mph = player["v"] * 2.237
             load = AUDIO["pull_load"] if player["launched"] and not player["done"] else 0.2
             self.app.audio.set_engine(rpm, load)
+            self._update_dash(rpm, gear, mph)
         else:
             self.app.audio.idle(900)
-        # Refresh the status/hint text every frame so the countdown + gap stay smooth.
-        if getattr(self, "status", None):
+            self._update_dash(850, 1, 0)
+        # Status / hint / gap labels stay smooth between periodic redraws.
+        if self.dash.get("status") is not None:
             text, _, hint = self._race_status()
-            self.status["text"] = text
-            self.hint["text"] = hint
+            self.dash["status"]["text"] = text
+            self.dash["hint"]["text"] = hint
+            if race and race["active"]:
+                gap = race["p"]["d"] - race["r"]["d"]
+                if abs(gap) > 0.5:
+                    self.dash["gap"]["text"] = (f"YOU +{gap:.0f}m" if gap > 0 else f"RIVAL +{-gap:.0f}m")
+                    self.dash["gap"]["text_fg"] = GREEN if gap > 0 else RED
+                else:
+                    self.dash["gap"]["text"] = "DEAD EVEN"
+                    self.dash["gap"]["text_fg"] = AMBER
+            else:
+                self.dash["gap"]["text"] = ""
+
+    def _update_dash(self, rpm, gear, mph):
+        d = self.dash
+        if not d:
+            return
+        # Tach needle position.
+        frac = clamp((rpm - 850) / (7300 - 850), 0, 1)
+        d["needle"].setX(d["tach_x0"] + frac * (d["tach_x1"] - d["tach_x0"]))
+        d["rpm"]["text"] = f"{int(rpm)}"
+        d["gear"]["text"] = "N" if rpm <= 900 and gear == 1 else str(gear)
+        d["mph"]["text"] = f"{int(mph)}"
+        # Shift light: brightens (and the bezel goes red) past the redline.
+        if rpm >= SHIFT_RPM:
+            d["shift_bg"]["frameColor"] = (1.0, 0.20, 0.20, 0.90)
+            d["shift_lbl"]["text_fg"] = WHITE
+        else:
+            d["shift_bg"]["frameColor"] = PANEL_DARK
+            d["shift_lbl"]["text_fg"] = DIM
 
     def bind_keys(self):
         self.accept("space", self.do_key)
@@ -62,13 +153,12 @@ class RaceTask(TaskBase):
         event = self.game.race_key()
         if event in ("launch", "shift"):
             self.spawn_flames(self.player_car, 2)
-        if event == "shift":  # bang + a quick crackle on each upshift
+        if event == "shift":
             self.app.audio.bang()
             self.app.audio.overrun(28, 0.3)
-        self.dirty = True  # flip the Launch button to Shift, etc.
+        self.dirty = True
 
     def _race_status(self):
-        """Return (status text, color, hint) for the current race phase."""
         race = self.game.race
         if not race:
             return "Pick a rival, then Stage & Race.", DIM, "SPACE launches on GREEN, then shifts gears."
@@ -77,12 +167,11 @@ class RaceTask(TaskBase):
         if race["active"]:
             if now < race["green_at"]:
                 if not player["launched"]:
-                    return f"STAGED - get ready  {race['green_at'] - now:0.1f}s", AMBER, "Hands on the wheel. Wait for GREEN."
+                    return f"STAGED   {race['green_at'] - now:0.1f}s", AMBER, "Hands on the wheel. Wait for GREEN."
                 return "WAIT FOR GREEN!", RED, "Pre-loaded - you'll roll the moment it goes green."
             if not player["launched"]:
                 return "GREEN - GO!", GREEN, "Press SPACE to LAUNCH now!"
-            return f"GO!   You {player['d']:.0f} m   /   Rival {rival['d']:.0f} m", GREEN, f"SPACE to shift  (gear {player['gear']})"
-        # finished
+            return "GO!", GREEN, f"SPACE to shift  (gear {player['gear']})"
         won = player["et"] < rival["et"] if rival["et"] else True
         foe = self.game.rivals[self.game.bro.selected_rival]
         if won:
@@ -91,23 +180,66 @@ class RaceTask(TaskBase):
         return (f"LOSS  {player['et']:.2f}s @ {player['trap']:.0f} mph", RED,
                 f"Rival ran {rival['et']:.2f}s. Tune up or buy parts, then run it back.")
 
+    # -- UI ----------------------------------------------------------------
     def build_ui(self, left, right):
-        # No full-screen panels here: the 3D cars race up the centre of the screen,
-        # so the UI hugs the edges (status top-left, ladder top-right, buttons low)
-        # and leaves the middle clear instead of covering the strip.
         game = self.game
         text, color, hint = self._race_status()
-        self.status = self.label(text, (left + 0.05, 0, 0.54), 0.052, color, wordwrap=20)
-        self.hint = self.label(hint, (left + 0.05, 0, 0.43), 0.030, DIM, wordwrap=28)
-        staged = game.race_active()
-        launching = (not staged) or not game.race["p"]["launched"]
-        self.button("Stage & Race", (-0.34, 0, -0.80), (0.42, 0.10),
-                    self.bind(game.start_race), game.car.flashed and not staged, GREEN_2)
-        self.button(("Launch" if launching else "Shift") + " (SPACE)", (0.34, 0, -0.80),
-                    (0.42, 0.10), self.do_key, staged)
-        self.label("SKREETS LADDER", (right - 0.05, 0, 0.54), 0.032, BLUE, align=TextNode.ARight)
+        self.dash["status"] = self.label(text, (0, 0, 0.92), 0.046, color, align=TextNode.ACenter, wordwrap=44)
+        self.dash["hint"] = self.label(hint, (0, 0, 0.85), 0.028, DIM, align=TextNode.ACenter, wordwrap=64)
+        self.dash["gap"] = self.label("", (0, 0, 0.77), 0.044, AMBER, align=TextNode.ACenter)
+        # Skreets ladder (smaller, top-right).
+        self.label("SKREETS LADDER", (right - 0.05, 0, 0.66), 0.030, BLUE, align=TextNode.ARight)
         for index, rival in enumerate(game.rivals):
             sel = index == game.bro.selected_rival
-            self.button(f"{rival.name}  ${rival.purse}", (right - 0.42, 0, 0.44 - index * 0.095), (0.74, 0.078),
-                        self.bind(game.select_rival, index), index <= game.bro.unlocked_rival,
-                        GREEN_2 if sel else None, 0.030)
+            self.button(f"{rival.name}  ${rival.purse}",
+                        (right - 0.42, 0, 0.58 - index * 0.075), (0.78, 0.062),
+                        self.bind(game.select_rival, index),
+                        index <= game.bro.unlocked_rival,
+                        GREEN_2 if sel else None, 0.026)
+        # Stage / Launch (top-left).
+        staged = game.race_active()
+        launching = (not staged) or not game.race["p"]["launched"]
+        self.button("Stage & Race", (left + 0.22, 0, 0.66), (0.40, 0.085),
+                    self.bind(game.start_race), game.car.flashed and not staged, GREEN_2, 0.032)
+        self.button(("Launch" if launching else "Shift") + " (SPACE)",
+                    (left + 0.22, 0, 0.56), (0.40, 0.085), self.do_key, staged, None, 0.032)
+        self._build_dash(left, right)
+
+    def _build_dash(self, left, right):
+        d = self.dash
+        # Tach bar geometry (bottom centre).
+        d["tach_x0"], d["tach_x1"] = -0.72, 0.72
+        z0, z1 = -0.82, -0.76
+        span = d["tach_x1"] - d["tach_x0"]
+        # Backdrop + zone fills.
+        self.frame((d["tach_x0"] - 0.01, d["tach_x1"] + 0.01, z0 - 0.012, z1 + 0.012),
+                   color=PANEL_DARK, border=BOX_LINE)
+        amber_x = d["tach_x0"] + (5500 - 850) / (7300 - 850) * span
+        red_x = d["tach_x0"] + (SHIFT_RPM - 850) / (7300 - 850) * span
+        self.frame((d["tach_x0"], amber_x, z0, z1), color=GREEN_2, border=None)
+        self.frame((amber_x, red_x, z0, z1), color=AMBER, border=None)
+        self.frame((red_x, d["tach_x1"], z0, z1), color=RED, border=None)
+        # Tick marks every 1000 rpm.
+        for r in (1000, 2000, 3000, 4000, 5000, 6000, 7000):
+            tx = d["tach_x0"] + (r - 850) / (7300 - 850) * span
+            self.frame((tx - 0.003, tx + 0.003, z1, z1 + 0.025), color=WHITE, border=None)
+            self.label(f"{r // 1000}", (tx, 0, z1 + 0.035), 0.022, DIM, align=TextNode.ACenter)
+        # Needle (positioned in _update_dash).
+        d["needle"] = self.frame((-0.006, 0.006, -0.058, 0.058), color=WHITE, border=None)
+        d["needle"].setPos(d["tach_x0"], 0, (z0 + z1) / 2)
+        # Big digital RPM (above the tach).
+        d["rpm"] = self.label("0", (0, 0, -0.69), 0.075, TEXT, align=TextNode.ACenter)
+        self.label("RPM", (0, 0, -0.62), 0.024, DIM, align=TextNode.ACenter)
+        # Gear letter (left of the tach).
+        gx = d["tach_x0"] - 0.13
+        self.frame((gx - 0.10, gx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
+        d["gear"] = self.label("N", (gx, 0, -0.84), 0.085, GREEN, align=TextNode.ACenter)
+        self.label("GEAR", (gx, 0, -0.69), 0.022, DIM, align=TextNode.ACenter)
+        # MPH (right of the tach).
+        mx = d["tach_x1"] + 0.13
+        self.frame((mx - 0.10, mx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
+        d["mph"] = self.label("0", (mx, 0, -0.83), 0.075, TEXT, align=TextNode.ACenter)
+        self.label("MPH", (mx, 0, -0.69), 0.022, DIM, align=TextNode.ACenter)
+        # Shift light (centre, above the RPM digits).
+        d["shift_bg"] = self.frame((-0.11, 0.11, -0.58, -0.50), color=PANEL_DARK, border=BOX_LINE)
+        d["shift_lbl"] = self.label("SHIFT", (0, 0, -0.555), 0.034, DIM, align=TextNode.ACenter)
