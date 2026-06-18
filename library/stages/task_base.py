@@ -4,10 +4,10 @@ import random
 import time
 
 from direct.gui.OnscreenImage import OnscreenImage
-from panda3d.core import TextNode, TransparencyAttrib, Vec3, Vec4
+from panda3d.core import Point3, TextNode, TransparencyAttrib, Vec3, Vec4
 
 from library.core import assets
-from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS
+from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS, WHEEL_PREFIX, WHEEL_STATIC
 from library.game.geometry import make_box
 from library.stages.hud import Hud
 
@@ -75,6 +75,39 @@ class TaskBase(Hud):
         car = assets.load_model("car")
         car.reparentTo(self.scene)
         return car
+
+    def prepare_wheels(self, car):
+        """Return pivots to rotate so the wheels spin in place about their axle (X).
+
+        car.glb's wheel parts (names prefixed ``WHEEL_PREFIX``; the body is ``vw:``)
+        are flat siblings whose transforms pivot at the *model* origin, so spinning
+        them directly flings them across the scene. We group the spinnable parts
+        (calipers excluded -- they don't turn with the wheel) into the four corners,
+        wrap each group in a pivot at the wheel's centre, and reparent the parts under
+        it (preserving world position). Falls back to the old procedural tire_/rim_
+        nodes if this isn't the detailed model."""
+        parts = [n for n in car.findAllMatches("**/" + WHEEL_PREFIX + "*")
+                 if not n.getParent().getName().startswith(WHEEL_PREFIX)
+                 and not any(s in n.getName().lower() for s in WHEEL_STATIC)]
+        if not parts:
+            return list(car.findAllMatches("**/tire_*")) + list(car.findAllMatches("**/rim_*"))
+        corners: dict = {}
+        for part in parts:
+            bounds = part.getTightBounds(car)
+            if not bounds:
+                continue
+            center = (bounds[0] + bounds[1]) * 0.5
+            corners.setdefault((center.x >= 0, center.y >= 0), []).append((part, bounds[0], bounds[1]))
+        pivots = []
+        for index, group in enumerate(corners.values()):
+            lo = Point3(min(b0.x for _, b0, _ in group), min(b0.y for _, b0, _ in group), min(b0.z for _, b0, _ in group))
+            hi = Point3(max(b1.x for _, _, b1 in group), max(b1.y for _, _, b1 in group), max(b1.z for _, _, b1 in group))
+            pivot = car.attachNewNode(f"wheel-pivot-{index}")
+            pivot.setPos((lo + hi) * 0.5)
+            for part, _, _ in group:
+                part.wrtReparentTo(pivot)
+            pivots.append(pivot)
+        return pivots
 
     def bind(self, fn, *args):
         """Wrap a model action so the UI redraws after it runs."""

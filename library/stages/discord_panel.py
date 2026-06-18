@@ -6,9 +6,9 @@ from panda3d.core import TextNode, TransparencyAttrib
 
 from library.core import assets
 from library.core.constants import (
-    AMBER, BLUE, BOX_LINE, DISCORD_CHANNEL_GROUP, DISCORD_MSG_LINES, DISCORD_SERVER,
-    DISCORD_WIN, DISCORD_RAIL_W, DISCORD_CHAN_W, DISCORD_MEMBER_W, DIM, GREEN, LINE,
-    MUTED, PANEL, PANEL_DARK, RED, TEXT, WHITE,
+    AMBER, BLUE, BOX_LINE, DISCORD_CHANNEL_GROUP, DISCORD_MSG_LINES, DISCORD_OFFLINE_MAX,
+    DISCORD_ONLINE_MAX, DISCORD_SERVER, DISCORD_WIN, DISCORD_RAIL_W, DISCORD_CHAN_W,
+    DISCORD_MEMBER_W, DIM, GREEN, LINE, MUTED, PANEL, PANEL_DARK, RED, TEXT, WHITE,
 )
 from library.core.utils import rgba
 from library.stages.hud import Hud
@@ -123,14 +123,19 @@ class DiscordPanel(Hud):
         online, offline = discord.online(), discord.offline()
         self.label(f"Online - {len(online)}", (x0 + 0.06, 0, top - 0.07), 0.026, DIM)
         z = top - 0.135
-        for member in online:
+        for member in online[:DISCORD_ONLINE_MAX]:
             self._member_row(x0, member, z, True)
             z -= 0.105
+        if len(online) > DISCORD_ONLINE_MAX:
+            self.label(f"+{len(online) - DISCORD_ONLINE_MAX} more online", (x0 + 0.10, 0, z + 0.01), 0.022, DIM)
+            z -= 0.06
         self.label(f"Offline - {len(offline)}", (x0 + 0.06, 0, z - 0.005), 0.026, DIM)
         z -= 0.075
-        for member in offline:
+        for member in offline[:DISCORD_OFFLINE_MAX]:
             self._member_row(x0, member, z, False)
             z -= 0.082
+        if len(offline) > DISCORD_OFFLINE_MAX:
+            self.label(f"+{len(offline) - DISCORD_OFFLINE_MAX} more", (x0 + 0.10, 0, z + 0.01), 0.022, MUTED)
 
     def _member_row(self, x0, member, z, online):
         avatar = self.image("avatar", (x0 + 0.10, 0, z), 0.036)

@@ -111,7 +111,14 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   — they live on the app. Subclasses set `title`/`key`/`live` (and `music_key`, which
   defaults to `key` but is the themed folder name for TUNE→`tuning`/SKREETS→`skreetz`)
   and override `build_scene`/`build_ui`/`bind_keys`/`tick`. Provides
-  `add_garage_scene()`, `panel_pair()`, `bind()`, and exhaust `spawn_flames`.
+  `add_garage_scene()`, `panel_pair()`, `bind()`, exhaust `spawn_flames`, and
+  `prepare_wheels(car)`. `prepare_wheels` makes the detailed `car.glb` wheels spin in
+  place: its wheel parts (names prefixed `WHEEL_PREFIX` = `w:`; the body is `vw:`) are
+  flat siblings whose transforms pivot at the *model* origin, so spinning them directly
+  flings them across the scene. It groups the spinnable parts (calipers — `WHEEL_STATIC`
+  — excluded) into the four corners, wraps each in a pivot at the wheel centre, and
+  returns the pivots to rotate about the axle (X). Falls back to the old `tire_`/`rim_`
+  nodes if this isn't the detailed model.
 - `garage_stage.py` — `GarageStage(Hud)`: the home hub — ground + glb GTI on a slow
   turntable, header, a row of task buttons from `MODES`, and Simon. `on_pick(key)`.
 - `simon_panel.py` — `SimonPanel(Hud)`: the reusable Ask-Simon pill + roast/tip popup

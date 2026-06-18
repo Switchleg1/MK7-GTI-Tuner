@@ -118,6 +118,13 @@ TASK_CAMERAS = {
     "dyno": {"pos": (6.6, -3.2, 1.9), "look_at": (0.0, 0.2, 0.7), "fov": 45},
 }
 
+# Wheel spinning (car.glb). Body parts are prefixed "vw:", wheel parts "w:"; the
+# wheel parts are flat siblings whose transforms pivot at the model origin, so
+# TaskBase.prepare_wheels regroups the spinnable ones into 4 corner pivots and spins
+# those about the axle (X). Calipers must stay put (don't rotate with the wheel).
+WHEEL_PREFIX = "w:"
+WHEEL_STATIC = ("calliper", "caliper")  # name substrings of wheel parts that don't spin
+
 # --------------------------------------------------------------------------
 # Dyno (SimosTools-style gauge cluster + live graph)
 # --------------------------------------------------------------------------
@@ -379,6 +386,51 @@ DISCORD_ROSTER = [
     ("wunder", "Wunder", "greenname", "pro", 0.58, rgba("#54d98a"), None,
      ["i do remote tunes, dm me", "datalog and i'll revise it", "greenname pro tuner here",
       "my maps slap, references available", "send the stock file first"]),
+    ("diggs", "Diggs", "admin", "crusty", 0.72, rgba("#9fe8c4"), "probably an alien",
+     ["back in my day we didn't datalog", "i've seen faster, kid", "the skreetz remember everything",
+      "your 1/4 is embarrassing", "earthlings can't tune", "humans, always rushing the tune"]),
+    ("kumar", "Kumar", "greenname", "broke", 0.60, rgba("#7ec98f"), "tunes 4 food",
+     ["i'll tune it for a sandwich", "blew another motor, third one today", "rods are temporary, hunger is forever",
+      "pay me in tacos", "it ran when i sent it i swear", "warranty? i can't afford lunch"]),
+    ("sleepy", "Sleepy", "greenname", "gatekeeper", 0.45, rgba("#4cc9a0"), "gapping plugs",
+     ["fresh plugs fix everything", "you'll never beat my 1/4", "what heat range you running",
+      "gapped my plugs again, feels good", "post the timeslip or it didn't happen", "ngk one step colder, trust me"]),
+    ("onelow", "OneLow", "user", "pops_scholar", 0.60, rgba("#ffe066"), "PhD in crackle",
+     ["overrun fueling is an art form", "more spark cut, less shame", "i've studied every bang",
+      "your pops are weak, add throttle", "the crackle map is poetry", "antilag is just pops with commitment"]),
+    ("eric_s", "Eric S", "user", "flipper", 0.55, rgba("#d4a96a"), "buying another car",
+     ["just bought another one", "selling the gti, buying an m2 monday", "everything i own is for sale",
+      "had one of those, sold it", "i flip cars not tunes", "title in hand, who wants it"]),
+    ("dyno_dan", "Dyno Dan", "greenname", "dyno", 0.60, rgba("#7cc4ff"), "strapped down",
+     ["what'd it make on the dyno?", "numbers or it didn't happen", "that's a $75 pull",
+      "tuned by feel? in this economy?", "stp corrected or bro-rrected?", "my dyno doesn't lie"]),
+    ("karen_nd", "Karen_NextDoor", "user", "karen", 0.50, rgba("#ff9ec4"), "calling the HOA",
+     ["i've already reported three of you", "those bangs woke my children", "i have your plate number",
+      "the police are aware of this group", "this is a residential area", "i pay taxes here you know"]),
+    ("vince_vortex", "Vince", "user", "boomer", 0.50, rgba("#a8b0bf"), "typing an essay",
+     ["back in 2009 we did it differently", "the search function exists for a reason", "*posts six paragraphs*",
+      "i covered this in my 2011 thread", "kids these days don't read the pinned", "i've been here since vortex"]),
+    ("cornelius", "Cornelius", "greenname", "corn", 0.60, rgba("#e8c84a"), "blending E60",
+     ["just add more corn", "what's your ethanol content?", "E85 fixes that",
+      "pump gas is for cowards", "i haven't smelled gasoline in years", "blend it and re-log"]),
+    ("slammed_seb", "Slammed Seb", "user", "stance", 0.55, rgba("#9b6bff"), "scraping frame",
+     ["does it come lower?", "who cares about whp, is it slammed?", "scraped the oil pan again",
+      "stance over horsepower, always", "fitment is everything", "can't clear my own driveway lol"]),
+    ("gremlin", "BoostGremlin", "user", "gremlin", 0.60, rgba("#9ae66e"), "sending it",
+     ["SEND IT", "more boost, what's the worst that happens", "delete the cat while you're in there",
+      "pull the o2s, trust me", "live a little, lean it out", "we ball til it blows"]),
+    ("mk5_marcus", "Marcus", "user", "hater", 0.50, rgba("#7f9ac0"), "coping in a mk5",
+     ["mk5 was peak golf", "you kids and your IS38s", "my pd150 has more soul",
+      "overrated chassis honestly", "back when tuning meant something", "the mk7 is a corolla with a badge"]),
+    ("rhonda", "Rhonda", "greenname", "supercharger", 0.55, rgba("#46d6b8"), "boosting linearly",
+     ["just supercharge it", "turbo lag is a choice", "linear power beats turbo any day",
+      "i have a kit for that, dm me", "instant boost, no waiting", "the whine is the best part"]),
+    ("flashfella", "FlashFella", "greenname", "remote", 0.50, rgba("#6ee0a0"), "revising your map",
+     ["revision's almost ready", "send me a fresh log", "i'll have it tonight (he won't)",
+      "fifty bucks a revision", "you're in my queue, relax", "did you not get my email?"]),
+    ("noobnathan", "NoobNathan", "user", "noob", 0.70, rgba("#a0d8ff"), "reading the manual",
+     ["where's the dipstick?", "is stage 1 safe on stock?", "what's a longview?",
+      "do i need a tune to add a sticker", "just got my gti yesterday!", "how do i open the hood"]),
 ]
 
 # Help-request outcome pools. Each: (effect, (lo, hi), template). ``{user}`` is the
@@ -415,6 +467,22 @@ PERSONA_LEAN = {
     "troll": (0.2, 2.3, 0.0),
     "money": (1.0, 0.8, 1.0),
     "pro": (1.5, 0.5, 0.6),
+    "good idea fairy": (1.1, 1.0, 0.1),  # enthusiastic ideas, mixed results
+    "crusty": (1.3, 0.7, 0.0),           # dry old street king, knows his stuff
+    "broke": (0.9, 1.4, 1.0),            # tunes for food (money), blows motors (risk)
+    "gatekeeper": (0.7, 1.1, 0.2),       # guards his 1/4 time, won't really help
+    "pops_scholar": (1.4, 0.6, 0.0),     # genuinely knows pops & bangs
+    "flipper": (1.0, 0.9, 0.7),          # always buying/selling, deals not tunes
+    "dyno": (1.2, 0.7, 0.8),             # numbers guy, charges per pull
+    "karen": (0.3, 1.8, 0.0),            # not a tuner, files complaints
+    "boomer": (1.0, 0.9, 0.0),           # forum essays, sometimes dated
+    "corn": (1.3, 0.7, 0.4),             # E85 evangelist
+    "stance": (0.7, 1.0, 0.0),           # looks over power
+    "gremlin": (0.5, 1.6, 0.0),          # eggs you on to send it
+    "hater": (0.7, 1.1, 0.0),            # contrarian old-gen owner
+    "supercharger": (1.2, 0.7, 0.9),     # sells SC kits
+    "remote": (1.0, 1.0, 0.8),           # promises revisions, may ghost
+    "noob": (0.8, 0.8, 0.0),             # clueless but harmless
 }
 
 # Someone always tells you to post a log when you ask without one.
@@ -441,3 +509,6 @@ DISCORD_RAIL_W = 0.14      # server icon rail
 DISCORD_CHAN_W = 0.50      # channel list column
 DISCORD_MEMBER_W = 0.56    # member list column
 DISCORD_MSG_LINES = 7      # messages shown in the scrollback
+# Member-list caps so a big roster doesn't overflow the window (rest -> "+N more").
+DISCORD_ONLINE_MAX = 8
+DISCORD_OFFLINE_MAX = 5

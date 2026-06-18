@@ -37,7 +37,7 @@ class DynoTask(TaskBase):
 
     def build_scene(self):
         self.car_np = self.add_garage_scene()
-        self.wheels = list(self.car_np.findAllMatches("**/tire_*")) + list(self.car_np.findAllMatches("**/rim_*"))
+        self.wheels = self.prepare_wheels(self.car_np)
         self.spin = 0.0
         self.running = False
         self.pull_t = 0.0
@@ -77,7 +77,7 @@ class DynoTask(TaskBase):
             self.game.finish_dyno(self.result)  # record + grade-based toast/Dave quip
             self.dirty = True
         self._sample()
-        self.spin += dt * 1700
+        self.spin -= dt * 1700
         for wheel in self.wheels:
             wheel.setP(self.spin)
         self.app.audio.set_engine(self.values["rpm"], AUDIO["pull_load"])

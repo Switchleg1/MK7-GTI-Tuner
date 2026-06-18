@@ -20,7 +20,7 @@ class StreetTask(TaskBase):
 
     def build_scene(self):
         self.car = self.add_garage_scene()
-        self.wheels = list(self.car.findAllMatches("**/tire_*")) + list(self.car.findAllMatches("**/rim_*"))
+        self.wheels = self.prepare_wheels(self.car)
         self.rpm = 850.0
         self.throttle = 0.0
         self.spin = 0.0
@@ -39,7 +39,7 @@ class StreetTask(TaskBase):
         else:
             self.throttle = max(0.0, self.throttle - dt * 1.6)
         self.rpm += (850 + self.throttle * 6200 - self.rpm) * clamp(dt * 5, 0, 1)
-        self.spin += dt * (4 + self.rpm / 220) * 40
+        self.spin -= dt * (4 + self.rpm / 220) * 40
         for wheel in self.wheels:
             wheel.setP(self.spin)
         self.car.setH(math.sin(time.perf_counter() * 1.3) * 1.3)
