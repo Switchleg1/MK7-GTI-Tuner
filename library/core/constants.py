@@ -30,6 +30,12 @@ BOX_LINE = rgba("#2f7d57", 0.55)     # subtle green ring around glass panels
 BTN_LINE = rgba("#357f59", 0.50)     # ring around an enabled button
 BTN_DISABLED_FILL = rgba("#0a0f13", 0.55)
 BTN_DISABLED_TEXT = rgba("#3a4750")
+
+# Dedicated cull bin for game-level overlays (Simon/Discord panels, the toast, and
+# the notifications), registered in app startup ABOVE Panda's default "fixed" bin so
+# they always draw over stage UI. Sorts within it order the overlays among themselves.
+OVERLAY_BIN = "a2d-overlay"
+OVERLAY_SORT = {"panel": 500, "toast": 900, "notify": 1000}
 TEXT = rgba("#cfe3ee")
 DIM = rgba("#7d93a3")
 MUTED = rgba("#41535f")
@@ -203,6 +209,24 @@ AUDIO = {
     "overrun_min_rpm": 3000,     # below this a throttle lift won't crackle
     "overrun_count": 24,         # max pops/bangs in a full-intensity burst
 }
+
+# --------------------------------------------------------------------------
+# Music: per-stage background tracks in data/music/<key>/. A random song plays;
+# when it finishes another random one from the same folder starts. Drop .ogg/.mp3/
+# .wav files in the folder named for each stage key (the task keys, plus "garage"
+# for the hub and "unlock" for the cinematic). Missing/empty folder -> silence.
+# --------------------------------------------------------------------------
+MUSIC_DIR = "data/music"
+MUSIC_EXTS = (".ogg", ".mp3", ".wav")
+MUSIC_VOLUME = 0.2
+
+# "Now playing" toast: a game-level overlay (above every stage) shown for
+# TOAST_SECONDS when a song starts, then it fades out over TOAST_FADE.
+TOAST_SECONDS = 5.0
+TOAST_FADE = 0.6
+TOAST_W = 0.98
+TOAST_H = 0.135
+TOAST_Z = -0.85
 
 # --------------------------------------------------------------------------
 # Unlock cinematic (driver-side: LHD car faces +Y, driver seat/door on -X,

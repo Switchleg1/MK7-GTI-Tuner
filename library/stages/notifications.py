@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from direct.gui import DirectGuiGlobals as DGG
 from direct.gui.DirectGui import DirectFrame, DirectLabel
-from direct.task import Task
-from panda3d.core import ClockObject, TextNode
+from panda3d.core import TextNode
 
-from library.core.constants import AMBER, PANEL_DARK, TEXT, WHITE
+from library.core.constants import AMBER, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, TEXT, WHITE
 from library.core.constants import GREEN as GREEN
 
 TOAST_LIFE = 4.5
@@ -21,20 +20,20 @@ class Notifications:
 
     It's purely a view: the model fills ``game.toast_queue`` (achievement labels)
     and ``game.dave_queue`` (Dave lines); this drains them each frame. Drawn in the
-    ``fixed`` bin so it sits on top of task panels."""
+    overlay bin so it sits on top of stage UI and the other overlays."""
 
     def __init__(self, app, game):
         self.app = app
         self.game = game
         self.font = getattr(app, "mono_font", None)
         self.root = app.aspect2d.attachNewNode("notifications")
-        self.root.setBin("fixed", 1000)
+        self.root.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"])
         self.toasts = []
         self.dave = None
-        app.taskMgr.add(self._update, "notifications")
 
-    def _update(self, task):
-        dt = ClockObject.getGlobalClock().getDt()
+    def render(self, dt):
+        """Called each frame by the app's render loop: drain the model's queues and
+        animate the achievement toasts + Dyno Dave bubble."""
         while self.game.toast_queue:
             self._add_toast(self.game.toast_queue.pop(0))
         if self.game.dave_queue:
@@ -43,7 +42,6 @@ class Notifications:
             self._set_dave(line)
         self._tick_toasts(dt)
         self._tick_dave(dt)
-        return Task.cont
 
     # -- achievement toasts ------------------------------------------------
     def _add_toast(self, label):
@@ -51,7 +49,7 @@ class Notifications:
         w, h = 0.82, 0.13
         frame = DirectFrame(parent=self.root, frameSize=(-w / 2, w / 2, -h / 2, h / 2),
                             frameColor=PANEL_DARK, relief=DGG.FLAT, pos=(right + w, 0, 0.72))
-        frame.setBin("fixed", 1001)
+        frame.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"] + 1)
         frame.setTransparency(1)
         DirectFrame(parent=frame, frameSize=(-w / 2, -w / 2 + 0.02, -h / 2, h / 2), frameColor=GREEN, relief=DGG.FLAT)
         DirectLabel(parent=frame, text="ACHIEVEMENT UNLOCKED", pos=(-w / 2 + 0.06, 0, 0.022), scale=0.025,
@@ -80,7 +78,7 @@ class Notifications:
             w, h = 0.98, 0.17
             frame = DirectFrame(parent=self.root, frameSize=(-w / 2, w / 2, -h / 2, h / 2),
                                 frameColor=PANEL_DARK, relief=DGG.FLAT, pos=(left + w / 2, 0, 0.70))
-            frame.setBin("fixed", 1001)
+            frame.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"] + 1)
             frame.setTransparency(1)
             DirectFrame(parent=frame, frameSize=(-w / 2, w / 2, h / 2 - 0.006, h / 2), frameColor=AMBER, relief=DGG.FLAT)
             DirectLabel(parent=frame, text="DYNO DAVE", pos=(-w / 2 + 0.05, 0, 0.04), scale=0.025,

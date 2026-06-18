@@ -24,6 +24,7 @@ class MapsTask(TaskBase):
 
     title = "TUNE"
     key = "maps"
+    music_key = "tuning"  # data/music/tuning/
 
     def build_ui(self, left, right):
         self._ready = False

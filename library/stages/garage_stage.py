@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from direct.task import Task
 from panda3d.core import ClockObject, TextNode
 
 from library.core import assets
 from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT
 from library.stages.hud import Hud
-from library.stages.simon_panel import SimonPanel
 
 
 class GarageStage(Hud):
     """The home hub: the GTI slowly turning in the bay with a row of task buttons.
-    Picking one calls ``on_pick(key)``; this is where Back returns you."""
+    Picking one calls ``on_pick(key)``; this is where Back returns you. The shared
+    Simon/Discord panels live on the app, so the hub shows them too."""
+
+    music_key = "garage"
 
     def __init__(self, app, game, on_pick):
         super().__init__(app, "garage-hub")
@@ -19,8 +20,6 @@ class GarageStage(Hud):
         self.on_pick = on_pick
         self.scene = app.render.attachNewNode("scene-garage")
         self.car = None
-        self.simon = None
-        self._tick_name = f"garage-spin-{id(self)}"
 
     def enter(self):
         from library.core.constants import GARAGE_CAMERA
@@ -32,21 +31,15 @@ class GarageStage(Hud):
         assets.load_model("ground").reparentTo(self.scene)
         self.car = assets.load_model("car")
         self.car.reparentTo(self.scene)
-        self.simon = SimonPanel(self.app, self.game, "")
         self.draw()
-        self.app.taskMgr.add(self._spin, self._tick_name)
 
     def exit(self):
-        self.app.taskMgr.remove(self._tick_name)
-        if self.simon:
-            self.simon.destroy()
         self.scene.removeNode()
         self.destroy()
 
-    def _spin(self, task):
+    def render(self, dt):
         if self.car:
             self.car.setH(ClockObject.getGlobalClock().getFrameTime() * 14.0)
-        return Task.cont
 
     def draw(self):
         self.clear()

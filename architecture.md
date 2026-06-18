@@ -12,12 +12,36 @@ mk7_gti_tuner.py -> configure_panda3d() -> MK7Tuner3D (ShowBase: shell + GameSta
 ```
 
 `MK7Tuner3D` (`library/game/app.py`) is a thin shell: it owns the window, lights,
-glTF render setup, the mono font, the `GameState` model, and **one active stage**.
-`set_stage(stage)` calls `self.stage.exit()` then `stage.enter()`. Every stage owns
-its own `aspect2d` sub-node (UI) and `render` sub-node (scene) and removes them on
-`exit()` — so a task never renders over the hub (the old tab/back overlap bug). There
-is no tab bar: the **GarageStage** hub (the GTI on a turntable) launches one task at
-a time, and each task's **Back** button (bottom-left, Simon-pill style) returns to it.
+glTF render setup, the mono font, the `Game` model, **one active stage**, and the
+game-level overlays. `set_stage(stage)` calls `self.stage.exit()` then `stage.enter()`,
+then `_sync_overlays(stage)` (point the music + shared panels at the new stage's key).
+Every stage owns its own `aspect2d` sub-node (UI) and `render` sub-node (scene) and
+removes them on `exit()` — so a task never renders over the hub (the old tab/back
+overlap bug). There is no tab bar: the **GarageStage** hub (the GTI on a turntable)
+launches one task at a time, and each task's **Back** button (bottom-left) returns to it.
+
+### Render loop (one place)
+
+A single task, `MK7Tuner3D._render`, drives every frame in a fixed order:
+
+```
+game.render():
+  per-frame updates   -> music.update(dt), toast.render(dt), notifications.render(dt)
+  current stage       -> self.stage.render(dt)         (task tick/redraw or hub spin)
+  game-level panels    -> simon.render(dt), discord.render(dt)
+```
+
+So the **Simon and Discord panels are owned by the app, not by the task** — they are
+built once on first hub entry, persist for the session, and just get re-pointed at the
+new context on each `set_stage`. Tasks no longer add their own per-frame task or their
+own panels.
+
+All game-level overlays (the panels, the toast, the notifications) draw in a dedicated
+cull bin, **`OVERLAY_BIN`** (`"a2d-overlay"`), registered in `app._register_overlay_bin`
+at sort 60 — above Panda's default bins (background/opaque/transparent/fixed/unsorted,
+sorts 10-50). aspect2d's DirectGui stage UI lands in `fixed` (40), so the overlays would
+otherwise be drawn *under* it; the higher bin keeps them on top regardless of draw
+order. `OVERLAY_SORT` orders the overlays within that bin (panel < toast < notify).
 
 ## Layout
 
@@ -27,12 +51,12 @@ the root. Assets stay at the root in `data/`.
 ```
 mk7_gti_tuner.py            entry point
 library/
-  core/      constants.py utils.py panda_config.py assets.py audio.py
+  core/      constants.py utils.py panda_config.py assets.py audio.py music.py
   game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
              discord.py discord_user.py discord_admin.py discord_green_name.py
              discord_normal_user.py geometry.py tuning.py simos.py
   stages/    hud.py task_base.py garage_stage.py simon_panel.py discord_panel.py
-             notifications.py unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
+             toast.py notifications.py unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
 data/        models/*.glb  images/*.png  audio/*.wav
@@ -58,6 +82,10 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   throttle load, plus pooled pop/bang/blow-off one-shots so overrun bursts overlap.
   No-ops if Panda has no audio backend; tasks drive it via `app.audio` and it is
   silenced on `TaskBase.exit()`. Sounds resolve via `assets.sound_path(key)`.
+- `music.py` — `MusicPlayer`: per-stage background music. `set_track(key)` plays a
+  random song from `data/music/<key>/` (resolved by `assets.music_paths`); on the
+  finished event it auto-plays another random one. Each start raises a "now playing"
+  toast. Owned by the app and re-pointed in `_sync_overlays`.
 
 ### `library/stages` — navigation + shared widgets
 - `hud.py` — `Hud(DirectObject)`: a tracked node tree under `aspect2d` plus the draw
@@ -66,12 +94,14 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   `frame`/`button` tint the `ui_box` texture for the fill and `ui_ring` for the border
   (via `_glass`); the `slider` thumb is the round `knob` texture. `destroy()` removes
   the whole tree. Base for every screen.
-- `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node, a
-  `SimonPanel`, and a `DiscordPanel`; `enter()` sets the camera, builds scene/UI, binds
-  keys, and runs a per-frame `_update` (calls `tick(dt)` + flame update + a `dirty`/live
-  redraw); `exit()` tears it all down. Subclasses set `title`/`key`/`live` and override
-  `build_scene`/`build_ui`/`bind_keys`/`tick`. Provides `add_garage_scene()`,
-  `panel_pair()`, `bind()` (run action + mark dirty), and exhaust `spawn_flames`.
+- `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node;
+  `enter()` sets the camera, builds scene/UI, and binds keys; the app's render loop
+  calls `render(dt)` (which runs `tick(dt)` + flame/reaction updates + a `dirty`/live
+  redraw); `exit()` tears it all down. The Simon/Discord panels are **not** owned here
+  — they live on the app. Subclasses set `title`/`key`/`live` (and `music_key`, which
+  defaults to `key` but is the themed folder name for TUNE→`tuning`/SKREETS→`skreetz`)
+  and override `build_scene`/`build_ui`/`bind_keys`/`tick`. Provides
+  `add_garage_scene()`, `panel_pair()`, `bind()`, and exhaust `spawn_flames`.
 - `garage_stage.py` — `GarageStage(Hud)`: the home hub — ground + glb GTI on a slow
   turntable, header, a row of task buttons from `MODES`, and Simon. `on_pick(key)`.
 - `simon_panel.py` — `SimonPanel(Hud)`: the reusable Ask-Simon pill + roast/tip popup
@@ -83,6 +113,10 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   line. Own node tree; companion to `SimonPanel`.
 - `notifications.py` — `Notifications`: a session-long top-screen overlay (achievement
   toasts + Dyno Dave bubbles) drained from `game.toast_queue` / `game.dave_queue`.
+  `render(dt)` is called by the app loop (no task of its own).
+- `toast.py` — `Toast(Hud)`: a single game-level bottom-centre prompt. `show(title,
+  message, seconds)` flashes it (used by `MusicPlayer` for "now playing"); `render(dt)`
+  holds it then fades it out.
 
 ### `library/stages` — cinematic unlock + its pieces
 - `unlock_stage.py` — `UnlockStage`: plug → phone → flash → done via `direct.interval`

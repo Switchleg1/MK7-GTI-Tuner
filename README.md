@@ -63,7 +63,12 @@ or the project root when run from source (see `library/core/assets.py`).
    - **RACE** — quarter-mile vs the street ladder.
    - **SHOP** — spend winnings on mods. **BENCH** — re-flash the current tune.
 3. Each task has a **Back** button (bottom-left) that returns you to the garage hub.
-4. **Ask Discord** (pill, any task). Opens the *MQB Vibe Coders* chat window — a
+4. **Music.** Each stage plays a random track from `data/music/<stage>/` and rolls to
+   another random one when it ends; a **NOW PLAYING** toast pops at the bottom for a
+   few seconds when a song starts. Drop your own `.ogg`/`.mp3`/`.wav` files in the
+   per-stage folders (`tuning/`, `skreetz/`, `dyno/`, `race/`, `shop/`, `bench/`,
+   `garage/`, `unlock/`) — see `data/music/README.txt`. Empty folder = silence.
+5. **Ask Discord** (pill, any task). Opens the *MQB Vibe Coders* chat window — a
    server rail, the channel list, the `#ecu-tuning` thread, and a member list where
    only a fraction of the roster is online at a time. **Type a help request and press
    Enter**: the text (mention a datalog!), who's online, and a dice roll decide the
@@ -86,9 +91,11 @@ data/
   images/   phone_wallpaper.png simostools_icon.png flash_complete.png logo.png
             simon*.png emoji_*.png ui_box.png ui_ring.png knob.png avatar.png
   audio/    engine_loop.wav intake_loop.wav turbo_loop.wav pop_*.wav bang_*.wav bov.wav
+  music/    <stage>/*.ogg|*.mp3|*.wav   (background tracks; see music/README.txt)
 ```
 
-Standard formats for now; a packed custom format may come later.
+The SFX in `audio/` are generated; the `music/` tracks are yours to drop in. Standard
+formats for now; a packed custom format may come later.
 
 ## Project rules
 

@@ -4,24 +4,22 @@ import random
 import time
 
 from direct.gui.OnscreenImage import OnscreenImage
-from direct.task import Task
-from panda3d.core import ClockObject, TextNode, TransparencyAttrib, Vec3, Vec4
+from panda3d.core import TextNode, TransparencyAttrib, Vec3, Vec4
 
 from library.core import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS
 from library.game.geometry import make_box
-from library.stages.discord_panel import DiscordPanel
 from library.stages.hud import Hud
-from library.stages.simon_panel import SimonPanel
 
 
 class TaskBase(Hud):
     """Base for a single full-screen task (BENCH/MAPS/DYNO/STREET/RACE/SHOP).
 
-    Owns its own 2D UI (via Hud), a 3D scene node, and a SimonPanel, plus a Back
-    button to the garage hub. Subclasses set ``title``/``key``/``live`` and override
-    ``build_scene``/``build_ui``/``bind_keys``/``tick``. ``exit()`` tears it all down
-    so nothing renders over the next stage."""
+    Owns its own 2D UI (via Hud) and a 3D scene node, plus a Back button to the
+    garage hub. The shared Simon/Discord panels live on the app, not here. Subclasses
+    set ``title``/``key``/``live`` and override ``build_scene``/``build_ui``/
+    ``bind_keys``/``tick``. The app's render loop calls ``render(dt)`` each frame;
+    ``exit()`` tears it all down so nothing renders over the next stage."""
 
     title = "TASK"
     key = ""
@@ -32,33 +30,22 @@ class TaskBase(Hud):
         self.game = game
         self.on_back = on_back
         self.scene = app.render.attachNewNode(f"scene-{self.key}")
-        self.simon = None
-        self.discord = None
         self.dirty = True
         self.last_draw = 0.0
         self.flames = []
         self.reactions = []
-        self._tick_name = f"task-tick-{id(self)}"
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
         self.set_camera()
         self.build_scene()
-        self.simon = SimonPanel(self.app, self.game, self.key)
-        self.discord = DiscordPanel(self.app, self.game, self.key)
         self.redraw()
         self.bind_keys()
-        self.app.taskMgr.add(self._update, self._tick_name)
 
     def exit(self):
-        self.app.taskMgr.remove(self._tick_name)
         audio = getattr(self.app, "audio", None)
         if audio:
             audio.silence()  # stop the engine note from droning into the next stage
-        if self.simon:
-            self.simon.destroy()
-        if self.discord:
-            self.discord.destroy()
         self.scene.removeNode()
         self.destroy()
 
@@ -152,8 +139,9 @@ class TaskBase(Hud):
         from library.core.constants import AMBER, BLUE as _B, DIM, GREEN, RED, VIOLET
         return {"ok": GREEN, "info": _B, "warn": AMBER, "err": RED, "violet": VIOLET}.get(kind, DIM)
 
-    def _update(self, task):
-        dt = ClockObject.getGlobalClock().getDt()
+    def render(self, dt):
+        """Called every frame by the app's render loop: advance flames/reactions,
+        run the subclass ``tick``, and redraw when dirty (or on the live timer)."""
         self.update_flames(dt)
         self.update_reactions(dt)
         self.tick(dt)
@@ -162,4 +150,3 @@ class TaskBase(Hud):
             self.redraw()
             self.dirty = False
             self.last_draw = now
-        return Task.cont

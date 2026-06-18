@@ -28,6 +28,10 @@ class Hud(DirectObject):
         aspect = self.app.getAspectRatio()
         return -aspect + 0.04, aspect - 0.04
 
+    def render(self, dt):
+        """Per-frame hook called by the app's render loop. Screens that animate
+        (tasks, the garage turntable, toasts) override this; static panels don't."""
+
     def clear(self):
         for node in self.nodes:
             node.destroy()

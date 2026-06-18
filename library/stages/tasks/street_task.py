@@ -16,6 +16,7 @@ class StreetTask(TaskBase):
     title = "SKREETS"
     key = "street"
     live = True
+    music_key = "skreetz"  # data/music/skreetz/
 
     def build_scene(self):
         self.car = self.add_garage_scene()

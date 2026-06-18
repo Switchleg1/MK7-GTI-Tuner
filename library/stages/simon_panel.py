@@ -31,6 +31,13 @@ class SimonPanel(Hud):
         self.open = False
         self.draw()
 
+    def set_context(self, key: str):
+        """Re-point Simon at the new stage (feeds his rules) and close any popup."""
+        self.tab = key
+        self.open = False
+        self.current = None
+        self.draw()
+
     def draw(self):
         self.clear()
         right = self.bounds()[1]

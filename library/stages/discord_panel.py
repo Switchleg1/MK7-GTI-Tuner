@@ -47,6 +47,12 @@ class DiscordPanel(Hud):
         self.open = False
         self.draw()
 
+    def set_context(self, key: str):
+        """Re-point the panel at the new stage and close the window if open."""
+        self.tab = key
+        self.open = False
+        self.draw()
+
     def _submit(self, text: str):
         text = (text or "").strip()
         if not text:

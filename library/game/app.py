@@ -2,22 +2,29 @@ from __future__ import annotations
 
 import sys
 
-from panda3d.core import AmbientLight, DirectionalLight, Filename, PerspectiveLens, Vec4, WindowProperties
+from panda3d.core import (
+    AmbientLight, ClockObject, CullBinManager, DirectionalLight, Filename, PerspectiveLens, Vec4, WindowProperties,
+)
 
 from direct.showbase.ShowBase import ShowBase
+from direct.task import Task
 
 from library.core.audio import GameAudio
-from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, WINDOW_TITLE
+from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, OVERLAY_BIN, OVERLAY_SORT, WINDOW_TITLE
+from library.core.music import MusicPlayer
 from library.core.panda_config import enable_gltf
 from library.game.game import Game
+from library.stages.discord_panel import DiscordPanel
 from library.stages.garage_stage import GarageStage
 from library.stages.notifications import Notifications
+from library.stages.simon_panel import SimonPanel
 from library.stages.tasks.bench_task import BenchTask
 from library.stages.tasks.dyno_task import DynoTask
 from library.stages.tasks.maps_task import MapsTask
 from library.stages.tasks.race_task import RaceTask
 from library.stages.tasks.shop_task import ShopTask
 from library.stages.tasks.street_task import StreetTask
+from library.stages.toast import Toast
 from library.stages.unlock_stage import UnlockStage
 
 TASK_CLASSES = {
@@ -31,8 +38,11 @@ TASK_CLASSES = {
 
 
 class MK7Tuner3D(ShowBase):
-    """Thin shell: owns the window/lights, the GameState model, and a single active
-    stage. Flow: UnlockStage (cinematic) -> GarageStage (hub) <-> a task at a time."""
+    """Thin shell: owns the window/lights, the Game model, a single active stage, and
+    the game-level overlays (music + now-playing toast, the achievement/Dave
+    notifications, and the shared Simon/Discord panels). One render loop drives them
+    all (see ``_render``). Flow: UnlockStage (cinematic) -> GarageStage (hub) <-> a
+    task at a time."""
 
     def __init__(self):
         super().__init__()
@@ -43,17 +53,52 @@ class MK7Tuner3D(ShowBase):
         if self.camLens is None:
             self.camLens = PerspectiveLens()
         self.camLens.setAspectRatio(DEFAULT_ASPECT)
+        self._register_overlay_bin()
         enable_gltf(self)
         self.setup_lights()
         self.mono_font = self.load_mono_font()
         self.audio = GameAudio(self)
         self.game = Game()
-        self.notifications = Notifications(self, self.game)  # session-long toast/Dave overlay
+        # Game-level overlays (above every stage), driven by the one render loop.
+        self.toast = Toast(self)                          # "now playing" + generic toasts
+        self.music = MusicPlayer(self)                    # per-stage background music
+        self.notifications = Notifications(self, self.game)  # achievement/Dave overlay
+        self.simon = None                                 # shared Ask-Simon panel (built at hub)
+        self.discord = None                               # shared Ask-Discord panel (built at hub)
         self.stage = None
+        self.taskMgr.add(self._render, "game-render")     # the single render loop
         self.accept("escape", sys.exit)
         self.start_unlock()
 
+    # -- render hierarchy --------------------------------------------------
+    def _render(self, task):
+        """game.render(): per-frame updates, then the current stage, then the
+        game-level panels (Simon/Discord) -- so the panels are owned by the game,
+        not by whatever task happens to be open."""
+        dt = ClockObject.getGlobalClock().getDt()
+        # 1. per-frame updates
+        self.music.update(dt)
+        self.toast.render(dt)
+        self.notifications.render(dt)
+        # 2. the current stage
+        if self.stage is not None:
+            self.stage.render(dt)
+        # 3. the shared panels (game-level, not task-dependent)
+        if self.simon is not None:
+            self.simon.render(dt)
+        if self.discord is not None:
+            self.discord.render(dt)
+        return Task.cont
+
     # -- setup -------------------------------------------------------------
+    def _register_overlay_bin(self):
+        """A cull bin for the game-level overlays, sorted ABOVE the default bins
+        (background/opaque/transparent/fixed/unsorted, sorts 10-50) so panels, the
+        toast, and notifications always draw over stage UI. Idempotent."""
+        cbm = CullBinManager.getGlobalPtr()
+        if cbm.findBin(OVERLAY_BIN) < 0:
+            cbm.addBin(OVERLAY_BIN, CullBinManager.BTFixed, 60)
+
     def window_properties(self) -> WindowProperties:
         props = WindowProperties()
         props.setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
@@ -88,10 +133,20 @@ class MK7Tuner3D(ShowBase):
             self.stage.exit()
         self.stage = stage
         stage.enter()
+        self._sync_overlays(stage)
+
+    def _sync_overlays(self, stage):
+        """Point the music + shared panels at the new stage's context key."""
+        key = getattr(stage, "music_key", "") or getattr(stage, "key", "")
+        self.music.set_track(key)
+        for panel in (self.simon, self.discord):
+            if panel is not None:
+                panel.set_context(key)
 
     def start_unlock(self):
         # UnlockStage self-manages its own cleanup before calling on_complete.
         self.stage = None
+        self.music.set_track("unlock")
         self.unlock = UnlockStage(self, on_complete=self.on_unlocked)
 
     def on_unlocked(self):
@@ -104,6 +159,11 @@ class MK7Tuner3D(ShowBase):
         self.enter_hub()
 
     def enter_hub(self):
+        if self.simon is None:  # build the shared panels once, on first hub entry
+            self.simon = SimonPanel(self, self.game, "garage")
+            self.discord = DiscordPanel(self, self.game, "garage")
+            for panel in (self.simon, self.discord):
+                panel.root.setBin(OVERLAY_BIN, OVERLAY_SORT["panel"])  # over stage UI, under toasts
         self.set_stage(GarageStage(self, self.game, on_pick=self.open_task))
 
     def open_task(self, key: str):
