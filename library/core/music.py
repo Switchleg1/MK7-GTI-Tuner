@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import random
 
-from library.core import assets
+from library.core.assets import assets
 from library.core.constants import MUSIC_VOLUME, TOAST_SECONDS
+from library.core.utils import clamp
 
 
 class MusicPlayer:
@@ -29,6 +30,13 @@ class MusicPlayer:
             return  # same context -> let the current song keep playing
         self.key = key
         self._play_random()
+
+    def set_volume(self, volume: float):
+        """Set the background-music level (0..1); applies to the playing song now and
+        to every song that follows. Driven by the options menu / saved config."""
+        self.volume = clamp(volume, 0.0, 1.0)
+        if self.current is not None:
+            self.current.setVolume(self.volume)
 
     def update(self, dt):
         """Render-loop hook. Music advances on the finished event, not per frame."""

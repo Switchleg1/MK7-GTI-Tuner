@@ -154,13 +154,28 @@ MODELS_DIR = "data/models"
 IMAGES_DIR = "data/images"
 AUDIO_DIR = "data/audio"
 
-MODEL_FILES = {
-    "ground": "ground.glb",
-    "car": "car.glb",
+CAR_MODEL_DIRECTORY = "cars"
+CAR_MODEL_FILES = {
+    'mk7_gti':          "mk7_gti.glb",
+    'civic_type_r':     "civic_type_r.glb",
+}
+
+CHARACTER_MODEL_DIRECTORY = "characters"
+CHARACTER_MODEL_FILES = {
     "character": "character.glb",
+}
+
+GEOMETRY_MODEL_DIRECTORY = "geometry"
+GEOMETRY_MODEL_FILES = {
+    "ground": "ground.glb",
+}
+
+MISC_MODEL_DIRECTORY = "misc"
+MISC_MODEL_FILES = {
     "phone": "phone.glb",
     "obd": "obd.glb",
 }
+
 IMAGE_FILES = {
     "wallpaper": "phone_wallpaper.png",
     "app_icon": "simostools_icon.png",
@@ -226,7 +241,8 @@ AUDIO = {
 # --------------------------------------------------------------------------
 MUSIC_DIR = "data/music"
 MUSIC_EXTS = (".ogg", ".mp3", ".wav")
-MUSIC_VOLUME = 0.2
+MUSIC_VOLUME = 0.2   # default background-music level (0..1), overridden by options.cfg
+FX_VOLUME = 0.8      # default sound-effects level (engine/pops/bangs), 0..1
 
 # "Now playing" toast: a game-level overlay (above every stage) shown for
 # TOAST_SECONDS when a song starts, then it fades out over TOAST_FADE.
@@ -235,6 +251,36 @@ TOAST_FADE = 0.6
 TOAST_W = 0.98
 TOAST_H = 0.135
 TOAST_Z = -0.85
+
+# --------------------------------------------------------------------------
+# Save games + options. Both live under the user's app-data folder (APP_NAME);
+# options.cfg persists between runs and loads at startup, savegame.json holds a
+# full career snapshot (bro / car+mods / rivals / discord). SAVE_VERSION lets a
+# future load reject or migrate an old layout.
+# --------------------------------------------------------------------------
+SAVE_VERSION = 1
+CONFIG_FILE = "options.cfg"
+SAVE_FILE = "savegame.json"
+
+# --------------------------------------------------------------------------
+# Main / pause menu. One MenuStage walks these pages (root / options / graphics);
+# the app supplies the actions. Root rows: (action key, label, visibility) where
+# visibility is "all" (always), "pause" (only with a game in progress), or
+# "main" (only on the title screen). "load" is auto-disabled with no save file.
+# --------------------------------------------------------------------------
+MENU_MUSIC_KEY = "garage"  # title + pause menu share the hub track (continuous)
+MENU_ITEMS = [
+    ("resume", "Resume", "pause"),
+    ("new", "New Game", "all"),
+    ("load", "Load Game", "all"),
+    ("save", "Save Game", "pause"),
+    ("options", "Options", "all"),
+    ("quit", "Quit", "all"),
+]
+MENU_PANEL = (-0.66, 0.66, -0.66, 0.66)  # centred glass card (l, r, b, t)
+MENU_BTN = (1.04, 0.12)                  # menu button size (w, h)
+MENU_BTN_GAP = 0.155                     # vertical spacing between menu buttons
+MENU_VOL_RANGE = (0.0, 1.0)              # music / fx volume slider range
 
 # --------------------------------------------------------------------------
 # Unlock cinematic (driver-side: LHD car faces +Y, driver seat/door on -X,

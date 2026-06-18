@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import random
 
-from library.core.assets import sound_path
-from library.core.constants import AUDIO
+from library.core.assets.assets import sound_path
+from library.core.constants import AUDIO, FX_VOLUME
 from library.core.utils import clamp
 
 
@@ -23,6 +23,7 @@ class GameAudio:
     def __init__(self, base):
         self.base = base
         self.enabled = False
+        self.fx_volume = FX_VOLUME  # master gain for all SFX (engine/pops/bangs)
         self.engine = self.intake = self.turbo = None
         self.pops: list = []
         self.bangs: list = []
@@ -34,6 +35,7 @@ class GameAudio:
                 return
             self.mgr = mgr
             mgr.setConcurrentSoundLimit(AUDIO["concurrent_limit"])
+            mgr.setVolume(self.fx_volume)  # master SFX gain (options menu adjusts it)
             self.engine = self._loop("engine")
             self.intake = self._loop("intake")
             self.turbo = self._loop("turbo")
@@ -87,6 +89,13 @@ class GameAudio:
 
     def idle(self, rpm=950):
         self.set_engine(rpm, AUDIO["idle_load"])
+
+    def set_fx_volume(self, volume):
+        """Master gain for all sound effects (0..1) via the AudioManager -- scales the
+        engine loop and every pop/bang at once. Driven by the options menu / config."""
+        self.fx_volume = clamp(volume, 0.0, 1.0)
+        if self.enabled:
+            self.mgr.setVolume(self.fx_volume)
 
     def silence(self):
         if not self.enabled:

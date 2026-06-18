@@ -7,7 +7,7 @@ from direct.interval.IntervalGlobal import Func, LerpColorScaleInterval, LerpFun
 from direct.showbase.DirectObject import DirectObject
 from panda3d.core import TextNode, TransparencyAttrib
 
-from library.core import assets
+import library.core.assets as assets
 from library.stages.character import Character
 from library.core.constants import (
     BLUE,
@@ -64,15 +64,15 @@ class UnlockStage(DirectObject):
 
     # -- scene -------------------------------------------------------------
     def _build_scene(self):
-        assets.load_model("ground").reparentTo(self.root)
-        assets.load_model("car").reparentTo(self.root)
+        assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.root)
+        assets.load_model(assets.ModelType.CAR, "mk7_gti").reparentTo(self.root)
 
         char_model = assets.load_model("character")
         char_model.reparentTo(self.root)
         char_model.setPos(*CHARACTER_POS)
         self.character = Character(char_model)
 
-        obd = assets.load_model("obd")
+        obd = assets.load_model(assets.ModelType.MISC, "obd")
         self.port = obd.find("**/obd_port")
         self.port.reparentTo(self.root)
         self.port.setPos(*OBD_PORT_POS)
@@ -80,7 +80,7 @@ class UnlockStage(DirectObject):
         self.adapter.reparentTo(self.port)
         self.adapter.setPos(*OBD_ADAPTER_REST)
 
-        self.phone = assets.load_model("phone")
+        self.phone = assets.load_model(assets.ModelType.MISC, "phone")
         self.character.attach_to_hand(self.phone, PHONE_IN_HAND)
         self.phone.hide()
 

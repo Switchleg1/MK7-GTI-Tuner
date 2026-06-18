@@ -4,7 +4,7 @@ import time
 
 from panda3d.core import TextNode, Vec4
 
-from library.core import assets
+import library.core.assets as assets
 from library.core.constants import (
     AMBER, AUDIO, BLUE, BOX_LINE, DIM, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
 )
@@ -49,11 +49,11 @@ class RaceTask(TaskBase):
     live = True
 
     def build_scene(self):
-        assets.load_model("ground").reparentTo(self.scene)
-        self.player_car = assets.load_model("car")
+        assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.scene)
+        self.player_car = assets.load_model(assets.ModelType.CAR, "mk7_gti")
         self.player_car.reparentTo(self.scene)
         self.player_car.setPos(-2.2, 0, 0.0)
-        self.rival_car = assets.load_model("car")
+        self.rival_car = assets.load_model(assets.ModelType.CAR, "civic_type_r")
         self.rival_car.reparentTo(self.scene)
         self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
         self.rival_car.setPos(RIVAL_X, 0, 0.0)
@@ -101,11 +101,10 @@ class RaceTask(TaskBase):
 
     # -- per-frame ---------------------------------------------------------
     def tick(self, dt):
-        race = self.game.race
-        if race and race["active"]:
+        if self.game.race and self.game.race["active"]:
             self.game.step_race(dt)
-            player = race["p"]
-            rival = race["r"]
+            player = self.game.race["p"]
+            rival = self.game.race["r"]
             # Rival lane position = the literal gap, in scaled scene units.
             self.rival_car.setY((rival["d"] - player["d"]) * RIVAL_GAP_SCALE)
             # World scroll: lane dashes/cones travel backward at the player's speed.
@@ -135,8 +134,8 @@ class RaceTask(TaskBase):
             text, _, hint = self._race_status()
             self.dash["status"]["text"] = text
             self.dash["hint"]["text"] = hint
-            if race and race["active"]:
-                gap = race["p"]["d"] - race["r"]["d"]
+            if self.game.race and self.game.race["active"]:
+                gap = self.game.race["p"]["d"] - self.game.race["r"]["d"]
                 if abs(gap) > 0.5:
                     self.dash["gap"]["text"] = (f"YOU +{gap:.0f}m" if gap > 0 else f"RIVAL +{-gap:.0f}m")
                     self.dash["gap"]["text_fg"] = GREEN if gap > 0 else RED

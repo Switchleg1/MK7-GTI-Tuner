@@ -135,3 +135,17 @@ class Discord:
 
     def member(self, handle: str):
         return self.by_handle.get(handle)
+
+    # -- save --------------------------------------------------------------
+    def to_dict(self) -> dict:
+        """The roster itself comes from constants; only presence + the open channel
+        are dynamic, so that's all the save carries (keyed by handle)."""
+        return {"active_channel": self.active_channel,
+                "online": {m.handle: m.online for m in self.members}}
+
+    def from_dict(self, data: dict):
+        self.active_channel = data.get("active_channel", self.active_channel)
+        online = data.get("online", {})
+        for member in self.members:
+            if member.handle in online:
+                member.online = bool(online[member.handle])

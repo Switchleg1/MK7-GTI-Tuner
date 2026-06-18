@@ -6,7 +6,7 @@ import time
 from direct.gui.OnscreenImage import OnscreenImage
 from panda3d.core import Point3, TextNode, TransparencyAttrib, Vec3, Vec4
 
-from library.core import assets
+from library.core.assets import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS, WHEEL_PREFIX, WHEEL_STATIC
 from library.game.geometry import make_box
 from library.stages.hud import Hud
@@ -71,8 +71,8 @@ class TaskBase(Hud):
 
     # -- helpers -----------------------------------------------------------
     def add_garage_scene(self):
-        assets.load_model("ground").reparentTo(self.scene)
-        car = assets.load_model("car")
+        assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.scene)
+        car = assets.load_model(assets.ModelType.CAR, "mk7_gti")
         car.reparentTo(self.scene)
         return car
 

@@ -5,7 +5,8 @@ import time
 
 from library.core.constants import (
     BUST_FINE, DISCORD_GREEN_BRUSHOFF, GOD_PAYOUT, GREEN_NAME_CRED, KAREN_AFTER_BUST,
-    KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, TRACK_M, TUNE_SALE, WIZARD_CRED,
+    KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TRACK_M,
+    TUNE_SALE, WIZARD_CRED,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -42,11 +43,16 @@ class Game:
     nodes. Display reads go straight to ``game.bro`` / ``game.car``."""
 
     def __init__(self):
+        self.pros = ProTuner.roster()  # static reference data (never reset)
+        self.new_game()
+
+    def new_game(self):
+        """(Re)initialise a fresh career in place. Mutating the existing Game (rather
+        than building a new one) keeps the shared panels' ``game`` references valid."""
         self.bro = TunerBro()
         self.rivals = RivalGreenName.ladder()
         self.cars = CarLibrary()
         self.discord = Discord()
-        self.pros = ProTuner.roster()
         self.logs: list[tuple[str, str]] = []
         self.race = None
         self.simon_tick = 0  # rotates Simon through his ranked insights
@@ -355,8 +361,28 @@ class Game:
 
     # -- save --------------------------------------------------------------
     def to_dict(self) -> dict:
-        return {"bro": self.bro.to_dict(), "cars": self.cars.to_dict()}
+        """A full career snapshot: the bro, the car library (build + mods), the rival
+        ladder, the discord presence, and the career counters/achievements. Restored
+        in place by ``from_dict`` so live panel references stay valid."""
+        return {
+            "version": SAVE_VERSION,
+            "bro": self.bro.to_dict(),
+            "cars": self.cars.to_dict(),
+            "rivals": [rival.to_dict() for rival in self.rivals],
+            "discord": self.discord.to_dict(),
+            "achievements": sorted(self.achievements),
+            "total_pops": self.total_pops,
+            "map_switches": self.map_switches,
+            "simon_tick": self.simon_tick,
+        }
 
     def from_dict(self, data: dict):
         self.bro.from_dict(data.get("bro", {}))
         self.cars.from_dict(data.get("cars", {}))
+        for rival, saved in zip(self.rivals, data.get("rivals", [])):
+            rival.from_dict(saved)
+        self.discord.from_dict(data.get("discord", {}))
+        self.achievements = set(data.get("achievements", []))
+        self.total_pops = data.get("total_pops", 0)
+        self.map_switches = data.get("map_switches", 0)
+        self.simon_tick = data.get("simon_tick", 0)

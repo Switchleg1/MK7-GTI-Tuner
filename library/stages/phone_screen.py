@@ -5,7 +5,7 @@ from direct.gui.DirectGui import DirectButton, DirectFrame, DirectLabel
 from direct.gui.OnscreenImage import OnscreenImage
 from panda3d.core import TextNode, TransparencyAttrib
 
-from library.core import assets
+from library.core.assets import assets
 from library.core.constants import (
     DIM,
     GREEN,

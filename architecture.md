@@ -3,12 +3,13 @@
 ## Stage flow
 
 ```
-mk7_gti_tuner.py -> configure_panda3d() -> MK7Tuner3D (ShowBase: shell + GameState)
+mk7_gti_tuner.py -> configure_panda3d() -> MK7Tuner3D (ShowBase: shell + Game)
        |
-  UnlockStage (cinematic) --on_complete--> GarageStage (3D hub)
-                                              | on_pick(key)        ^ on_back
-                                              v                     |
-                                           <Task>.enter()  ----  <Task>.exit()
+  MenuStage (title) --New Game--> UnlockStage (cinematic) --on_complete--\
+       ^  ^  |        --Load Game--------------------------------------> GarageStage (3D hub)
+       |  |  Options (sound/graphics, options.cfg)                          | on_pick(key)   ^ on_back
+       |  Save Game (savegame.json)                                         v                |
+       Esc / MENU button <---- (pause menu, resumable) ----            <Task>.enter() -- <Task>.exit()
 ```
 
 `MK7Tuner3D` (`library/game/app.py`) is a thin shell: it owns the window, lights,
@@ -50,8 +51,28 @@ therefore calls **`_lift_overlays`**, which reparents the overlays to the end of
 `aspect2d` after each `set_stage`, putting their regions above the new stage's UI. The
 **Discord window** adds a full-screen `state=NORMAL` modal shade behind itself (in
 `_modal_shade`); lifted above the task, it swallows click-through (the window's own
-button + entry are created after it, so they stay interactive). ESC is intentionally
-*not* bound to quit.
+button + entry are created after it, so they stay interactive).
+
+### Menu + save/load
+
+The app **boots into `MenuStage`** (the title screen) rather than straight into the
+cinematic. **New Game** runs the same `UnlockStage` cinematic; **Load Game** restores a
+`savegame.json` and jumps straight to the hub (no cinematic — the ECU state is already
+flashed). At the hub, the **MENU** button or **Esc** opens the same stage as a *pause*
+menu (`resumable=True`), which adds **Resume** + **Save Game**. `Esc` toggles it (open at
+the hub, resume from the menu) and is inert during the cinematic / inside a task. Because
+`MenuStage` is a normal stage that *replaces* the current one, there's no modal/​click
+concern — but the persistent Simon/Discord "Ask" pills don't belong on the menu, so
+`_sync_overlays` **stashes** them while a `MenuStage` is active (stash also pulls their
+mouse regions; reparenting un-stashes, so the stash runs *after* `_lift_overlays`).
+
+**New Game / Load Game mutate the single `Game` in place** (`Game.new_game()` /
+`from_dict`) rather than constructing a new one, so the shared panels' cached `game`
+reference stays valid. **Options** live in `options.cfg` (a `Config`): music + FX volume
+now (applied live to `MusicPlayer.set_volume` / `GameAudio.set_fx_volume` and persisted on
+change), graphics later. Both files live under the per-user app-data dir (`storage.py`),
+not the bundled `data/`, so they're writable in a frozen build. NB: the player options are
+`app.options`; `app.config` is ShowBase's own Panda config — don't shadow it.
 
 ## Layout
 
@@ -62,10 +83,11 @@ the root. Assets stay at the root in `data/`.
 mk7_gti_tuner.py            entry point
 library/
   core/      constants.py utils.py panda_config.py assets.py audio.py music.py
+             config.py storage.py
   game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
              discord.py discord_user.py discord_admin.py discord_green_name.py
              discord_normal_user.py geometry.py tuning.py simos.py
-  stages/    hud.py task_base.py garage_stage.py simon_panel.py discord_panel.py
+  stages/    hud.py task_base.py garage_stage.py menu_stage.py simon_panel.py discord_panel.py
              toast.py notifications.py unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
@@ -80,7 +102,7 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `mk7_gti_tuner.py` — entry point: configure Panda, run `MK7Tuner3D`.
 - `panda_config.py` — `configure_panda3d()` (window/MSAA prc) and `enable_gltf(base)`
   (auto-shader + multisample; no simplepbr, for robust startup).
-- `assets.py` — `load_model(key)` (loads a `.glb` via panda3d-gltf with
+- `assets.py` — `load_model(type, key)` (loads a `.glb` via panda3d-gltf with
   `skip_axis_conversion=True`), `image_path(key)`, and `data_root()` (frozen-aware:
   `sys._MEIPASS` when packaged, project root from source).
 - `constants.py` — **all** defaults, thresholds, colors, asset paths, the cinematic
@@ -92,10 +114,20 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   throttle load, plus pooled pop/bang/blow-off one-shots so overrun bursts overlap.
   No-ops if Panda has no audio backend; tasks drive it via `app.audio` and it is
   silenced on `TaskBase.exit()`. Sounds resolve via `assets.sound_path(key)`.
+  `set_fx_volume(v)` sets the master SFX gain via the `AudioManager` (options menu).
 - `music.py` — `MusicPlayer`: per-stage background music. `set_track(key)` plays a
   random song from `data/music/<key>/` (resolved by `assets.music_paths`); on the
   finished event it auto-plays another random one. Each start raises a "now playing"
-  toast. Owned by the app and re-pointed in `_sync_overlays`.
+  toast. `set_volume(v)` (driven by the options menu) levels the current + future songs.
+  Owned by the app and re-pointed in `_sync_overlays`.
+- `storage.py` — writable per-user paths + JSON I/O: `app_data_dir()` (`%APPDATA%/<APP_NAME>`,
+  created on demand — writable even in a frozen build, unlike bundled `data/`),
+  `config_path()`/`save_path()`/`has_save()`, and tolerant `read_json`/`write_json`
+  (atomic temp-file replace; never raises).
+- `config.py` — `Config`: the player's options, persisted to `options.cfg`
+  (`load()`/`save()`/`to_dict`/`from_dict`). Holds `music_volume`, `fx_volume`, and a
+  forward-compat `graphics` bag. `apply(app)` pushes the volumes into the music player +
+  audio. Lives on the app as **`app.options`** (not `app.config`, which is Panda's).
 
 ### `library/stages` — navigation + shared widgets
 - `hud.py` — `Hud(DirectObject)`: a tracked node tree under `aspect2d` plus the draw
@@ -120,7 +152,13 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   returns the pivots to rotate about the axle (X). Falls back to the old `tire_`/`rim_`
   nodes if this isn't the detailed model.
 - `garage_stage.py` — `GarageStage(Hud)`: the home hub — ground + glb GTI on a slow
-  turntable, header, a row of task buttons from `MODES`, and Simon. `on_pick(key)`.
+  turntable, header, a **MENU** button (`on_menu`), a row of task buttons from `MODES`,
+  and Simon. `on_pick(key)`.
+- `menu_stage.py` — `MenuStage(Hud)`: the title + pause menu. One stage walking three
+  pages (root / options / graphics) on a centred glass card. Root rows come from
+  `MENU_ITEMS` filtered by `resumable` (Resume/Save only mid-career; Load auto-disabled
+  with no save). The app passes the actions (`new`/`load`/`save`/`resume`/`quit`); the
+  options page hosts the music + FX volume sliders (apply live + persist to `options.cfg`).
 - `simon_panel.py` — `SimonPanel(Hud)`: the reusable Ask-Simon pill + roast/tip popup
   (own node tree, toggles independently of the host screen), fed by `simos`.
 - `discord_panel.py` — `DiscordPanel(Hud)`: the **Ask-Discord chat window**. A pill
@@ -162,13 +200,16 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   (run via `python -m library.assetgen.generate_assets`).
 
 ### `library/game` — model tree + math
-A save-ready object tree (each node has `to_dict`/`from_dict`; serialization itself is
-a later step). Display reads go straight to `game.bro`/`game.car`; cross-node actions
-are orchestrated on `Game`.
+A save-ready object tree: each node has `to_dict`/`from_dict`, and `Game.to_dict` rolls
+them into a single career snapshot written to `savegame.json` (see `storage.py`). Display
+reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated on `Game`.
 - `game.py` — `Game`: root/session. Holds `bro: TunerBro`, `rivals: [RivalGreenName]`,
   `cars: CarLibrary`, `discord: Discord`, transient `logs`/`race`, a `car` property, and
   the orchestration that spans nodes (`buy_mod`, `register_pops`, the quarter-mile race,
-  `ask_discord`, log).
+  `ask_discord`, log). `new_game()` resets a fresh career **in place** (so cached
+  references survive); `to_dict`/`from_dict` cover the bro, car library (build + mods),
+  rival ladder, discord presence, and the career counters/achievements (stamped with
+  `SAVE_VERSION`), restoring in place.
 - `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress,
   `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`). Room
   for emotional damage / route / skills.
@@ -230,9 +271,11 @@ path works from source and from the exe. The committed `.spec` mirrors this
 ## Verifying changes
 
 1. `python -m library.assetgen.generate_assets` — rebuild assets (offline, no window).
-2. `python mk7_gti_tuner.py` — unlock cinematic → garage hub → open each task → Back
-   → open another (no overlay left behind); throttle/pops on STREET, a dyno pull, a
-   race all run. For quick visual checks render in a `window-type offscreen` ShowBase
-   and `saveScreenshot` (drive a task's `_update` with `taskMgr.step()`).
+2. `python mk7_gti_tuner.py` — title menu → New Game → unlock cinematic → garage hub →
+   open each task → Back → open another (no overlay left behind); throttle/pops on
+   STREET, a dyno pull, a race all run. At the hub, MENU/Esc opens the pause menu: Save
+   Game, then New Game/Load Game round-trips the career; Options sliders change music/FX
+   volume live and survive a relaunch (`options.cfg`). For quick visual checks render in a
+   `window-type offscreen` ShowBase and `saveScreenshot` (drive `taskMgr.step()`).
 3. `build.bat` then run `dist/MK7-GTI-Tuner.exe` — confirm the packaged build loads
    its assets (the bundled `data/`).

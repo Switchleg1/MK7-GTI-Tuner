@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from panda3d.core import ClockObject, TextNode
 
-from library.core import assets
+import library.core.assets as assets
 from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT, VIOLET
 from library.stages.hud import Hud
 
@@ -14,11 +14,12 @@ class GarageStage(Hud):
 
     music_key = "garage"
 
-    def __init__(self, app, game, on_pick, on_summon=None):
+    def __init__(self, app, game, on_pick, on_summon=None, on_menu=None):
         super().__init__(app, "garage-hub")
         self.game = game
         self.on_pick = on_pick
         self.on_summon = on_summon  # launch the Bench Wizard Trial when summoned
+        self.on_menu = on_menu      # open the pause menu (save / load / options)
         self.scene = app.render.attachNewNode("scene-garage")
         self.car = None
 
@@ -29,8 +30,8 @@ class GarageStage(Hud):
             self.app.camLens.setFov(GARAGE_CAMERA.get("fov", 42))
         self.app.camera.setPos(*GARAGE_CAMERA["pos"])
         self.app.camera.lookAt(*GARAGE_CAMERA["look_at"])
-        assets.load_model("ground").reparentTo(self.scene)
-        self.car = assets.load_model("car")
+        assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.scene)
+        self.car = assets.load_model(assets.ModelType.CAR, "mk7_gti")
         self.car.reparentTo(self.scene)
         self.draw()
 
@@ -46,6 +47,8 @@ class GarageStage(Hud):
         self.clear()
         left, right = self.bounds()
         self.draw_header(self.game)
+        if self.on_menu:
+            self.button("MENU", (left + 0.21, 0, 0.66), (0.34, 0.09), self.on_menu, True, PANEL, 0.04)
         self.label("GARAGE", (0, 0, 0.66), 0.06, GREEN, align=TextNode.ACenter)
         self.label("Pick a task. Ask Simon if you're stuck.", (0, 0, 0.58), 0.034, DIM, align=TextNode.ACenter)
         if self.on_summon and self.game.wizard_available():

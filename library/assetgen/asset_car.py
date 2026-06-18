@@ -47,7 +47,7 @@ def build(out_dir: str) -> str:
     """Stylised MK7 GTI (red, faces +Y) with the driver door (-X) already open
     and a visible interior, so the seated character can reach the OBD2 port."""
     scene = GlbScene()
-    car = scene.group("car")
+    car = scene.group("mk7_gti")
 
     for name, size, color, pos, kw in BODY_PARTS:
         scene.box(name, size, color, translation=pos, parent=car, **kw)

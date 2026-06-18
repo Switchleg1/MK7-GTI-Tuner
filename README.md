@@ -49,6 +49,11 @@ or the project root when run from source (see `library/core/assets.py`).
 
 ## How it plays
 
+The app opens on a **main menu** (New Game · Load Game · Options · Quit). **New Game**
+runs the cinematic below; **Load Game** drops you straight back at the garage with your
+saved career. At the garage, the **MENU** button (or **Esc**) opens the same menu as a
+pause screen with **Save Game** and **Resume**.
+
 1. **Unlock (cinematic).** The guy sits in the open driver door, feet on the ground.
    1. **Click the OBD2 port** under the dash → he plugs in the adapter (link progress).
    2. **Tap the phone** → he raises it and the SimosTools app opens.
@@ -75,13 +80,18 @@ or the project root when run from source (see `library/core/assets.py`).
    outcome — cash, a free community map, or clout if it goes well; a broken part
    (costs cash) or lost clients (costs clout) if it doesn't. Admins help, green names
    want money, and the troll will gladly ruin your day.
+6. **Menu, saves & options.** **Esc** (or the hub **MENU** button) opens the pause menu:
+   **Save Game** writes a full career snapshot (cash, the car build + mods, rival ladder,
+   Discord state) and **Load Game** restores it. **Options → Sound** has live music + FX
+   volume sliders; **Graphics** is a placeholder for now. Options persist in `options.cfg`
+   and the save in `savegame.json`, both under your user app-data folder.
 
 ### Controls
 
 - **Mouse** — click task buttons, in-task buttons, Back, the phone, and Discord.
 - **Space** — **hold** to keep the throttle pinned on Street (release to crackle);
   launch & shift on Race. **Type + Enter** in the Discord box to ask for help.
-  **Esc** — quit.
+- **Esc** — open the pause menu at the garage (resume from it); **Quit** lives in the menu.
 
 ## Data layout
 
@@ -96,6 +106,10 @@ data/
 
 The SFX in `audio/` are generated; the `music/` tracks are yours to drop in. Standard
 formats for now; a packed custom format may come later.
+
+Saves and options are **not** in `data/` — they're written to a per-user, writable
+location so they survive a packaged build: `%APPDATA%\MK7 GTI Tuner\` on Windows
+(`savegame.json`, `options.cfg`).
 
 ## Project rules
 

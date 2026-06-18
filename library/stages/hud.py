@@ -6,7 +6,7 @@ from direct.gui.OnscreenImage import OnscreenImage
 from direct.showbase.DirectObject import DirectObject
 from panda3d.core import TextNode, TransparencyAttrib
 
-from library.core import assets
+from library.core.assets import assets
 from library.core.constants import (
     BOX_LINE, BTN_DISABLED_FILL, BTN_DISABLED_TEXT, BTN_LINE, DIM, GREEN, GREEN_2,
     LINE, PANEL, PANEL_DARK, TEXT, VIOLET, WHITE,

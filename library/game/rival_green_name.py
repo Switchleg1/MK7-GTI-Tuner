@@ -24,3 +24,10 @@ class RivalGreenName:
 
     def to_dict(self) -> dict:
         return {"name": self.name, "whp": self.whp, "weight": self.weight, "grip": self.grip, "purse": self.purse}
+
+    def from_dict(self, data: dict):
+        # Restore the stats from a save (the ladder itself is rebuilt from RIVALS, so
+        # the colour stays); guards against a future roster change shifting indices.
+        for key in ("name", "whp", "weight", "grip", "purse"):
+            if key in data:
+                setattr(self, key, data[key])

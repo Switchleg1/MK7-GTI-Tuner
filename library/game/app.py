@@ -7,13 +7,16 @@ from panda3d.core import (
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 
+from library.core import storage
 from library.core.audio import GameAudio
-from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, OVERLAY_BIN, OVERLAY_SORT, WINDOW_TITLE
+from library.core.config import Config
+from library.core.constants import BG, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, OVERLAY_BIN, OVERLAY_SORT, TOAST_SECONDS, WINDOW_TITLE
 from library.core.music import MusicPlayer
 from library.core.panda_config import enable_gltf
 from library.game.game import Game
 from library.stages.discord_panel import DiscordPanel
 from library.stages.garage_stage import GarageStage
+from library.stages.menu_stage import MenuStage
 from library.stages.notifications import Notifications
 from library.stages.simon_panel import SimonPanel
 from library.stages.tasks.bench_task import BenchTask
@@ -65,8 +68,13 @@ class MK7Tuner3D(ShowBase):
         self.simon = None                                 # shared Ask-Simon panel (built at hub)
         self.discord = None                               # shared Ask-Discord panel (built at hub)
         self.stage = None
+        self.session_started = False                      # a career is in progress (enables pause menu)
+        # NB: ``self.config`` is ShowBase's Panda config -- don't shadow it; ours is ``options``.
+        self.options = Config.load()                      # options.cfg (sound, ...)
+        self.options.apply(self)                          # push saved volumes into music + audio
+        self.accept("escape", self._on_escape)            # Esc toggles the pause menu at the hub
         self.taskMgr.add(self._render, "game-render")     # the single render loop
-        self.start_unlock()
+        self.enter_menu(resumable=False)                  # boot to the title menu
 
     # -- render hierarchy --------------------------------------------------
     def _render(self, task):
@@ -136,13 +144,18 @@ class MK7Tuner3D(ShowBase):
     def _sync_overlays(self, stage):
         """Point the music + shared panels at the new stage's context key, then lift
         the overlays so they sit above the freshly-built stage UI (visually AND for
-        mouse picking)."""
+        mouse picking). The Simon/Discord "Ask" pills don't belong on the menu, so
+        they're stashed there (stash also pulls their click regions)."""
         key = getattr(stage, "music_key", "") or getattr(stage, "key", "")
         self.music.set_track(key)
         for panel in (self.simon, self.discord):
             if panel is not None:
                 panel.set_context(key)
-        self._lift_overlays()
+        self._lift_overlays()  # reparents (which un-stashes) -- so stash AFTER it
+        if isinstance(stage, MenuStage):
+            for panel in (self.simon, self.discord):
+                if panel is not None:
+                    panel.root.stash()
 
     def _lift_overlays(self):
         """Reparent the overlays to the end of aspect2d so they're traversed AFTER the
@@ -155,7 +168,9 @@ class MK7Tuner3D(ShowBase):
 
     def start_unlock(self):
         # UnlockStage self-manages its own cleanup before calling on_complete.
-        self.stage = None
+        if self.stage is not None:  # e.g. the menu we launched from -- tear it down
+            self.stage.exit()
+            self.stage = None
         self.music.set_track("unlock")
         self.unlock = UnlockStage(self, on_complete=self.on_unlocked)
 
@@ -164,9 +179,44 @@ class MK7Tuner3D(ShowBase):
         # Kept OUT of enter_hub so returning to the hub from a task doesn't re-run
         # mark_unlocked() and wipe the player's flashed tune + switch-patch slots.
         self.game.car.mark_unlocked()
+        self.session_started = True
         if self.game.unlock("first_flash", "Boot Patched, Baby"):
             self.game.dave("flash")
         self.enter_hub()
+
+    # -- menu + save/load --------------------------------------------------
+    def enter_menu(self, resumable: bool):
+        actions = {"new": self._new_game, "load": self._load_game,
+                   "save": self._save_game, "resume": self.enter_hub, "quit": self.userExit}
+        self.set_stage(MenuStage(self, self.game, resumable=resumable, actions=actions))
+
+    def _on_escape(self):
+        """Esc opens the pause menu from the hub, and resumes from the menu. Inert
+        during the cinematic / inside a task (those have their own Back / flow)."""
+        if isinstance(self.stage, MenuStage):
+            if self.stage.resumable:
+                self.enter_hub()
+        elif isinstance(self.stage, GarageStage):
+            self.enter_menu(resumable=True)
+
+    def _new_game(self):
+        self.game.new_game()           # reset career in place (panels keep their ref)
+        self.session_started = False
+        self.start_unlock()            # same cinematic the app boots into
+
+    def _load_game(self):
+        data = storage.read_json(storage.save_path())
+        if not data:
+            self.toast.show("LOAD FAILED", "no save file found", TOAST_SECONDS)
+            return
+        self.game.from_dict(data)      # restore in place
+        self.session_started = True
+        self.enter_hub()               # skip the cinematic -- the ECU state is restored
+
+    def _save_game(self):
+        ok = storage.write_json(storage.save_path(), self.game.to_dict())
+        self.toast.show("GAME SAVED" if ok else "SAVE FAILED",
+                        "career stored" if ok else "could not write save file", TOAST_SECONDS)
 
     def enter_hub(self):
         if self.simon is None:  # build the shared panels once, on first hub entry
@@ -174,7 +224,8 @@ class MK7Tuner3D(ShowBase):
             self.discord = DiscordPanel(self, self.game, "garage")
             for panel in (self.simon, self.discord):
                 panel.root.setBin(OVERLAY_BIN, OVERLAY_SORT["panel"])  # over stage UI, under toasts
-        self.set_stage(GarageStage(self, self.game, on_pick=self.open_task, on_summon=self.open_wizard))
+        self.set_stage(GarageStage(self, self.game, on_pick=self.open_task,
+                                   on_summon=self.open_wizard, on_menu=lambda: self.enter_menu(resumable=True)))
 
     def open_task(self, key: str):
         self.set_stage(TASK_CLASSES[key](self, self.game, on_back=self.enter_hub))

@@ -4,7 +4,7 @@ from direct.gui import DirectGuiGlobals as DGG
 from direct.gui.DirectGui import DirectEntry, DirectFrame
 from panda3d.core import TextNode, TransparencyAttrib
 
-from library.core import assets
+from library.core.assets import assets
 from library.core.constants import (
     AMBER, BLUE, BOX_LINE, DISCORD_CHANNEL_GROUP, DISCORD_MSG_LINES, DISCORD_OFFLINE_MAX,
     DISCORD_ONLINE_MAX, DISCORD_SERVER, DISCORD_WIN, DISCORD_RAIL_W, DISCORD_CHAN_W,

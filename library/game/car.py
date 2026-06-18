@@ -102,7 +102,7 @@ class Car:
 
     # -- save --------------------------------------------------------------
     def to_dict(self) -> dict:
-        return {k: getattr(self, k) for k in ("name", "connected", "read", "patched", "flashed", "switch_patch", "dirty", "tune", "flashed_tune", "slots", "active_slot", "mods")}
+        return {k: getattr(self, k) for k in ("name", "connected", "read", "patched", "flashed", "switch_patch", "dirty", "tune", "flashed_tune", "slots", "active_slot", "mods", "dyno_result", "grade")}
 
     def from_dict(self, data: dict):
         for key, value in data.items():
