@@ -562,3 +562,9 @@ GOD_PAYOUT = 1_000_000   # one-time reward for passing the Trial
 # Every map that can land in bro.unlocked_maps (Discord community + pro-granted),
 # resolved by apply + the TUNE selector. (Discord's random pool stays COMMUNITY_MAPS.)
 UNLOCKABLE_MAPS = {**COMMUNITY_MAPS, **PRO_MAPS}
+
+# Karen meter: cools down whenever you're not making noise; if it tops out the
+# cops roll up and write a citation. Repeatable -- every cap-out is a new bust.
+KAREN_COOLDOWN_PER_SEC = 6.0   # 100% -> 0 in ~17 s of silence
+BUST_FINE = 250                # base citation; scaled by your cred / rep
+KAREN_AFTER_BUST = 30.0        # they don't forget instantly

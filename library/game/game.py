@@ -4,7 +4,8 @@ import random
 import time
 
 from library.core.constants import (
-    DISCORD_GREEN_BRUSHOFF, GOD_PAYOUT, GREEN_NAME_CRED, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, TRACK_M, TUNE_SALE, WIZARD_CRED,
+    BUST_FINE, DISCORD_GREEN_BRUSHOFF, GOD_PAYOUT, GREEN_NAME_CRED, KAREN_AFTER_BUST,
+    KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, TRACK_M, TUNE_SALE, WIZARD_CRED,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -138,13 +139,31 @@ class Game:
             self.unlock("burble_brain", "Burble Brain")
         if pop > 90:
             self.unlock("cat_delete", "Cat Delete Speedrun")
-        if self.bro.karen >= 100 and self.unlock("menace", "Neighborhood Menace"):
-            self.log("the neighbors filed a noise complaint - you're a legend now", "warn")
-            self.dave("cops")
+        if self.bro.karen >= 100:
+            self.bust_if_maxed()  # real cop penalty (repeatable)
         elif random.random() < 0.18:
             self.dave("bigbang")
         self.maybe_green()
         return max(4, round(pop / 10))
+
+    def cool_heat(self, dt: float):
+        """Continuous Karen-meter cooldown -- called every frame from quieter tasks
+        (street_task) when the throttle is down. No-op if the meter is already at 0."""
+        if self.bro.karen > 0:
+            self.bro.add_heat(-dt * KAREN_COOLDOWN_PER_SEC)
+
+    def bust_if_maxed(self):
+        """If the Karen meter capped, the cops roll up: fine the bro and partially
+        reset the meter. Repeatable -- every cap-out is a new citation. The first
+        bust also fires the Neighborhood Menace achievement."""
+        if self.bro.karen < 100:
+            return
+        fine = int(BUST_FINE * (1 + self.bro.cred / 300.0))
+        self.bro.pay_repair(fine)
+        self.bro.karen = KAREN_AFTER_BUST
+        self.log(f"COPS rolled up - noise complaint citation: -${fine}", "err")
+        self.dave("cops")
+        self.unlock("menace", "Neighborhood Menace")
 
     # -- discord -----------------------------------------------------------
     def ask_discord(self, text: str) -> dict:

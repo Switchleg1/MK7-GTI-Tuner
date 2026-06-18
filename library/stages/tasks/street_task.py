@@ -45,6 +45,9 @@ class StreetTask(TaskBase):
         self.car.setH(math.sin(time.perf_counter() * 1.3) * 1.3)
         self._peak_rpm = max(self._peak_rpm, self.rpm)
         self.app.audio.set_engine(self.rpm, 0.12 + 0.88 * self.throttle)
+        # Karen cools down whenever the bro isn't actively making noise.
+        if self.throttle < 0.08:
+            self.game.cool_heat(dt)
         # A rev arms the lift; as the throttle decays back down, fire the crackle.
         if self._lift_armed and self.throttle < 0.15:
             self._lift_armed = False
