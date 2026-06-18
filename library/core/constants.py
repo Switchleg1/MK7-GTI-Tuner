@@ -558,3 +558,7 @@ DISCORD_GREEN_BRUSHOFF = [
 # --------------------------------------------------------------------------
 WIZARD_CRED = 500        # cred needed before the Wizard's DM arrives
 GOD_PAYOUT = 1_000_000   # one-time reward for passing the Trial
+
+# Every map that can land in bro.unlocked_maps (Discord community + pro-granted),
+# resolved by apply + the TUNE selector. (Discord's random pool stays COMMUNITY_MAPS.)
+UNLOCKABLE_MAPS = {**COMMUNITY_MAPS, **PRO_MAPS}

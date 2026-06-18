@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import AMBER, BLUE, COMMUNITY_MAPS, DIM, GREEN, GREEN_2, TEXT
+from library.core.constants import AMBER, BLUE, DIM, GREEN, GREEN_2, PRO_MAPS, TEXT, UNLOCKABLE_MAPS
 from library.game.tuning import pop_score
 from library.stages.task_base import TaskBase
 
@@ -51,10 +51,12 @@ class MapsTask(TaskBase):
                                     (lbox[0] + 0.06, 0, z - 0.13), 0.030, AMBER)
         maps = self.game.bro.unlocked_maps
         if maps:
+            # pro-granted maps first (the rarer reward), then community; capped to fit.
+            ordered = [k for k in maps if k in PRO_MAPS] + [k for k in maps if k not in PRO_MAPS]
             cz = z - 0.24
-            self.label("COMMUNITY MAPS (via Discord)", (lbox[0] + 0.06, 0, cz + 0.05), 0.026, GREEN)
-            for index, key in enumerate(maps[:3]):
-                self.button(COMMUNITY_MAPS[key]["name"], (lbox[0] + 0.40, 0, cz - index * 0.082), (0.74, 0.072),
+            self.label("UNLOCKED MAPS", (lbox[0] + 0.06, 0, cz + 0.05), 0.026, GREEN)
+            for index, key in enumerate(ordered[:4]):
+                self.button(UNLOCKABLE_MAPS[key]["name"], (lbox[0] + 0.40, 0, cz - index * 0.082), (0.74, 0.072),
                             self.bind(self.game.apply_preset, key))
 
         # -- right panel: pops & bangs + switch slots --------------------

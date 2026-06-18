@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import COMMUNITY_MAPS, MODS, PRESETS
+from library.core.constants import MODS, PRESETS, UNLOCKABLE_MAPS
 from library.game.tuning import clone_tune, compute_tune, default_tune, grade_for_result, pop_score
 
 
@@ -74,7 +74,7 @@ class Car:
         return ("FLASH OK - new map written to the ECU.", "ok")
 
     def apply_preset(self, key: str):
-        table = PRESETS if key in PRESETS else COMMUNITY_MAPS
+        table = PRESETS if key in PRESETS else UNLOCKABLE_MAPS
         self.tune = clone_tune(table[key])
         self.dirty = self.flashed
         return (f"preset loaded: {self.tune['name']}", "info")
