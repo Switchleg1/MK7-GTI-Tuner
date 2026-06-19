@@ -77,37 +77,68 @@ class TaskBase(Hud):
         return car
 
     def prepare_wheels(self, car):
-        """Return pivots to rotate so the wheels spin in place about their axle (X).
+        """Return per-corner pivots to rotate so the wheels spin in place about their
+        axle (X), for any of the detailed car .glb models.
 
-        car.glb's wheel parts (names prefixed ``WHEEL_PREFIX``; the body is ``vw:``)
-        are flat siblings whose transforms pivot at the *model* origin, so spinning
-        them directly flings them across the scene. We group the spinnable parts
-        (calipers excluded -- they don't turn with the wheel) into the four corners,
-        wrap each group in a pivot at the wheel's centre, and reparent the parts under
-        it (preserving world position). Falls back to the old procedural tire_/rim_
-        nodes if this isn't the detailed model."""
-        parts = [n for n in car.findAllMatches("**/" + WHEEL_PREFIX + "*")
-                 if not n.getParent().getName().startswith(WHEEL_PREFIX)
-                 and not any(s in n.getName().lower() for s in WHEEL_STATIC)]
-        if not parts:
+        Wheel meshes pivot at the *model* origin, so spinning them directly flings them
+        across the scene. We gather the spinnable wheel geometry (the geom leaves under
+        any ``WHEEL_PREFIX`` node, brake calipers dropped -- they don't turn), cluster
+        it into the four corners by car-space position, and wrap each corner in a pivot
+        at that wheel's centre, reparenting the geometry under it (preserving world
+        position). Returns the four pivots to rotate (``setP``).
+
+        Works regardless of how the model groups its wheels -- ``mk7_gti.glb`` uses flat
+        per-corner ``w:`` siblings, while ``civic_type_r.glb`` lumps all four into one
+        ``w:wheels`` group; position clustering handles both. The caliper label can sit
+        on a leaf *or* an ancestor (e.g. the named ``w:Calliper…`` node above a generic
+        mesh), so ``_wheel_static`` checks the whole chain. Falls back to the old
+        procedural ``tire_``/``rim_`` nodes if there's no ``WHEEL_PREFIX`` geometry."""
+        roots = [n for n in car.findAllMatches("**/" + WHEEL_PREFIX + "*")
+                 if not n.getParent().getName().startswith(WHEEL_PREFIX)]
+        leaves, seen = [], set()
+        for root in roots:
+            geoms = list(root.findAllMatches("**/+GeomNode"))
+            if root.node().isGeomNode():
+                geoms.append(root)
+            for geom in geoms:
+                key = geom.getKey()
+                if key in seen or self._wheel_static(geom, root):
+                    seen.add(key)
+                    continue
+                seen.add(key)
+                leaves.append(geom)
+        if not leaves:
             return list(car.findAllMatches("**/tire_*")) + list(car.findAllMatches("**/rim_*"))
         corners: dict = {}
-        for part in parts:
-            bounds = part.getTightBounds(car)
+        for leaf in leaves:
+            bounds = leaf.getTightBounds(car)
             if not bounds:
                 continue
             center = (bounds[0] + bounds[1]) * 0.5
-            corners.setdefault((center.x >= 0, center.y >= 0), []).append((part, bounds[0], bounds[1]))
+            corners.setdefault((center.x >= 0, center.y >= 0), []).append((leaf, bounds[0], bounds[1]))
         pivots = []
         for index, group in enumerate(corners.values()):
             lo = Point3(min(b0.x for _, b0, _ in group), min(b0.y for _, b0, _ in group), min(b0.z for _, b0, _ in group))
             hi = Point3(max(b1.x for _, _, b1 in group), max(b1.y for _, _, b1 in group), max(b1.z for _, _, b1 in group))
             pivot = car.attachNewNode(f"wheel-pivot-{index}")
             pivot.setPos((lo + hi) * 0.5)
-            for part, _, _ in group:
-                part.wrtReparentTo(pivot)
+            for leaf, _, _ in group:
+                leaf.wrtReparentTo(pivot)
             pivots.append(pivot)
         return pivots
+
+    @staticmethod
+    def _wheel_static(geom, root):
+        """True if ``geom`` (or any ancestor up to ``root``) is a brake caliper -- the
+        caliper label may live on a named parent above a generically-named mesh."""
+        node = geom
+        while not node.isEmpty():
+            if any(token in node.getName().lower() for token in WHEEL_STATIC):
+                return True
+            if node == root:
+                break
+            node = node.getParent()
+        return False
 
     def bind(self, fn, *args):
         """Wrap a model action so the UI redraws after it runs."""

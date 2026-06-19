@@ -53,14 +53,10 @@ class RaceTask(TaskBase):
         self.player_car = assets.load_model(assets.ModelType.CAR, "mk7_gti")
         self.player_car.reparentTo(self.scene)
         self.player_car.setPos(-2.2, 0, 0.0)
-        self.rival_car = assets.load_model(assets.ModelType.CAR, "civic_type_r")
-        self.rival_car.reparentTo(self.scene)
-        self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
-        self.rival_car.setPos(RIVAL_X, 0, 0.0)
+        self.player_wheels = self.prepare_wheels(self.player_car)
+        self._load_rival_car()
         # Wheel pivots for both cars -- spun in tick so the cars look like they're
         # moving even though they hold their scene Y position.
-        self.player_wheels = self.prepare_wheels(self.player_car)
-        self.rival_wheels = self.prepare_wheels(self.rival_car)
         self.spin = 0.0
         self._build_track()
         # Chase camera (overrides TASK_CAMERAS["race"] for the duration of the stage).
@@ -70,6 +66,7 @@ class RaceTask(TaskBase):
         self.app.camera.lookAt(*CHASE_CAM_LOOK)
         # Cached dash widgets (rebuilt each redraw; tick checks for them).
         self.dash = {}
+        self.race = None
 
     def _build_track(self):
         """Two rows of lane dashes + side cones laid out along +Y. Each is a
@@ -101,10 +98,10 @@ class RaceTask(TaskBase):
 
     # -- per-frame ---------------------------------------------------------
     def tick(self, dt):
-        if self.game.race and self.game.race["active"]:
-            self.game.step_race(dt)
-            player = self.game.race["p"]
-            rival = self.game.race["r"]
+        if self.race and self.race["active"]:
+            self._step_race(dt)
+            player = self.race["p"]
+            rival = self.race["r"]
             # Rival lane position = the literal gap, in scaled scene units.
             self.rival_car.setY((rival["d"] - player["d"]) * RIVAL_GAP_SCALE)
             # World scroll: lane dashes/cones travel backward at the player's speed.
@@ -134,8 +131,8 @@ class RaceTask(TaskBase):
             text, _, hint = self._race_status()
             self.dash["status"]["text"] = text
             self.dash["hint"]["text"] = hint
-            if self.game.race and self.game.race["active"]:
-                gap = self.game.race["p"]["d"] - self.game.race["r"]["d"]
+            if self.race and self.race["active"]:
+                gap = self.race["p"]["d"] - self.race["r"]["d"]
                 if abs(gap) > 0.5:
                     self.dash["gap"]["text"] = (f"YOU +{gap:.0f}m" if gap > 0 else f"RIVAL +{-gap:.0f}m")
                     self.dash["gap"]["text_fg"] = GREEN if gap > 0 else RED
@@ -167,7 +164,7 @@ class RaceTask(TaskBase):
         self.accept("space", self.do_key)
 
     def do_key(self):
-        event = self.game.race_key()
+        event = self._race_key()
         if event in ("launch", "shift"):
             self.spawn_flames(self.player_car, 2)
         if event == "shift":
@@ -176,7 +173,7 @@ class RaceTask(TaskBase):
         self.dirty = True
 
     def _race_status(self):
-        race = self.game.race
+        race = self.race
         if not race:
             return "Pick a rival, then Stage & Race.", DIM, "SPACE launches on GREEN, then shifts gears."
         player, rival = race["p"], race["r"]
@@ -210,14 +207,14 @@ class RaceTask(TaskBase):
             sel = index == game.bro.selected_rival
             self.button(f"{rival.name}  ${rival.purse}",
                         (right - 0.42, 0, 0.58 - index * 0.075), (0.78, 0.062),
-                        self.bind(game.select_rival, index),
+                        self.bind(self._select_rival, index),
                         index <= game.bro.unlocked_rival,
                         GREEN_2 if sel else None, 0.026)
         # Stage / Launch (top-left).
-        staged = game.race_active()
-        launching = (not staged) or not game.race["p"]["launched"]
+        staged = self._race_active()
+        launching = (not staged) or not self.race["p"]["launched"]
         self.button("Stage & Race", (left + 0.22, 0, 0.66), (0.40, 0.085),
-                    self.bind(game.start_race), game.car.flashed and not staged, GREEN_2, 0.032)
+                    self.bind(self._start_race), game.car.flashed and not staged, GREEN_2, 0.032)
         self.button(("Launch" if launching else "Shift") + " (SPACE)",
                     (left + 0.22, 0, 0.56), (0.40, 0.085), self.do_key, staged, None, 0.032)
         self._build_dash(left, right)
@@ -260,3 +257,98 @@ class RaceTask(TaskBase):
         # Shift light (centre, above the RPM digits).
         d["shift_bg"] = self.frame((-0.11, 0.11, -0.58, -0.50), color=PANEL_DARK, border=BOX_LINE)
         d["shift_lbl"] = self.label("SHIFT", (0, 0, -0.555), 0.034, DIM, align=TextNode.ACenter)
+        
+    def _select_rival(self, index: int):
+        if index <= self.game.bro.unlocked_rival:
+            self.game.bro.selected_rival = index
+            self._load_rival_car()
+            
+    def _load_rival_car(self):
+        rival = self.game.rivals[self.game.bro.selected_rival]
+        if rival:
+            self.rival_car = assets.load_model(assets.ModelType.CAR, rival.model)
+            self.rival_car.reparentTo(self.scene)
+            self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
+            self.rival_car.setPos(RIVAL_X, 0, 0.0)
+            self.rival_wheels = self.prepare_wheels(self.rival_car)
+        else:
+            self.rival_car = None
+            self.rival_wheels = None
+
+    def _race_active(self) -> bool:
+        return bool(self.race and self.race["active"])
+
+    def _start_race(self) -> str | None:
+        if not self.game.car.flashed or self._race_active():
+            return None
+        if self.game.car.car_perf()["blown"]:
+            self.game.log("Your tune is a grenade. Fix it on dyno first.", "err")
+            return "blown"
+        now = time.perf_counter()
+        self.race = {"active": True, "green_at": now + 1.9, "rival_launch": now + 2.15,
+                     "p": {"d": 0.0, "v": 0.0, "gear": 1, "launched": False, "done": False, "et": 0.0, "trap": 0.0},
+                     "r": {"d": 0.0, "v": 0.0, "done": False, "et": 0.0, "trap": 0.0}}
+        self.game.log("staged - launch on green", "info")
+        return "staged"
+    
+    def _race_key(self) -> str | None:
+        if not self._race_active():
+            return None
+        player = self.race["p"]
+        if not player["launched"]:
+            player["launched"] = True
+            self.game.log("launched" if time.perf_counter() >= self.race["green_at"] else "red light", "ok")
+            return "launch"
+        if player["gear"] < 6:
+            player["gear"] += 1
+            return "shift"
+        return None
+
+    def _step_race(self, dt: float):
+        if time.perf_counter() < self.race["green_at"]:
+            return
+        player, rival = self.race["p"], self.race["r"]
+        foe = self.game.rivals[self.game.bro.selected_rival]
+        if player["launched"] and not player["done"]:
+            perf = self.game.car.car_perf()
+            self._step_car(player, perf["whp"], perf["weight"], perf["grip"], dt)
+            if player["d"] >= TRACK_M:
+                player["done"], player["et"], player["trap"] = True, time.perf_counter() - self.race["green_at"], player["v"] * 2.237
+        if time.perf_counter() >= self.race["rival_launch"] and not rival["done"]:
+            self._step_car(rival, foe.whp, foe.weight, foe.grip, dt)
+            if rival["d"] >= TRACK_M:
+                rival["done"], rival["et"], rival["trap"] = True, time.perf_counter() - self.race["green_at"], rival["v"] * 2.237
+        if player["done"] and rival["done"]:
+            self._resolve_race(player, rival, foe)
+
+    def _step_car(self, car, whp, weight, grip, dt):
+        force = min(weight * 9.81 * grip, whp * 745.7 / max(car["v"], 2))
+        drag = 0.5 * 1.2 * 0.62 * car["v"] * car["v"]
+        car["v"] = max(0, car["v"] + ((force - drag) / weight) * dt)
+        car["d"] += car["v"] * dt
+
+    def _resolve_race(self, player, rival, foe):
+        game = self.game
+        won = player["et"] < rival["et"]
+        if won:
+            game.bro.earn(foe.purse)
+            game.bro.add_cred(round(foe.purse / 5))
+            game.unlock("first_win", "Won Some Cash")
+            if game.bro.selected_rival == game.bro.unlocked_rival and game.bro.unlocked_rival < len(game.rivals) - 1:
+                game.bro.unlocked_rival += 1
+                game.unlock("ladder", "Climbing the Ladder")
+            if game.bro.selected_rival == len(game.rivals) - 1:
+                game.unlock("king", "King of the Streets")
+            game.dave("win")
+        else:
+            game.dave("lose")
+        game.log(("WIN" if won else "LOSS") + f" {player['et']:.2f}s @ {round(player['trap'])} mph", "ok" if won else "warn")
+        game.maybe_green()
+        self.race["active"] = False
+
+    def _race_result_text(self) -> str:
+        if not self.race:
+            return "Launch on green. Shift with Space."
+        if self._race_active():
+            return f"You {self.race['p']['d']:.0f}m / Rival {self.race['r']['d']:.0f}m"
+        return "Race complete. Check the log."

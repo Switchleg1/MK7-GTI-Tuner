@@ -101,11 +101,11 @@ MODS = [
 ]
 
 RIVALS = [
-    {"name": "Stock Civic", "whp": 158, "weight": 1280, "grip": 0.90, "purse": 120, "color": rgba("#9fb3c0")},
-    {"name": "Civic Si", "whp": 208, "weight": 1300, "grip": 0.92, "purse": 230, "color": rgba("#e6e6e6")},
-    {"name": "WRX STI", "whp": 300, "weight": 1520, "grip": 1.18, "purse": 480, "color": rgba("#3a6ad6")},
-    {"name": "BMW M2", "whp": 385, "weight": 1560, "grip": 1.00, "purse": 850, "color": rgba("#222222")},
-    {"name": "Rival Shop Mk7", "whp": 365, "weight": 1370, "grip": 1.06, "purse": 1600, "color": rgba("#e7232b")},
+    {"name": "Stock Civic", "whp": 158, "weight": 1280, "grip": 0.90, "purse": 120, "color": rgba("#9fb3c0"), "model": "civic_type_r"},
+    {"name": "Civic Si", "whp": 208, "weight": 1300, "grip": 0.92, "purse": 230, "color": rgba("#e6e6e6"), "model": "civic_type_r"},
+    {"name": "WRX STI", "whp": 300, "weight": 1520, "grip": 1.18, "purse": 480, "color": rgba("#3a6ad6"), "model": "civic_type_r"},
+    {"name": "BMW M2", "whp": 385, "weight": 1560, "grip": 1.00, "purse": 850, "color": rgba("#222222"), "model": "civic_type_r"},
+    {"name": "Rival Shop Mk7", "whp": 365, "weight": 1370, "grip": 1.06, "purse": 1600, "color": rgba("#e7232b"), "model": "mk7_gti"},
 ]
 
 REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"), (340, "Wanted by the HOA")]
@@ -156,8 +156,8 @@ AUDIO_DIR = "data/audio"
 
 CAR_MODEL_DIRECTORY = "cars"
 CAR_MODEL_FILES = {
-    'mk7_gti':          "mk7_gti.glb",
-    'civic_type_r':     "civic_type_r.glb",
+    "mk7_gti":          "mk7_gti.glb",
+    "civic_type_r":     "civic_type_r.glb",
 }
 
 CHARACTER_MODEL_DIRECTORY = "characters"
