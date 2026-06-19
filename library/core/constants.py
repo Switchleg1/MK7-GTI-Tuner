@@ -615,3 +615,19 @@ UNLOCKABLE_MAPS = {**COMMUNITY_MAPS, **PRO_MAPS}
 KAREN_COOLDOWN_PER_SEC = 6.0   # 100% -> 0 in ~17 s of silence
 BUST_FINE = 250                # base citation; scaled by your cred / rep
 KAREN_AFTER_BUST = 30.0        # they don't forget instantly
+
+# --------------------------------------------------------------------------
+# Emotional Damage (0..100): getting clowned -- a bad Discord outcome, a blown
+# motor, a cop bust, a bad tune review, a lost race -- piles on. High ED gives
+# the bro the shakes: he loses power and launch grip on the strip. Wins heal it.
+# --------------------------------------------------------------------------
+ED_RACE_WHP_PENALTY = 0.18     # fraction of whp lost at 100% ED
+ED_RACE_GRIP_PENALTY = 0.22    # fraction of launch grip lost at 100% ED
+ED_HEAL_ON_WIN = 30.0
+ED_LOSS = 8.0                  # losing a race stings
+ED_DISCORD_BAD = 12.0          # got bad advice / clowned in #help
+ED_DISCORD_GOOD_HEAL = 4.0     # a good outcome cheers you up a little
+ED_BLOWN = 15.0                # grenading an engine hurts
+ED_BAD_REVIEW = 8.0            # a bricked customer
+ED_BUST = 10.0                 # the cops, humiliating
+ED_TAUNT_THRESHOLD = 50        # at/above this, the crew piles on

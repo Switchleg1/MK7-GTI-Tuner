@@ -23,6 +23,7 @@ class TunerBro:
         self.green_name = False             # verified pro status
         self.tunes_sold = 0                 # tunes sold to other users (green-name income)
         self.god = False                    # passed the Bench Wizard's Trial
+        self.emotional_damage = 0.0         # 0..100; high = shaky hands on the strip
 
     def rep(self) -> str:
         return rep_title(self.cred)
@@ -49,6 +50,10 @@ class TunerBro:
     def add_heat(self, amount: float):
         self.karen = clamp(self.karen + amount, 0, 100)
 
+    def add_damage(self, amount: float):
+        """Emotional damage, 0..100 (negative amount heals)."""
+        self.emotional_damage = clamp(self.emotional_damage + amount, 0, 100)
+
     def unlock_map(self, key: str) -> bool:
         if key in self.unlocked_maps:
             return False
@@ -56,7 +61,7 @@ class TunerBro:
         return True
 
     def to_dict(self) -> dict:
-        return {k: getattr(self, k) for k in ("name", "cash", "cred", "karen", "simon_tick", "selected_rival", "unlocked_rival", "unlocked_maps", "green_name", "tunes_sold", "god")}
+        return {k: getattr(self, k) for k in ("name", "cash", "cred", "karen", "simon_tick", "selected_rival", "unlocked_rival", "unlocked_maps", "green_name", "tunes_sold", "god", "emotional_damage")}
 
     def from_dict(self, data: dict):
         for key, value in data.items():

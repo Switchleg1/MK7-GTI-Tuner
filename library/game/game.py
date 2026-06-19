@@ -4,7 +4,8 @@ import random
 import time
 
 from library.core.constants import (
-    BUST_FINE, DISCORD_GREEN_BRUSHOFF, GOD_PAYOUT, GREEN_NAME_CRED, KAREN_AFTER_BUST,
+    BUST_FINE, DISCORD_GREEN_BRUSHOFF, ED_BAD_REVIEW, ED_BLOWN, ED_BUST, ED_DISCORD_BAD,
+    ED_DISCORD_GOOD_HEAL, ED_TAUNT_THRESHOLD, GOD_PAYOUT, GREEN_NAME_CRED, KAREN_AFTER_BUST,
     KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TRACK_M,
     TUNE_SALE, WIZARD_CRED,
 )
@@ -34,6 +35,17 @@ DAVE_LINES = {
     "wizard": ["The Wizard wants a word. Don't keep him waiting.", "A secret tuner trial just dropped. Go.", "Some hooded guy DM'd you. Spooky. Click it."],
     "god": ["GOD STATUS. Nobody can tell you anything now.", "You passed the Trial. Unreal.", "Infinite-ish money. Go nuts."],
 }
+
+# When emotional damage is high, the crew piles on (logged as a chat-style ping).
+ED_TAUNTS = [
+    "tacos: ratio. + post a log. + cope.",
+    "cp4334: bent another one? rods are merely suggestions.",
+    "Simon: this is why we tell you to post a log.",
+    "tacos: skill issue (affectionate)",
+    "Mike: more boost would've fixed that. (it would not have)",
+    "JC: that's a 2x4 problem. it's always a 2x4 problem.",
+    "the FB group screenshotted your build. brutal.",
+]
 
 
 class Game:
@@ -105,11 +117,23 @@ class Game:
     def dave(self, pool: str):
         self.dave_queue.append(pick(DAVE_LINES[pool]))
 
+    # -- emotional damage (getting clowned hurts your race launches) --------
+    def hurt_bro(self, amount: float, taunt: bool = True):
+        """Pile on emotional damage. Once it's high, the crew starts piling on too."""
+        self.bro.add_damage(amount)
+        if taunt and self.bro.emotional_damage >= ED_TAUNT_THRESHOLD and random.random() < 0.6:
+            self.log(pick(ED_TAUNTS), "err")
+
+    def soothe_bro(self, amount: float):
+        """Heal emotional damage (a win, a good outcome)."""
+        self.bro.add_damage(-amount)
+
     def finish_dyno(self, result: dict):
         """Record the pull, log the grade, and fire grade-based achievements/quips."""
         self._log_result(self.car.record_dyno(result))
         if result["blown"]:
             self.unlock("money_shift", "Money Shift")
+            self.hurt_bro(ED_BLOWN)
             self.dave("blown")
         elif self.car.grade.startswith("Grade S"):
             self.unlock("tuner_of_year", "Tuner of the Year")
@@ -188,6 +212,7 @@ class Game:
         self.bro.pay_repair(fine)
         self.bro.karen = KAREN_AFTER_BUST
         self.log(f"COPS rolled up - noise complaint citation: -${fine}", "err")
+        self.hurt_bro(ED_BUST)
         self.dave("cops")
         self.unlock("menace", "Neighborhood Menace")
 
@@ -209,6 +234,7 @@ class Game:
         who = pick(roster)
         line = pick(DISCORD_GREEN_BRUSHOFF)
         self.log("green name asked in #help: " + line, "warn")
+        self.hurt_bro(ED_DISCORD_BAD * 0.5)
         return {"kind": "bad", "effect": "none", "amount": 0, "map_key": None,
                 "summary": "you're green now - they expect you to know this one",
                 "replies": [{"name": who.name, "color": who.color, "text": line}]}
@@ -226,6 +252,10 @@ class Game:
             self.bro.pay_repair(amount)
         elif effect == "clients":
             self.bro.add_cred(-amount)
+        if outcome["kind"] == "good":
+            self.soothe_bro(ED_DISCORD_GOOD_HEAL)
+        else:
+            self.hurt_bro(ED_DISCORD_BAD)
         self.log(outcome["summary"], "ok" if outcome["kind"] == "good" else "warn")
 
     # -- green name (verified pro path) ------------------------------------
@@ -264,6 +294,7 @@ class Game:
             return
         if random.random() < TUNE_SALE["bad_chance"]:
             self.bro.add_cred(-4)
+            self.hurt_bro(ED_BAD_REVIEW)
             self.log(pick(SALE_BAD), "warn")
             return
         whp = self.car.compute()["whp"]
