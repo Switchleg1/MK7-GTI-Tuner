@@ -28,7 +28,6 @@ def build_context(game, tab: str = "") -> dict:
         "cred": bro.cred,
         "selected_rival": bro.selected_rival,
         "unlocked_rival": bro.unlocked_rival,
-        "race_active": game.race_active(),
         "grade": car.grade,
         "active_slot": car.active_slot,
     }
