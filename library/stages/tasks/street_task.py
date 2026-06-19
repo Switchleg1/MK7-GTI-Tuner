@@ -4,7 +4,10 @@ import math
 import random
 import time
 
-from library.core.constants import AMBER, DIM, GREEN, GREEN_2, PANEL, RED, TEXT
+from library.core.constants import (
+    AMBER, BUST_FINE, DIM, ED_BUST, GREEN, GREEN_2, KAREN_AFTER_BUST,
+    KAREN_COOLDOWN_PER_SEC, PANEL, RED, TEXT,
+)
 from library.core.utils import clamp
 from library.stages.task_base import TaskBase
 
@@ -47,14 +50,14 @@ class StreetTask(TaskBase):
         self.app.audio.set_engine(self.rpm, 0.12 + 0.88 * self.throttle)
         # Karen cools down whenever the bro isn't actively making noise.
         if self.throttle < 0.08:
-            self.game.cool_heat(dt)
+            self._cool_karen(dt)
         # A rev arms the lift; as the throttle decays back down, fire the crackle.
         if self._lift_armed and self.throttle < 0.15:
             self._lift_armed = False
             if self._peak_rpm > 1800:
                 self.app.audio.bov()
                 self.app.audio.overrun(self.game.car.active_pop(), 0.9)
-                self.spawn_flames(self.car, self.game.register_pops())  # cred + Karen + flames
+                self.spawn_flames(self.car, self._pops())  # cred + Karen + flames
                 self._spawn_reactions()  # floating crowd / Karen emoji popups
                 self.dirty = True  # refresh the cred / Karen readout now
             self._peak_rpm = 0.0
@@ -82,12 +85,40 @@ class StreetTask(TaskBase):
     def do_pops(self):
         if not self.game.car.flashed:
             return
-        count = self.game.register_pops()
+        count = self._pops()
         self.spawn_flames(self.car, count)
         self.app.audio.bov()
         self.app.audio.overrun(self.game.car.active_pop(), 1.0)
         self._spawn_reactions()
         self.dirty = True
+
+    # -- Karen / cops (street-only mechanics) ------------------------------
+    def _cool_karen(self, dt):
+        """Karen cools down while the bro isn't making noise (throttle down).
+        No-op once the meter is already at 0."""
+        if self.game.bro.karen > 0:
+            self.game.bro.add_heat(-dt * KAREN_COOLDOWN_PER_SEC)
+
+    def _pops(self) -> int:
+        """Register a pop blip on the model (cred / Karen / quip) and, if that just
+        capped the Karen meter, take the bust. Returns the flame count for the scene."""
+        count = self.game.register_pops()
+        if self.game.bro.karen >= 100:
+            self._bust()
+        return count
+
+    def _bust(self):
+        """Karen meter capped -> the cops roll up: a citation (scaled by rep), a
+        partial meter reset, an emotional-damage hit, and the achievement. Repeatable
+        -- every cap-out is a fresh citation."""
+        bro = self.game.bro
+        fine = int(BUST_FINE * (1 + bro.cred / 300.0))
+        bro.pay_repair(fine)
+        bro.karen = KAREN_AFTER_BUST
+        self.game.log(f"COPS rolled up - noise complaint citation: -${fine}", "err")
+        self.game.hurt_bro(ED_BUST)
+        self.game.dave("cops")
+        self.game.unlock("menace", "Neighborhood Menace")
 
     def _spawn_reactions(self):
         """Float crowd-hype emojis up on the right and Karen-rage on the left,

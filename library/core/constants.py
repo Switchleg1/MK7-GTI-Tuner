@@ -634,3 +634,36 @@ ED_BLOWN = 15.0                # grenading an engine hurts
 ED_BAD_REVIEW = 8.0            # a bricked customer
 ED_BUST = 10.0                 # the cops, humiliating
 ED_TAUNT_THRESHOLD = 50        # at/above this, the crew piles on
+
+# When ED is high the crew piles on -- one of these is logged as a chat-style ping.
+ED_TAUNTS = [
+    "tacos: ratio. + post a log. + cope.",
+    "cp4334: bent another one? rods are merely suggestions.",
+    "Simon: this is why we tell you to post a log.",
+    "tacos: skill issue (affectionate)",
+    "Mike: more boost would've fixed that. (it would not have)",
+    "JC: that's a 2x4 problem. it's always a 2x4 problem.",
+    "the FB group screenshotted your build. brutal.",
+]
+
+# --------------------------------------------------------------------------
+# Dyno Dave: reactive one-liners keyed by event pool. ``game.dave(pool)`` picks
+# one and the Notifications overlay drains it into his bubble. EDIT FREELY.
+# --------------------------------------------------------------------------
+DAVE_LINES = {
+    "flash": ["Aight, she's flashed. Try not to grenade it.", "New map's in - let's make some noise.", "Flashed clean. Go cause problems."],
+    "mapswitch": ["Stalk magic. Civilized.", "Map swap on the fly, you animal.", "Cops around? Slap it to valet."],
+    "bigbang": ["That one set off car alarms. Beautiful.", "Somewhere a Prius is crying.", "I felt that in my fillings.", "Cats? We don't do cats here."],
+    "cops": ["The whole street knows your plate now. Worth it.", "Noise complaint AND legend status. Balanced."],
+    "dyno": ["Numbers don't lie. The dyno might, but not today.", "That'll do. Send it again.", "Decent pull - chase a little more."],
+    "sgrade": ["S-grade?! Tuner of the year, baby.", "Now THAT is a tune. Frame it."],
+    "blown": ["...we don't talk about that one.", "That's a rebuild. GoFundMe time.", "Money shift. Classic. Painful."],
+    "win": ["GET THAT MONEY. Easy work.", "He never stood a chance.", "Cash money - go buy a turbo."],
+    "lose": ["Oof. Hit the shop and run it back.", "He spanked you. Tune up.", "Slower car, faster wallet... oh wait."],
+    "shop": ["Bolted on - she's meaner now.", "Good buy. Now go use it.", "Money well spent, for once."],
+    "green": ["You went GREEN, baby. Verified and everything.", "Green name. Now the noobs DM you.", "You're official. Don't let it go to your head."],
+    "sell": ["Sold a tune to some poor soul. Cha-ching.", "Another satisfied (?) customer.", "You're a tune mill now."],
+    "pro": ["Talking to the pros now, huh.", "Networking. Gross. Profitable.", "Big leagues."],
+    "wizard": ["The Wizard wants a word. Don't keep him waiting.", "A secret tuner trial just dropped. Go.", "Some hooded guy DM'd you. Spooky. Click it."],
+    "god": ["GOD STATUS. Nobody can tell you anything now.", "You passed the Trial. Unreal.", "Infinite-ish money. Go nuts."],
+}

@@ -4,10 +4,9 @@ import random
 import time
 
 from library.core.constants import (
-    BUST_FINE, DISCORD_GREEN_BRUSHOFF, ED_BAD_REVIEW, ED_BLOWN, ED_BUST, ED_DISCORD_BAD,
-    ED_DISCORD_GOOD_HEAL, ED_TAUNT_THRESHOLD, GOD_PAYOUT, GREEN_NAME_CRED, KAREN_AFTER_BUST,
-    KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TRACK_M,
-    TUNE_SALE, WIZARD_CRED,
+    DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_BAD_REVIEW, ED_BLOWN, ED_DISCORD_BAD,
+    ED_DISCORD_GOOD_HEAL, ED_TAUNT_THRESHOLD, ED_TAUNTS, GOD_PAYOUT, GREEN_NAME_CRED,
+    MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TRACK_M, TUNE_SALE, WIZARD_CRED,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -16,36 +15,6 @@ from library.game.discord import Discord
 from library.game.pro_tuner import ProTuner
 from library.game.rival_green_name import RivalGreenName
 from library.game.tuner_bro import TunerBro
-
-# Dyno Dave's reactive one-liners, by event pool.
-DAVE_LINES = {
-    "flash": ["Aight, she's flashed. Try not to grenade it.", "New map's in - let's make some noise.", "Flashed clean. Go cause problems."],
-    "mapswitch": ["Stalk magic. Civilized.", "Map swap on the fly, you animal.", "Cops around? Slap it to valet."],
-    "bigbang": ["That one set off car alarms. Beautiful.", "Somewhere a Prius is crying.", "I felt that in my fillings.", "Cats? We don't do cats here."],
-    "cops": ["The whole street knows your plate now. Worth it.", "Noise complaint AND legend status. Balanced."],
-    "dyno": ["Numbers don't lie. The dyno might, but not today.", "That'll do. Send it again.", "Decent pull - chase a little more."],
-    "sgrade": ["S-grade?! Tuner of the year, baby.", "Now THAT is a tune. Frame it."],
-    "blown": ["...we don't talk about that one.", "That's a rebuild. GoFundMe time.", "Money shift. Classic. Painful."],
-    "win": ["GET THAT MONEY. Easy work.", "He never stood a chance.", "Cash money - go buy a turbo."],
-    "lose": ["Oof. Hit the shop and run it back.", "He spanked you. Tune up.", "Slower car, faster wallet... oh wait."],
-    "shop": ["Bolted on - she's meaner now.", "Good buy. Now go use it.", "Money well spent, for once."],
-    "green": ["You went GREEN, baby. Verified and everything.", "Green name. Now the noobs DM you.", "You're official. Don't let it go to your head."],
-    "sell": ["Sold a tune to some poor soul. Cha-ching.", "Another satisfied (?) customer.", "You're a tune mill now."],
-    "pro": ["Talking to the pros now, huh.", "Networking. Gross. Profitable.", "Big leagues."],
-    "wizard": ["The Wizard wants a word. Don't keep him waiting.", "A secret tuner trial just dropped. Go.", "Some hooded guy DM'd you. Spooky. Click it."],
-    "god": ["GOD STATUS. Nobody can tell you anything now.", "You passed the Trial. Unreal.", "Infinite-ish money. Go nuts."],
-}
-
-# When emotional damage is high, the crew piles on (logged as a chat-style ping).
-ED_TAUNTS = [
-    "tacos: ratio. + post a log. + cope.",
-    "cp4334: bent another one? rods are merely suggestions.",
-    "Simon: this is why we tell you to post a log.",
-    "tacos: skill issue (affectionate)",
-    "Mike: more boost would've fixed that. (it would not have)",
-    "JC: that's a 2x4 problem. it's always a 2x4 problem.",
-    "the FB group screenshotted your build. brutal.",
-]
 
 
 class Game:
@@ -189,32 +158,12 @@ class Game:
             self.unlock("burble_brain", "Burble Brain")
         if pop > 90:
             self.unlock("cat_delete", "Cat Delete Speedrun")
-        if self.bro.karen >= 100:
-            self.bust_if_maxed()  # real cop penalty (repeatable)
-        elif random.random() < 0.18:
+        # A big pop may earn a Dave quip -- unless the meter just capped, in which
+        # case the street task takes the bust (the cop penalty lives in street_task).
+        if self.bro.karen < 100 and random.random() < 0.18:
             self.dave("bigbang")
         self.maybe_green()
         return max(4, round(pop / 10))
-
-    def cool_heat(self, dt: float):
-        """Continuous Karen-meter cooldown -- called every frame from quieter tasks
-        (street_task) when the throttle is down. No-op if the meter is already at 0."""
-        if self.bro.karen > 0:
-            self.bro.add_heat(-dt * KAREN_COOLDOWN_PER_SEC)
-
-    def bust_if_maxed(self):
-        """If the Karen meter capped, the cops roll up: fine the bro and partially
-        reset the meter. Repeatable -- every cap-out is a new citation. The first
-        bust also fires the Neighborhood Menace achievement."""
-        if self.bro.karen < 100:
-            return
-        fine = int(BUST_FINE * (1 + self.bro.cred / 300.0))
-        self.bro.pay_repair(fine)
-        self.bro.karen = KAREN_AFTER_BUST
-        self.log(f"COPS rolled up - noise complaint citation: -${fine}", "err")
-        self.hurt_bro(ED_BUST)
-        self.dave("cops")
-        self.unlock("menace", "Neighborhood Menace")
 
     # -- discord -----------------------------------------------------------
     def ask_discord(self, text: str) -> dict:
