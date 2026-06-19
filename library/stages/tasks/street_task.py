@@ -138,6 +138,12 @@ class StreetTask(TaskBase):
                                 scale=random.uniform(0.05, 0.075), rise=random.uniform(0.30, 0.50),
                                 life=random.uniform(0.9, 1.2))
 
+    def build_buttons(self):
+        left, _ = self.bounds()
+        flashed = self.game.car.flashed
+        self.buttons.add("throttle", "Throttle", (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, flashed, GREEN_2)
+        self.buttons.add("pops", "Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, flashed)
+
     def build_ui(self, left, right):
         bro = self.game.bro
         self.label(f"{round(self.rpm)} RPM", (left + 0.06, 0, 0.34), 0.055, TEXT)
@@ -149,7 +155,7 @@ class StreetTask(TaskBase):
         self.frame((bar_x, bar_x + bar_w, -0.075, -0.05), color=PANEL, border=None)
         fill = bar_w * clamp(bro.karen / 100, 0, 1)
         self.frame((bar_x, bar_x + max(0.001, fill), -0.075, -0.05), color=RED, border=None)
-        label = "Throttle [HELD]" if self._held else "Throttle"
-        self.buttons.button("throttle", label, (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, self.game.car.flashed, GREEN if self._held else GREEN_2)
-        self.buttons.button("pops", "Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, self.game.car.flashed)
+        throttle = self.buttons.get("throttle")
+        throttle.text("Throttle [HELD]" if self._held else "Throttle")
+        throttle.color(GREEN if self._held else GREEN_2)
         self.label("Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.", (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)

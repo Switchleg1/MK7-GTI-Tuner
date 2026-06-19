@@ -192,33 +192,42 @@ class RaceTask(TaskBase):
                 f"Rival ran {rival['et']:.2f}s. Tune up or buy parts, then run it back.")
 
     # -- UI ----------------------------------------------------------------
+    def build_buttons(self):
+        game = self.game
+        left, right = self.bounds()
+        # Skreets ladder (top-right): one button per rival, fixed positions.
+        for index, rival in enumerate(game.rivals):
+            self.buttons.add(f"rival-{index}", f"{rival.name}  ${rival.purse}",
+                             (right - 0.42, 0, 0.58 - index * 0.075), (0.78, 0.062),
+                             self.bind(self._select_rival, index),
+                             index <= game.bro.unlocked_rival, GREEN_2, 0.026)
+        # Stage / Launch (top-left).
+        self.buttons.add("stage", "Stage & Race", (left + 0.22, 0, 0.66), (0.40, 0.085),
+                         self.bind(self._start_race), game.car.flashed, GREEN_2, 0.032)
+        self.buttons.add("launch", "Launch (SPACE)", (left + 0.22, 0, 0.56), (0.40, 0.085),
+                         self.do_key, False, None, 0.032)
+
     def build_ui(self, left, right):
         game = self.game
         text, color, hint = self._race_status()
         self.dash["status"] = self.label(text, (0, 0, 0.92), 0.046, color, align=TextNode.ACenter, wordwrap=44)
         self.dash["hint"] = self.label(hint, (0, 0, 0.85), 0.028, DIM, align=TextNode.ACenter, wordwrap=64)
         self.dash["gap"] = self.label("", (0, 0, 0.77), 0.044, AMBER, align=TextNode.ACenter)
-        
-        staged = self._race_active()
-        #only draw rivals when race is not active
-        if self._race_active() == False:
-            # Skreets ladder (smaller, top-right).
-            self.label("SKREETS LADDER", (right - 0.05, 0, 0.66), 0.030, BLUE, align=TextNode.ARight)
-        
-            for index, rival in enumerate(game.rivals):
-                sel = index == game.bro.selected_rival
-                self.buttons.button(f"rival-{index}", f"{rival.name}  ${rival.purse}",
-                                    (right - 0.42, 0, 0.58 - index * 0.075), (0.78, 0.062),
-                                    self.bind(self._select_rival, index),
-                                    index <= game.bro.unlocked_rival,
-                                    RED if sel else GREEN_2, 0.026)
 
-        # Stage / Launch (top-left).
+        staged = self._race_active()
+        # The rival ladder is only shown when a race isn't running.
+        if not staged:
+            self.label("SKREETS LADDER", (right - 0.05, 0, 0.66), 0.030, BLUE, align=TextNode.ARight)
+        for index in range(len(game.rivals)):
+            button = self.buttons.get(f"rival-{index}")
+            button.is_visible(not staged)
+            button.enabled(index <= game.bro.unlocked_rival)
+            button.color(RED if index == game.bro.selected_rival else GREEN_2)
         launching = (not staged) or not self.race["p"]["launched"]
-        self.buttons.button("stage", "Stage & Race", (left + 0.22, 0, 0.66), (0.40, 0.085),
-                            self.bind(self._start_race), game.car.flashed and not staged, GREEN_2, 0.032)
-        self.buttons.button("launch", ("Launch" if launching else "Shift") + " (SPACE)",
-                            (left + 0.22, 0, 0.56), (0.40, 0.085), self.do_key, staged, None, 0.032)
+        self.buttons.get("stage").enabled(game.car.flashed and not staged)
+        launch = self.buttons.get("launch")
+        launch.text(("Launch" if launching else "Shift") + " (SPACE)")
+        launch.enabled(staged)
         
         # Emotional damage readout (it saps power + launch grip on the strip).
         ed = game.bro.emotional_damage

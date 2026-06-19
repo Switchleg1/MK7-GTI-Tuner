@@ -36,16 +36,18 @@ class TaskBase(Hud):
         self.flames = []
         self.reactions = []
         self.allow_back = True
-        # Each task owns its own button controller: buttons are declared in build_ui
-        # via self.buttons.button(key, ...), persist across redraws (so clicks aren't
-        # dropped by the rebuild and can flash on press), and are freed on exit. They
-        # live on their own layer, lifted above the redrawn frames/labels each pass.
+        # Each task owns its own button controller. Buttons are BUILT ONCE in
+        # build_buttons() (on enter) and only tweaked afterwards (text/color/enabled/
+        # is_visible) -- they persist across redraws, so clicks aren't dropped by the
+        # rebuild and they can flash on press. They live on their own layer, lifted
+        # above the redrawn frames/labels each pass, and are freed on exit.
         self.buttons = ButtonController(app, self.root.attachNewNode("task-buttons"))
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
         self.set_camera()
         self.build_scene()
+        self.build_buttons()  # create this task's buttons once
         self.redraw()
         self.bind_keys()
 
@@ -67,6 +69,11 @@ class TaskBase(Hud):
     # -- overridable hooks -------------------------------------------------
     def build_scene(self):
         self.add_garage_scene()
+
+    def build_buttons(self):
+        """Create this task's buttons ONCE (on enter) via ``self.buttons.add(key, ...)``.
+        After this, only change their properties (``text``/``color``/``enabled``/
+        ``is_visible``) -- typically from ``build_ui``, which runs each redraw."""
 
     def build_ui(self, left, right):
         pass
@@ -193,20 +200,23 @@ class TaskBase(Hud):
 
     def redraw(self):
         self.clear()                 # rebuild decoration (labels/frames); buttons persist
-        self.buttons.begin()         # start a declarative pass; build_ui re-declares buttons
         left, right = self.bounds()
         self.draw_header(self.game)
         self.label(self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
         if self.allow_back:
             self.back_button(self.on_back)
-        self.build_ui(left, right)
-        self.buttons.prune()         # drop any button not re-declared this pass
+        self.build_ui(left, right)   # draws labels/frames + tweaks button props (not create)
         self.buttons.lift()          # keep buttons above the frames/labels just rebuilt
 
-    def panel_pair(self, left, right):
+    def panel_boxes(self, left, right):
+        """The two panel-box extents (no drawing) -- so build_buttons can place buttons
+        relative to them without depending on the (redrawn) frames."""
         gap = 0.04
         mid = (left + right) / 2
-        boxes = ((left, mid - gap / 2, -0.62, 0.48), (mid + gap / 2, right, -0.62, 0.48))
+        return ((left, mid - gap / 2, -0.62, 0.48), (mid + gap / 2, right, -0.62, 0.48))
+
+    def panel_pair(self, left, right):
+        boxes = self.panel_boxes(left, right)
         for box in boxes:
             self.frame(box, (0, 0, 0), border=None)
         return boxes

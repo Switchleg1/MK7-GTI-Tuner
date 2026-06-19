@@ -116,6 +116,12 @@ class DynoTask(TaskBase):
         return self.points[-1]["pw"]
 
     # -- UI ----------------------------------------------------------------
+    def build_buttons(self):
+        left, right = self.bounds()
+        cx = ((left + right) / 2 + right) / 2
+        self.buttons.add("run", "Run Dyno Pull", (cx, 0, -0.30), (0.46, 0.12), self.start_pull,
+                         self.game.car.flashed and not self.running, GREEN_2)
+
     def build_ui(self, left, right):
         mid = (left + right) / 2
         cols, rows = 2, 3
@@ -194,7 +200,7 @@ class DynoTask(TaskBase):
     def _controls(self, mid, right):
         game = self.game
         cx = (mid + right) / 2
-        self.buttons.button("run", "Run Dyno Pull", (cx, 0, -0.30), (0.46, 0.12), self.start_pull, game.car.flashed and not self.running, GREEN_2)
+        self.buttons.get("run").enabled(game.car.flashed and not self.running)
         if self.running:
             state, color = f"pulling... {round(self.values['rpm'])} rpm", AMBER
         elif game.car.flashed:

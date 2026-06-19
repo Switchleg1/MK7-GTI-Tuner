@@ -148,24 +148,28 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `button.py` — `Button`: one managed task button — a rounded glass `DirectButton`
   (`ui_box` fill + `ui_ring` border) that **flashes a "clicked" colour** for
   `BUTTON_CLICK_HOLD`s on press then reverts (auto-brightens the normal colour if no
-  clicked colour is given). Properties (text/pos/size/command/enabled/colours/hold) edit
-  live via `configure`; `render(dt)` advances the flash. Never destroyed by a redraw.
+  clicked colour is given). Built once, then tweaked via getter/setter methods —
+  `text()` / `color()` / `enabled()` / `is_visible()` / `command_fn()` (no arg = read,
+  one arg = set). **`is_visible`** defaults True; `render(dt)` enforces it (a not-visible
+  button is *stashed* — off-screen and unclickable) and advances the flash. Never
+  destroyed by a redraw.
 - `button_controller.py` — `ButtonController`: owns one task's buttons (created on enter,
-  destroyed on exit). Buttons are **keyed and persist** between redraws: re-declaring a
-  key edits the existing button instead of recreating it. Declarative pass
-  (`begin()` → `button(key, …)` per button → `prune()` drops keys not re-declared), plus
-  imperative `add`/`edit`/`remove`/`get` for any-time changes. `render(dt)` ticks all
-  flashes; `lift()` keeps the buttons drawn above the frames/labels a redraw just rebuilt.
+  destroyed on exit). Buttons are **built once** via `add(key, …)` and then changed in
+  place — `get(key).text(…)` / `.is_visible(…)` / … or `edit(key, **props)` — rather than
+  recreated. `render(dt)` ticks every button's visibility + flash; `lift()` keeps the
+  buttons drawn above the frames/labels a redraw just rebuilt.
 - `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node;
-  `enter()` sets the camera, builds scene/UI, and binds keys; the app's render loop
-  calls `render(dt)` (which runs `tick(dt)` + flame/reaction updates + the button
-  controller's flash tick + a `dirty`/live redraw). **Buttons are not part of the redraw
-  churn:** each task owns a `ButtonController` (`self.buttons`) whose buttons *persist*
-  across redraws (declared each pass in `build_ui` via `self.buttons.button(key, …)`,
-  edited not recreated), so a click can't be dropped by the UI rebuilding mid-press. A
-  redraw still `clear()`s/rebuilds the labels/frames (and the Back pill + sliders), so
-  `render` also **defers the redraw while the mouse button is held** (`_mouse_held`) to
-  protect those remaining recreated widgets. `exit()` destroys the controller, then tears
+  `enter()` sets the camera, builds the scene, **builds the buttons once
+  (`build_buttons()`)**, draws the UI, and binds keys; the app's render loop calls
+  `render(dt)` (which runs `tick(dt)` + flame/reaction updates + the button controller's
+  visibility/flash tick + a `dirty`/live redraw). **Buttons are built once and only
+  edited afterwards** (each task creates them in `build_buttons` and changes their
+  text/colour/enabled/visibility from `build_ui`); they live on their own layer, persist
+  across redraws (so a click can't be dropped by the UI rebuilding mid-press), and are
+  freed on exit. A redraw still `clear()`s/rebuilds the labels/frames (and the Back pill +
+  sliders), so `render` also **defers the redraw while the mouse button is held**
+  (`_mouse_held`) to protect those remaining recreated widgets. `exit()` destroys the
+  controller, then tears
   the rest down. The Simon/Discord panels are **not** owned here
   — they live on the app. Subclasses set `title`/`key`/`live` (and `music_key`, which
   defaults to `key` but is the themed folder name for TUNE→`tuning`/SKREETS→`skreetz`)
