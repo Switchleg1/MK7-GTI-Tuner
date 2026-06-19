@@ -110,6 +110,15 @@ RIVALS = [
 
 REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"), (340, "Wanted by the HOA")]
 
+# Dyno grade bands: (minimum score, grade letter, flavour note). Iterated high->low.
+GRADE_TABLE = [
+    (85, "S", "tuner of the year"),
+    (72, "A", "fast, loud, barely legal"),
+    (58, "B", "solid, more in it"),
+    (42, "C", "it runs"),
+    (0, "D", "rethink the map"),
+]
+
 # Garage hub + task cameras (glb car faces +Y, ~4 m long, driver side -X).
 GARAGE_CAMERA = {"pos": (5.6, -7.6, 3.0), "look_at": (-0.2, 0.4, 0.7), "fov": 42}
 TASK_CAMERAS = {
@@ -117,6 +126,14 @@ TASK_CAMERAS = {
     "race": {"pos": (0.0, -9.5, 3.4), "look_at": (0.0, 7.0, 0.6), "fov": 55},
     "dyno": {"pos": (6.6, -3.2, 1.9), "look_at": (0.0, 0.2, 0.7), "fov": 45},
 }
+
+# Race chase camera, framed BETWEEN the two lanes so BOTH cars stay visible. A
+# cockpit-only POV can't see the rival at the line (they sit ~4m to the side,
+# outside any sane FOV). The cars stay fixed and the world scrolls past, keeping
+# the "world moves around you" feel from a follow-camera vantage.
+CHASE_CAM_POS = (0.0, -8.0, 2.6)
+CHASE_CAM_LOOK = (0.0, 14.0, 0.5)
+CHASE_FOV = 55
 
 # Wheel spinning (car.glb). Body parts are prefixed "vw:", wheel parts "w:"; the
 # wheel parts are flat siblings whose transforms pivot at the model origin, so
@@ -606,6 +623,18 @@ DISCORD_GREEN_BRUSHOFF = [
 # --------------------------------------------------------------------------
 WIZARD_CRED = 500        # cred needed before the Wizard's DM arrives
 GOD_PAYOUT = 1_000_000   # one-time reward for passing the Trial
+
+# Trial board data. Phase 1: power the rig by clicking these in order. Phase 2:
+# land the probes on the live pads, avoid the decoys. Plus board geometry (world
+# units in the stage's 3D scene) and the pad color-scales.
+RIG_ORDER = ["POWER", "GROUND", "DATA", "CLOCK", "ENABLE"]
+PADS_LIVE = ["V+", "DATA", "CLK", "GND"]
+PADS_DECOY = ["12V", "FAN", "HORN", "A/C", "CAN"]
+PAD_TOP_Z = 0.28                 # z where the pogo tip contacts a pad
+PIN_TOP_Z = 2.6                  # pogo pin start/return height
+PAD_GOLD = rgba("#c9a227")
+PAD_GREEN = (0.4, 1.6, 0.7, 1)   # color scale for a probed live pad
+PAD_RED = (1.9, 0.35, 0.35, 1)   # color scale for a decoy flash
 
 # Every map that can land in bro.unlocked_maps (Discord community + pro-granted),
 # resolved by apply + the TUNE selector. (Discord's random pool stays COMMUNITY_MAPS.)

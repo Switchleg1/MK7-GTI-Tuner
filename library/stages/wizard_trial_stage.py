@@ -5,24 +5,14 @@ import random
 
 from panda3d.core import NodePath, TextNode
 
-from library.core.constants import BLUE, DIM, GOD_PAYOUT, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, VIOLET, WHITE
+from library.core.constants import (
+    BLUE, DIM, GOD_PAYOUT, GREEN, GREEN_2, LINE, PAD_GOLD, PAD_GREEN, PAD_RED, PAD_TOP_Z,
+    PADS_DECOY, PADS_LIVE, PANEL, PANEL_DARK, PIN_TOP_Z, RED, RIG_ORDER, TEXT, VIOLET, WHITE,
+)
 from library.core.utils import rgba
 from library.game.geometry import make_box
 from library.stages.hud import Hud
 from library.stages.picker import Picker
-
-# Phase 1: power the rig by clicking these in order.
-RIG_ORDER = ["POWER", "GROUND", "DATA", "CLOCK", "ENABLE"]
-# Phase 2: land the probes on the live pads, avoid the decoys.
-PADS_LIVE = ["V+", "DATA", "CLK", "GND"]
-PADS_DECOY = ["12V", "FAN", "HORN", "A/C", "CAN"]
-
-# Board geometry (world units, in the stage's 3D scene).
-PAD_TOP_Z = 0.28          # z where the pogo tip contacts a pad
-PAD_GOLD = rgba("#c9a227")
-PAD_GREEN = (0.4, 1.6, 0.7, 1)   # color scale for a probed live pad
-PAD_RED = (1.9, 0.35, 0.35, 1)   # color scale for a decoy flash
-PIN_TOP_Z = 2.6           # pogo pin start/return height
 
 
 class WizardTrialStage(Hud):

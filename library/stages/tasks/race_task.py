@@ -6,22 +6,15 @@ from panda3d.core import TextNode, Vec4
 
 import library.core.assets as assets
 from library.core.constants import (
-    AMBER, AUDIO, BLUE, BOX_LINE, DIM, ED_HEAL_ON_WIN, ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY,
-    ED_TAUNT_THRESHOLD, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
+    AMBER, AUDIO, BLUE, BOX_LINE, CHASE_CAM_LOOK, CHASE_CAM_POS, CHASE_FOV, DIM, ED_HEAL_ON_WIN,
+    ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY, ED_TAUNT_THRESHOLD, FINAL_DRIVE, GEAR_RATIOS,
+    GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
 )
 from library.core.utils import clamp
 from library.game.geometry import make_box
 from library.stages.task_base import TaskBase
 
-# Chase camera framed BETWEEN the two lanes so BOTH cars are visible. A
-# cockpit-only POV can't see the rival when they're side-by-side at start (they
-# sit ~4m straight off to the side, which is outside any sane FOV). The cars
-# still stay fixed and the world scrolls past, so it keeps the "world moves
-# around you" feel from a broadcast/follow camera vantage.
-SHIFT_RPM = 6500                # tach goes amber from 5500, red from here
-CHASE_CAM_POS = (0.0, -8.0, 2.6)
-CHASE_CAM_LOOK = (0.0, 14.0, 0.5)
-CHASE_FOV = 55
+SHIFT_RPM = 6500                # tach goes amber from 5500, red from here (chase cam lives in constants)
 
 RIVAL_X = 2.2                   # lateral lane offset (your car stays at -2.2)
 RIVAL_GAP_SCALE = 0.18          # scene units per meter of (rival.d - player.d)

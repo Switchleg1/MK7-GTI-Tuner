@@ -2,17 +2,8 @@ from __future__ import annotations
 
 import math
 
-from library.core.constants import DEFAULT_TUNE, FUEL, REPS, TUNE_THRESHOLDS
+from library.core.constants import DEFAULT_TUNE, FUEL, GRADE_TABLE, REPS, TUNE_THRESHOLDS
 from library.core.utils import clamp
-
-
-GRADE_TABLE = [
-    (85, "S", "tuner of the year"),
-    (72, "A", "fast, loud, barely legal"),
-    (58, "B", "solid, more in it"),
-    (42, "C", "it runs"),
-    (0, "D", "rethink the map"),
-]
 
 
 def default_tune() -> dict:

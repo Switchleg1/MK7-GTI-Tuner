@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import random
-import time
 
 from library.core.constants import (
     DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_BAD_REVIEW, ED_BLOWN, ED_DISCORD_BAD,
     ED_DISCORD_GOOD_HEAL, ED_TAUNT_THRESHOLD, ED_TAUNTS, GOD_PAYOUT, GREEN_NAME_CRED,
-    MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TRACK_M, TUNE_SALE, WIZARD_CRED,
+    MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TUNE_SALE, WIZARD_CRED,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -188,19 +187,25 @@ class Game:
                 "summary": "you're green now - they expect you to know this one",
                 "replies": [{"name": who.name, "color": who.color, "text": line}]}
 
+    def _grant_community_map(self, key: str):
+        self.bro.unlock_map(key)
+        self.unlock("community_map", "Community Map Plug")
+
+    # How each Discord outcome effect lands on the bro/car -- table-dispatched
+    # instead of an if/elif staircase. An unknown/"none" effect falls through to
+    # just the emotional-damage swing and the log line.
+    _DISCORD_EFFECTS = {
+        "cash": lambda self, o: self.bro.earn(o["amount"]),
+        "cred": lambda self, o: self.bro.add_cred(o["amount"]),
+        "map": lambda self, o: self._grant_community_map(o["map_key"]),
+        "part": lambda self, o: self.bro.pay_repair(o["amount"]),
+        "clients": lambda self, o: self.bro.add_cred(-o["amount"]),
+    }
+
     def _apply_discord(self, outcome: dict):
-        effect, amount = outcome["effect"], outcome["amount"]
-        if effect == "cash":
-            self.bro.earn(amount)
-        elif effect == "cred":
-            self.bro.add_cred(amount)
-        elif effect == "map":
-            self.bro.unlock_map(outcome["map_key"])
-            self.unlock("community_map", "Community Map Plug")
-        elif effect == "part":
-            self.bro.pay_repair(amount)
-        elif effect == "clients":
-            self.bro.add_cred(-amount)
+        handler = self._DISCORD_EFFECTS.get(outcome["effect"])
+        if handler:
+            handler(self, outcome)
         if outcome["kind"] == "good":
             self.soothe_bro(ED_DISCORD_GOOD_HEAL)
         else:
