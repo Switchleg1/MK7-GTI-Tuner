@@ -34,6 +34,7 @@ class TaskBase(Hud):
         self.last_draw = 0.0
         self.flames = []
         self.reactions = []
+        self.allow_back = True
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
@@ -188,7 +189,8 @@ class TaskBase(Hud):
         left, right = self.bounds()
         self.draw_header(self.game)
         self.label(self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
-        self.back_button(self.on_back)
+        if self.allow_back:
+            self.back_button(self.on_back)
         self.build_ui(left, right)
 
     def panel_pair(self, left, right):

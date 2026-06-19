@@ -19,6 +19,7 @@ class SimonPanel(Hud):
         self.tab = tab
         self.open = False
         self.current = None
+        self.show = True
         self.draw()
 
     def ask(self):
@@ -40,6 +41,8 @@ class SimonPanel(Hud):
 
     def draw(self):
         self.clear()
+        if not self.show:
+            return
         right = self.bounds()[1]
         self.pill("Ask Simon", (right - 0.34, 0, -0.85), self.ask, icon="simon")
         if not self.open or not self.current:

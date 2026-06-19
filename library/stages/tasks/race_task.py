@@ -54,6 +54,9 @@ class RaceTask(TaskBase):
         self.player_car.reparentTo(self.scene)
         self.player_car.setPos(-2.2, 0, 0.0)
         self.player_wheels = self.prepare_wheels(self.player_car)
+        self.rival_car = None       # set by _load_rival_car (which replaces any current one)
+        self.rival_wheels = None
+        self._rival_model = None
         self._load_rival_car()
         # Wheel pivots for both cars -- spun in tick so the cars look like they're
         # moving even though they hold their scene Y position.
@@ -264,9 +267,21 @@ class RaceTask(TaskBase):
             self._load_rival_car()
             
     def _load_rival_car(self):
+        """(Re)load the selected rival's car, REPLACING any current one. The previous
+        version never removed the old model, so selecting a rival left the old car
+        orphaned in the scene -- two rivals showing, one moving (the live one) and one
+        static. We remove the old node first, and skip the reload entirely when the
+        model is unchanged (just re-stage it) so tapping the ladder isn't a stutter."""
         rival = self.game.rivals[self.game.bro.selected_rival]
-        if rival:
-            self.rival_car = assets.load_model(assets.ModelType.CAR, rival.model)
+        model = rival.model if rival else None
+        if model and model == self._rival_model and self.rival_car:
+            self.rival_car.setPos(RIVAL_X, 0, 0.0)  # same model already loaded; just re-stage
+            return
+        if self.rival_car:
+            self.rival_car.removeNode()  # also frees its wheel pivots (children)
+        self._rival_model = model
+        if model:
+            self.rival_car = assets.load_model(assets.ModelType.CAR, model)
             self.rival_car.reparentTo(self.scene)
             self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
             self.rival_car.setPos(RIVAL_X, 0, 0.0)
@@ -285,6 +300,7 @@ class RaceTask(TaskBase):
             self.game.log("Your tune is a grenade. Fix it on dyno first.", "err")
             return "blown"
         now = time.perf_counter()
+        self.allow_back = False
         self.race = {"active": True, "green_at": now + 1.9, "rival_launch": now + 2.15,
                      "p": {"d": 0.0, "v": 0.0, "gear": 1, "launched": False, "done": False, "et": 0.0, "trap": 0.0},
                      "r": {"d": 0.0, "v": 0.0, "done": False, "et": 0.0, "trap": 0.0}}
@@ -345,6 +361,7 @@ class RaceTask(TaskBase):
         game.log(("WIN" if won else "LOSS") + f" {player['et']:.2f}s @ {round(player['trap'])} mph", "ok" if won else "warn")
         game.maybe_green()
         self.race["active"] = False
+        self.allow_back = True
 
     def _race_result_text(self) -> str:
         if not self.race:
