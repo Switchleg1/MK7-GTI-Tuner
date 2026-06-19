@@ -1,21 +1,12 @@
 from __future__ import annotations
 
-from library.core.constants import AMBER, BLUE, DIM, GREEN, GREEN_2, PRO_MAPS, TEXT, UNLOCKABLE_MAPS
+from library.core.constants import (
+    AMBER, BLUE, DIM, FUELS, GREEN, GREEN_2, PRESET_BUTTONS, PRO_MAPS, SLIDERS, TEXT, UNLOCKABLE_MAPS,
+)
 from library.game.tuning import pop_score
 from library.stages.task_base import TaskBase
 
-PRESET_BUTTONS = [("stock", "Stock"), ("stage1", "Stage 1"), ("stage2", "Stage 2"), ("crackle", "Crackle")]
-FUELS = ["91", "93", "E30", "E85"]
-
-# (slider attr, tune key, value range, label formatter)
-SLIDERS = [
-    ("sl_boost", "boost", (16.0, 28.0), lambda v: f"Boost {v:.1f} psi"),
-    ("sl_timing", "timing", (6.0, 18.0), lambda v: f"Timing {v:.1f} deg"),
-    ("sl_lambda", "lambda", (0.78, 0.90), lambda v: f"Lambda {v:.3f}"),
-    ("sl_of", "of", (0.0, 100.0), lambda v: f"Pop fuel {round(v)}"),
-    ("sl_or", "or", (0.0, 100.0), lambda v: f"Pop spark {round(v)}"),
-    ("sl_th", "th", (0.0, 100.0), lambda v: f"Throttle {round(v)}"),
-]
+# Derived once: slider attr -> tune key (the SLIDERS table itself lives in constants).
 SLIDER_KEY = {attr: key for attr, key, _, _ in SLIDERS}
 
 

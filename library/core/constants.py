@@ -90,6 +90,19 @@ PRESETS = {
     "crackle": {"boost": 23.0, "timing": 13.0, "lambda": 0.84, "fuel": "E30", "of": 95.0, "or": 92.0, "th": 85.0, "name": "Crackle Monster"},
 }
 
+# TUNE-screen UI tables: preset buttons (key, label), the fuel choices, and the
+# editable sliders -- (slider attr, tune key, value range, label formatter).
+PRESET_BUTTONS = [("stock", "Stock"), ("stage1", "Stage 1"), ("stage2", "Stage 2"), ("crackle", "Crackle")]
+FUELS = ["91", "93", "E30", "E85"]
+SLIDERS = [
+    ("sl_boost", "boost", (16.0, 28.0), lambda v: f"Boost {v:.1f} psi"),
+    ("sl_timing", "timing", (6.0, 18.0), lambda v: f"Timing {v:.1f} deg"),
+    ("sl_lambda", "lambda", (0.78, 0.90), lambda v: f"Lambda {v:.3f}"),
+    ("sl_of", "of", (0.0, 100.0), lambda v: f"Pop fuel {round(v)}"),
+    ("sl_or", "or", (0.0, 100.0), lambda v: f"Pop spark {round(v)}"),
+    ("sl_th", "th", (0.0, 100.0), lambda v: f"Throttle {round(v)}"),
+]
+
 MODS = [
     ("intake", "Cold Air Intake", 120, "+6 whp, quicker spool."),
     ("dp", "Catless Downpipe", 250, "+12 whp and much louder bangs. Cops notice fast."),
