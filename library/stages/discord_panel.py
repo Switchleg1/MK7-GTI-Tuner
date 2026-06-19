@@ -58,11 +58,33 @@ class DiscordPanel(Hud):
         if not text:
             return
         self.messages.append({"name": "You", "color": WHITE, "text": text})
+        ed_before = self.game.bro.emotional_damage
         outcome = self.game.ask_discord(text)
         self.messages.extend(outcome["replies"])
         self.messages.append({"name": "# result", "color": GREEN if outcome["kind"] == "good" else RED,
                               "text": outcome["summary"]})
+        self._note_damage(ed_before)
+        self._refresh_host()  # the screen behind drew cash/cred before this changed them
         self.draw()  # recreates the entry with focus
+
+    def _note_damage(self, before: float):
+        """Surface the emotional-damage swing right in the thread (it's otherwise
+        only shown on the race screen). Bad outcomes hurt, good ones heal."""
+        ed = self.game.bro.emotional_damage
+        delta = ed - before
+        if abs(delta) < 0.5:
+            return
+        self.messages.append({"name": "# emotional damage",
+                              "color": RED if delta > 0 else GREEN,
+                              "text": f"{round(ed)}%  ({'+' if delta > 0 else ''}{round(delta)})"})
+
+    def _refresh_host(self):
+        """The outcome moved cash / cred / ED on the model, but the task screen
+        behind this window drew those values before the interaction. Mark it dirty
+        so its header (and any cash readout) rebuilds on the next frame."""
+        stage = getattr(self.app, "stage", None)
+        if stage is not None and hasattr(stage, "dirty"):
+            stage.dirty = True
 
     # -- draw --------------------------------------------------------------
     def draw(self):
