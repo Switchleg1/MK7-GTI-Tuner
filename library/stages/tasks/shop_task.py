@@ -24,7 +24,7 @@ class ShopTask(TaskBase):
             x = left + 0.28 + col * 0.82
             y = 0.25 - row * 0.12
             label = f"{name} - {'owned' if game.car.mods[mod_id] else '$' + str(cost)}"
-            self.button(label, (x, 0, y), (0.72, 0.08), self.bind(game.buy_mod, mod_id), not game.car.mods[mod_id] and bro.cash >= cost)
+            self.buttons.button(f"mod-{mod_id}", label, (x, 0, y), (0.72, 0.08), self.bind(game.buy_mod, mod_id), not game.car.mods[mod_id] and bro.cash >= cost)
         self._green_section(left, right)
 
     def _green_section(self, left, right):
@@ -39,11 +39,11 @@ class ShopTask(TaskBase):
             return
         self.label("[ GREEN NAME ]  verified pro", (left + 0.06, 0, -0.345), 0.038, GREEN)
         self.label(f"Tunes sold: {bro.tunes_sold}", (right - 0.06, 0, -0.345), 0.032, TEXT, align=TextNode.ARight)
-        self.button("Sell a tune  (+$)", (left + 0.32, 0, -0.45), (0.54, 0.10), self.bind(game.sell_tune), True, GREEN_2)
+        self.buttons.button("sell", "Sell a tune  (+$)", (left + 0.32, 0, -0.45), (0.54, 0.10), self.bind(game.sell_tune), True, GREEN_2)
         for i, pro in enumerate(game.pros):
             have = pro.grant_map in bro.unlocked_maps
-            self.button(f"Ask {pro.name}" + (" (got it)" if have else ""),
-                        (left + 0.92 + i * 0.42, 0, -0.45), (0.38, 0.10), self.bind(game.ask_pro, pro.handle), not have)
+            self.buttons.button(f"pro-{pro.handle}", f"Ask {pro.name}" + (" (got it)" if have else ""),
+                                (left + 0.92 + i * 0.42, 0, -0.45), (0.38, 0.10), self.bind(game.ask_pro, pro.handle), not have)
         pro_keys = [p.grant_map for p in game.pros]
         have_n = sum(1 for k in pro_keys if k in bro.unlocked_maps)
         self.label(f"Pro map stages unlocked: {have_n}/{len(pro_keys)}  -  sell tunes to earn the rest.",

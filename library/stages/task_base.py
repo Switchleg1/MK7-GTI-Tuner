@@ -4,11 +4,12 @@ import random
 import time
 
 from direct.gui.OnscreenImage import OnscreenImage
-from panda3d.core import Point3, TextNode, TransparencyAttrib, Vec3, Vec4
+from panda3d.core import MouseButton, Point3, TextNode, TransparencyAttrib, Vec3, Vec4
 
 from library.core.assets import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS, WHEEL_PREFIX, WHEEL_STATIC
 from library.game.geometry import make_box
+from library.stages.button_controller import ButtonController
 from library.stages.hud import Hud
 
 
@@ -35,6 +36,11 @@ class TaskBase(Hud):
         self.flames = []
         self.reactions = []
         self.allow_back = True
+        # Each task owns its own button controller: buttons are declared in build_ui
+        # via self.buttons.button(key, ...), persist across redraws (so clicks aren't
+        # dropped by the rebuild and can flash on press), and are freed on exit. They
+        # live on their own layer, lifted above the redrawn frames/labels each pass.
+        self.buttons = ButtonController(app, self.root.attachNewNode("task-buttons"))
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
@@ -47,6 +53,7 @@ class TaskBase(Hud):
         audio = getattr(self.app, "audio", None)
         if audio:
             audio.silence()  # stop the engine note from droning into the next stage
+        self.buttons.destroy()  # free this task's buttons + their layer
         self.scene.removeNode()
         self.destroy()
 
@@ -185,13 +192,16 @@ class TaskBase(Hud):
                 self.reactions.remove(r)
 
     def redraw(self):
-        self.clear()
+        self.clear()                 # rebuild decoration (labels/frames); buttons persist
+        self.buttons.begin()         # start a declarative pass; build_ui re-declares buttons
         left, right = self.bounds()
         self.draw_header(self.game)
         self.label(self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
         if self.allow_back:
             self.back_button(self.on_back)
         self.build_ui(left, right)
+        self.buttons.prune()         # drop any button not re-declared this pass
+        self.buttons.lift()          # keep buttons above the frames/labels just rebuilt
 
     def panel_pair(self, left, right):
         gap = 0.04
@@ -207,12 +217,27 @@ class TaskBase(Hud):
 
     def render(self, dt):
         """Called every frame by the app's render loop: advance flames/reactions,
-        run the subclass ``tick``, and redraw when dirty (or on the live timer)."""
+        run the subclass ``tick``, and redraw when dirty (or on the live timer).
+
+        A redraw destroys and rebuilds every button (``clear()``), so doing it while
+        the mouse button is held would drop the click: the press lands on the old
+        button and the release on its freshly-built replacement, which never saw the
+        press. So we defer the redraw until the button is released -- the sim (tick)
+        keeps running; only the UI rebuild waits."""
         self.update_flames(dt)
         self.update_reactions(dt)
         self.tick(dt)
+        self.buttons.render(dt)  # advance click-flash (cheap; runs even while held)
+        if self._mouse_held():
+            return
         now = time.perf_counter()
         if self.dirty or (self.live and now - self.last_draw > UI_REFRESH_SECONDS):
             self.redraw()
             self.dirty = False
             self.last_draw = now
+
+    def _mouse_held(self) -> bool:
+        """True while the left mouse button is down (so we can defer UI rebuilds and
+        not drop the click). Safe when there's no mouse watcher (offscreen)."""
+        watcher = self.app.mouseWatcherNode
+        return watcher is not None and watcher.is_button_down(MouseButton.one())

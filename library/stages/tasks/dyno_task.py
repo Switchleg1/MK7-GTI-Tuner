@@ -194,7 +194,7 @@ class DynoTask(TaskBase):
     def _controls(self, mid, right):
         game = self.game
         cx = (mid + right) / 2
-        self.button("Run Dyno Pull", (cx, 0, -0.30), (0.46, 0.12), self.start_pull, game.car.flashed and not self.running, GREEN_2)
+        self.buttons.button("run", "Run Dyno Pull", (cx, 0, -0.30), (0.46, 0.12), self.start_pull, game.car.flashed and not self.running, GREEN_2)
         if self.running:
             state, color = f"pulling... {round(self.values['rpm'])} rpm", AMBER
         elif game.car.flashed:

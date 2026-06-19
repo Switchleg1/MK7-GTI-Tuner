@@ -32,12 +32,12 @@ class MapsTask(TaskBase):
         self.label("Fuel", (lbox[0] + 0.06, 0, z + 0.005), 0.032, DIM)
         for i, fuel in enumerate(FUELS):
             sel = car.tune["fuel"] == fuel
-            self.button(fuel, (lbox[0] + 0.42 + i * 0.20, 0, z + 0.01), (0.18, 0.075),
-                        (lambda f=fuel: self._set_fuel(f)), True, GREEN_2 if sel else None, 0.036)
+            self.buttons.button(f"fuel-{fuel}", fuel, (lbox[0] + 0.42 + i * 0.20, 0, z + 0.01), (0.18, 0.075),
+                                (lambda f=fuel: self._set_fuel(f)), True, GREEN_2 if sel else None, 0.036)
         z -= 0.17
         for index, (pkey, pname) in enumerate(PRESET_BUTTONS):
-            self.button(pname, (lbox[0] + 0.21 + index * 0.30, 0, z), (0.27, 0.085),
-                        self.bind(self.game.apply_preset, pkey))
+            self.buttons.button(f"preset-{pkey}", pname, (lbox[0] + 0.21 + index * 0.30, 0, z), (0.27, 0.085),
+                                self.bind(self.game.apply_preset, pkey))
         self.lbl_dirty = self.label("Flash required for changed tune." if car.dirty else "",
                                     (lbox[0] + 0.06, 0, z - 0.13), 0.030, AMBER)
         maps = self.game.bro.unlocked_maps
@@ -47,8 +47,8 @@ class MapsTask(TaskBase):
             cz = z - 0.24
             self.label("UNLOCKED MAPS", (lbox[0] + 0.06, 0, cz + 0.05), 0.026, GREEN)
             for index, key in enumerate(ordered[:4]):
-                self.button(UNLOCKABLE_MAPS[key]["name"], (lbox[0] + 0.40, 0, cz - index * 0.082), (0.74, 0.072),
-                            self.bind(self.game.apply_preset, key))
+                self.buttons.button(f"umap-{key}", UNLOCKABLE_MAPS[key]["name"], (lbox[0] + 0.40, 0, cz - index * 0.082), (0.74, 0.072),
+                                    self.bind(self.game.apply_preset, key))
 
         # -- right panel: pops & bangs + switch slots --------------------
         self.label("POPS & BANGS", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
@@ -65,11 +65,11 @@ class MapsTask(TaskBase):
             if not car.switch_patch and index > 0:
                 continue
             name = slot.get("name", "empty") if slot else "empty"
-            self.button(f"Slot {index + 1}: {name}", (rbox[0] + 0.34, 0, z), (0.56, 0.072),
-                        self.bind(self.game.select_slot, index), bool(slot))
+            self.buttons.button(f"slot-{index}", f"Slot {index + 1}: {name}", (rbox[0] + 0.34, 0, z), (0.56, 0.072),
+                                self.bind(self.game.select_slot, index), bool(slot))
             z -= 0.082
-        self.button("Assign Current Tune", (rbox[0] + 0.36, 0, z - 0.02), (0.58, 0.082),
-                    self.bind(self.game.assign_slot), car.flashed)
+        self.buttons.button("assign", "Assign Current Tune", (rbox[0] + 0.36, 0, z - 0.02), (0.58, 0.082),
+                            self.bind(self.game.assign_slot), car.flashed)
 
         self._ready = True
 

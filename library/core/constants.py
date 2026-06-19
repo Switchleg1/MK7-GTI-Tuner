@@ -30,6 +30,11 @@ BOX_LINE = rgba("#2f7d57", 0.55)     # subtle green ring around glass panels
 BTN_LINE = rgba("#357f59", 0.50)     # ring around an enabled button
 BTN_DISABLED_FILL = rgba("#0a0f13", 0.55)
 BTN_DISABLED_TEXT = rgba("#3a4750")
+# Managed task buttons (library/stages/button.py): on press a button flashes its
+# "clicked" colour for BUTTON_CLICK_HOLD seconds, then reverts. If no clicked colour
+# is given it auto-uses the normal colour brightened by BUTTON_CLICK_BRIGHTEN.
+BUTTON_CLICK_HOLD = 0.18
+BUTTON_CLICK_BRIGHTEN = 1.8
 
 # Dedicated cull bin for game-level overlays (Simon/Discord panels, the toast, and
 # the notifications), registered in app startup ABOVE Panda's default "fixed" bin so

@@ -94,8 +94,9 @@ library/
   game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
              discord.py discord_user.py discord_admin.py discord_green_name.py
              discord_normal_user.py geometry.py tuning.py simos.py
-  stages/    hud.py task_base.py garage_stage.py menu_stage.py simon_panel.py discord_panel.py
-             toast.py notifications.py unlock_stage.py phone_screen.py character.py picker.py progress_bar.py
+  stages/    hud.py task_base.py button.py button_controller.py garage_stage.py menu_stage.py
+             simon_panel.py discord_panel.py toast.py notifications.py unlock_stage.py
+             phone_screen.py character.py picker.py progress_bar.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
 data/        models/*.glb  images/*.png  audio/*.wav
@@ -144,10 +145,28 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   (via `_glass`); the `slider` thumb is the round `knob` texture. `set_visible(bool)`
   stash/unstashes the whole tree (regions included); `destroy()` removes it. Base for
   every screen.
+- `button.py` — `Button`: one managed task button — a rounded glass `DirectButton`
+  (`ui_box` fill + `ui_ring` border) that **flashes a "clicked" colour** for
+  `BUTTON_CLICK_HOLD`s on press then reverts (auto-brightens the normal colour if no
+  clicked colour is given). Properties (text/pos/size/command/enabled/colours/hold) edit
+  live via `configure`; `render(dt)` advances the flash. Never destroyed by a redraw.
+- `button_controller.py` — `ButtonController`: owns one task's buttons (created on enter,
+  destroyed on exit). Buttons are **keyed and persist** between redraws: re-declaring a
+  key edits the existing button instead of recreating it. Declarative pass
+  (`begin()` → `button(key, …)` per button → `prune()` drops keys not re-declared), plus
+  imperative `add`/`edit`/`remove`/`get` for any-time changes. `render(dt)` ticks all
+  flashes; `lift()` keeps the buttons drawn above the frames/labels a redraw just rebuilt.
 - `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node;
   `enter()` sets the camera, builds scene/UI, and binds keys; the app's render loop
-  calls `render(dt)` (which runs `tick(dt)` + flame/reaction updates + a `dirty`/live
-  redraw); `exit()` tears it all down. The Simon/Discord panels are **not** owned here
+  calls `render(dt)` (which runs `tick(dt)` + flame/reaction updates + the button
+  controller's flash tick + a `dirty`/live redraw). **Buttons are not part of the redraw
+  churn:** each task owns a `ButtonController` (`self.buttons`) whose buttons *persist*
+  across redraws (declared each pass in `build_ui` via `self.buttons.button(key, …)`,
+  edited not recreated), so a click can't be dropped by the UI rebuilding mid-press. A
+  redraw still `clear()`s/rebuilds the labels/frames (and the Back pill + sliders), so
+  `render` also **defers the redraw while the mouse button is held** (`_mouse_held`) to
+  protect those remaining recreated widgets. `exit()` destroys the controller, then tears
+  the rest down. The Simon/Discord panels are **not** owned here
   — they live on the app. Subclasses set `title`/`key`/`live` (and `music_key`, which
   defaults to `key` but is the themed folder name for TUNE→`tuning`/SKREETS→`skreetz`)
   and override `build_scene`/`build_ui`/`bind_keys`/`tick`. Provides

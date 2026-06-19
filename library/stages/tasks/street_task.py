@@ -150,6 +150,6 @@ class StreetTask(TaskBase):
         fill = bar_w * clamp(bro.karen / 100, 0, 1)
         self.frame((bar_x, bar_x + max(0.001, fill), -0.075, -0.05), color=RED, border=None)
         label = "Throttle [HELD]" if self._held else "Throttle"
-        self.button(label, (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, self.game.car.flashed, GREEN if self._held else GREEN_2)
-        self.button("Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, self.game.car.flashed)
+        self.buttons.button("throttle", label, (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, self.game.car.flashed, GREEN if self._held else GREEN_2)
+        self.buttons.button("pops", "Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, self.game.car.flashed)
         self.label("Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.", (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)
