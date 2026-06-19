@@ -67,7 +67,7 @@ class UnlockStage(DirectObject):
         assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.root)
         assets.load_model(assets.ModelType.CAR, "mk7_gti").reparentTo(self.root)
 
-        char_model = assets.load_model("character")
+        char_model = assets.load_model(assets.ModelType.CHARACTOR, "character")
         char_model.reparentTo(self.root)
         char_model.setPos(*CHARACTER_POS)
         self.character = Character(char_model)

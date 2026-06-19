@@ -81,8 +81,9 @@ pause screen with **Save Game** and **Resume**.
    (costs cash) or lost clients (costs clout) if it doesn't. Admins help, green names
    want money, and the troll will gladly ruin your day.
 6. **Menu, saves & options.** **Esc** (or the hub **MENU** button) opens the pause menu:
-   **Save Game** writes a full career snapshot (cash, the car build + mods, rival ladder,
-   Discord state) and **Load Game** restores it. **Options → Sound** has live music + FX
+   **Save Game** writes a career snapshot (cash, the car build + mods, ladder progress,
+   Discord state) and **Load Game** restores it. (The rival roster itself isn't saved —
+   it's rebuilt from the game's data each load, so tweaking rivals always takes effect.) **Options → Sound** has live music + FX
    volume sliders; **Graphics** is a placeholder for now. Options persist in `options.cfg`
    and the save in `savegame.json`, both under your user app-data folder.
 

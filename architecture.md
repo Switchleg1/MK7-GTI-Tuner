@@ -223,8 +223,12 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   first hub entry and assigns them here; not reset by `new_game`) plus
   `set_advisors_visible(bool)` so a task can show/hide the Ask pills. `new_game()` resets
   a fresh career **in place** (so cached references survive); `to_dict`/`from_dict` cover
-  the bro, car library (build + mods), rival ladder, discord presence, and the career
-  counters/achievements (stamped with `SAVE_VERSION`), restoring in place.
+  the bro, car library (build + mods), discord presence, and the career
+  counters/achievements (stamped with `SAVE_VERSION`), restoring in place. The **rival
+  ladder is intentionally not saved** — it's static reference data from `RIVALS`, always
+  rebuilt by `new_game`; only progress (`bro.unlocked_rival`/`selected_rival`) persists.
+  (`SAVE_VERSION 1` saved the ladder and froze stale specs into old saves — e.g. a rival's
+  `model` — so a constant edit didn't take effect on load; v2 drops it.)
 - `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress,
   `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`). Room
   for emotional damage / route / skills.

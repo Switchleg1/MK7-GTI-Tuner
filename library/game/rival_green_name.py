@@ -23,12 +23,6 @@ class RivalGreenName:
     def ladder(cls) -> list["RivalGreenName"]:
         return [cls.from_spec(spec) for spec in RIVALS]
 
-    def to_dict(self) -> dict:
-        return {"name": self.name, "whp": self.whp, "weight": self.weight, "grip": self.grip, "purse": self.purse, "model": self.model}
-
-    def from_dict(self, data: dict):
-        # Restore the stats from a save (the ladder itself is rebuilt from RIVALS, so
-        # the colour stays); guards against a future roster change shifting indices.
-        for key in ("name", "whp", "weight", "grip", "purse", "model"):
-            if key in data:
-                setattr(self, key, data[key])
+    # No to_dict/from_dict: the ladder is static reference data, always rebuilt from
+    # RIVALS. Saving it froze stale specs into old saves (see Game.to_dict); progress
+    # is persisted on TunerBro (unlocked_rival / selected_rival).

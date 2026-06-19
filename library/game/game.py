@@ -5,8 +5,8 @@ import time
 
 from library.core.constants import (
     BUST_FINE, DISCORD_GREEN_BRUSHOFF, GOD_PAYOUT, GREEN_NAME_CRED, KAREN_AFTER_BUST,
-    KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TRACK_M,
-    TUNE_SALE, WIZARD_CRED,
+    KAREN_COOLDOWN_PER_SEC, MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION,
+    TUNE_SALE, WIZARD_CRED, POP_CRED_CONST, KAREN_HEAT_CONST
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -158,8 +158,8 @@ class Game:
     def register_pops(self) -> int:
         """Apply cred/Karen from a pops blip; return a flame count for the scene."""
         pop = self.car.active_pop()
-        self.bro.add_cred(pop / 18)
-        self.bro.add_heat(pop / 18)
+        self.bro.add_cred(pop / POP_CRED_CONST)
+        self.bro.add_heat(pop / KAREN_HEAT_CONST)
         self.total_pops += 1
         if self.total_pops >= 50:
             self.unlock("burble_brain", "Burble Brain")
@@ -299,14 +299,19 @@ class Game:
 
     # -- save --------------------------------------------------------------
     def to_dict(self) -> dict:
-        """A full career snapshot: the bro, the car library (build + mods), the rival
-        ladder, the discord presence, and the career counters/achievements. Restored
-        in place by ``from_dict`` so live panel references stay valid."""
+        """A career snapshot: the bro, the car library (build + mods), the discord
+        presence, and the career counters/achievements. Restored in place by
+        ``from_dict`` so live panel references stay valid.
+
+        The **rival ladder is deliberately NOT saved** -- it's static reference data
+        from the ``RIVALS`` constant (names/stats/model), and the only dynamic part is
+        progress, which already lives on ``bro`` (``unlocked_rival``/``selected_rival``).
+        Persisting the specs froze them into the save and went stale whenever ``RIVALS``
+        changed (e.g. an old save pinned WRX STI's model to ``civic_type_r``)."""
         return {
             "version": SAVE_VERSION,
             "bro": self.bro.to_dict(),
             "cars": self.cars.to_dict(),
-            "rivals": [rival.to_dict() for rival in self.rivals],
             "discord": self.discord.to_dict(),
             "achievements": sorted(self.achievements),
             "total_pops": self.total_pops,
@@ -315,10 +320,10 @@ class Game:
         }
 
     def from_dict(self, data: dict):
+        # NB: rivals are NOT restored -- the ladder always comes from RIVALS (see
+        # to_dict); progress rides on bro. Any "rivals" key in an old save is ignored.
         self.bro.from_dict(data.get("bro", {}))
         self.cars.from_dict(data.get("cars", {}))
-        for rival, saved in zip(self.rivals, data.get("rivals", [])):
-            rival.from_dict(saved)
         self.discord.from_dict(data.get("discord", {}))
         self.achievements = set(data.get("achievements", []))
         self.total_pops = data.get("total_pops", 0)

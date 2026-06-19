@@ -256,10 +256,11 @@ TOAST_Z = -0.85
 # --------------------------------------------------------------------------
 # Save games + options. Both live under the user's app-data folder (APP_NAME);
 # options.cfg persists between runs and loads at startup, savegame.json holds a
-# full career snapshot (bro / car+mods / rivals / discord). SAVE_VERSION lets a
-# future load reject or migrate an old layout.
+# career snapshot (bro / car+mods / discord + progress). The rival ladder is NOT
+# saved -- it's static reference data from RIVALS (v1 saved it and froze stale
+# specs). SAVE_VERSION lets a future load reject or migrate an old layout.
 # --------------------------------------------------------------------------
-SAVE_VERSION = 1
+SAVE_VERSION = 2
 CONFIG_FILE = "options.cfg"
 SAVE_FILE = "savegame.json"
 
@@ -612,6 +613,8 @@ UNLOCKABLE_MAPS = {**COMMUNITY_MAPS, **PRO_MAPS}
 
 # Karen meter: cools down whenever you're not making noise; if it tops out the
 # cops roll up and write a citation. Repeatable -- every cap-out is a new bust.
-KAREN_COOLDOWN_PER_SEC = 6.0   # 100% -> 0 in ~17 s of silence
+KAREN_COOLDOWN_PER_SEC = 3.0   # 100% -> 0 in ~17 s of silence
+KAREN_HEAT_CONST = 9.0
+POP_CRED_CONST = 18.0
 BUST_FINE = 250                # base citation; scaled by your cred / rep
 KAREN_AFTER_BUST = 30.0        # they don't forget instantly
