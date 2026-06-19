@@ -29,13 +29,18 @@ A single task, `MK7Tuner3D._render`, drives every frame in a fixed order:
 game.render():
   per-frame updates   -> music.update(dt), toast.render(dt), notifications.render(dt)
   current stage       -> self.stage.render(dt)         (task tick/redraw or hub spin)
-  game-level panels    -> simon.render(dt), discord.render(dt)
+  advisor panels      -> game.simon_panel.render(dt), game.discord_panel.render(dt)
 ```
 
-So the **Simon and Discord panels are owned by the app, not by the task** — they are
-built once on first hub entry, persist for the session, and just get re-pointed at the
-new context on each `set_stage`. Tasks no longer add their own per-frame task or their
-own panels.
+So the **Ask-Simon / Ask-Discord panels are owned by the Game** (`game.simon_panel` /
+`game.discord_panel`), not by the task — they're built once on first hub entry (by the
+app, which has the Panda context), persist for the session, and get re-pointed at the new
+context on each `set_stage`. (The Discord *model* is `game.discord`; the panel is
+`game.discord_panel` — distinct.) Tasks no longer add their own per-frame task or their
+own panels, and because the panels live on the game, a task can hide them via
+**`game.set_advisors_visible(bool)`** (stash/unstash + close): the **race** hides both
+pills the moment it stages and restores them when it concludes (in lock-step with
+`allow_back`), so the cockpit isn't cluttered mid-run.
 
 All game-level overlays (the panels, the toast, the notifications) draw in a dedicated
 cull bin, **`OVERLAY_BIN`** (`"a2d-overlay"`), registered in `app._register_overlay_bin`
@@ -62,9 +67,11 @@ flashed). At the hub, the **MENU** button or **Esc** opens the same stage as a *
 menu (`resumable=True`), which adds **Resume** + **Save Game**. `Esc` toggles it (open at
 the hub, resume from the menu) and is inert during the cinematic / inside a task. Because
 `MenuStage` is a normal stage that *replaces* the current one, there's no modal/​click
-concern — but the persistent Simon/Discord "Ask" pills don't belong on the menu, so
-`_sync_overlays` **stashes** them while a `MenuStage` is active (stash also pulls their
-mouse regions; reparenting un-stashes, so the stash runs *after* `_lift_overlays`).
+concern — but the persistent Ask pills don't belong on the menu, so after `_lift_overlays`
+(which un-stashes via `reparentTo`) `_sync_overlays` calls
+`game.set_advisors_visible(not isinstance(stage, MenuStage))` — the single switch that
+hides them on the menu and shows them by default on any real stage (a task may then hide
+them itself). Stash (not hide) is used so their mouse regions go too.
 
 **New Game / Load Game mutate the single `Game` in place** (`Game.new_game()` /
 `from_dict`) rather than constructing a new one, so the shared panels' cached `game`
@@ -134,8 +141,9 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   helpers (`label`/`frame`/`button`/`slider`/`image`/`pill`), the shared
   `draw_header(game)`, and `back_button(cmd)`. **Boxes are translucent + rounded:**
   `frame`/`button` tint the `ui_box` texture for the fill and `ui_ring` for the border
-  (via `_glass`); the `slider` thumb is the round `knob` texture. `destroy()` removes
-  the whole tree. Base for every screen.
+  (via `_glass`); the `slider` thumb is the round `knob` texture. `set_visible(bool)`
+  stash/unstashes the whole tree (regions included); `destroy()` removes it. Base for
+  every screen.
 - `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node;
   `enter()` sets the camera, builds scene/UI, and binds keys; the app's render loop
   calls `render(dt)` (which runs `tick(dt)` + flame/reaction updates + a `dirty`/live
@@ -209,12 +217,14 @@ A save-ready object tree: each node has `to_dict`/`from_dict`, and `Game.to_dict
 them into a single career snapshot written to `savegame.json` (see `storage.py`). Display
 reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated on `Game`.
 - `game.py` — `Game`: root/session. Holds `bro: TunerBro`, `rivals: [RivalGreenName]`,
-  `cars: CarLibrary`, `discord: Discord`, transient `logs`/`race`, a `car` property, and
-  the orchestration that spans nodes (`buy_mod`, `register_pops`, the quarter-mile race,
-  `ask_discord`, log). `new_game()` resets a fresh career **in place** (so cached
-  references survive); `to_dict`/`from_dict` cover the bro, car library (build + mods),
-  rival ladder, discord presence, and the career counters/achievements (stamped with
-  `SAVE_VERSION`), restoring in place.
+  `cars: CarLibrary`, `discord: Discord` (model), transient `logs`, a `car` property, and
+  the orchestration that spans nodes (`buy_mod`, `register_pops`, `ask_discord`, log). It
+  also owns the **advisor panels** `simon_panel`/`discord_panel` (the app builds them on
+  first hub entry and assigns them here; not reset by `new_game`) plus
+  `set_advisors_visible(bool)` so a task can show/hide the Ask pills. `new_game()` resets
+  a fresh career **in place** (so cached references survive); `to_dict`/`from_dict` cover
+  the bro, car library (build + mods), rival ladder, discord presence, and the career
+  counters/achievements (stamped with `SAVE_VERSION`), restoring in place.
 - `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress,
   `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`). Room
   for emotional damage / route / skills.

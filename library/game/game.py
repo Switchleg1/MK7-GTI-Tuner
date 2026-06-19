@@ -44,6 +44,13 @@ class Game:
 
     def __init__(self):
         self.pros = ProTuner.roster()  # static reference data (never reset)
+        # The advisor UI panels live here (built once by the app on first hub entry,
+        # kept for the session -- NOT reset by new_game). The Discord *model* is
+        # ``self.discord``; the on-screen panels are ``*_panel``. ``advisors_visible``
+        # lets a task hide the pills (e.g. the race hides them while it's live).
+        self.simon_panel = None
+        self.discord_panel = None
+        self.advisors_visible = True
         self.new_game()
 
     def new_game(self):
@@ -64,6 +71,20 @@ class Game:
     @property
     def car(self) -> Car:
         return self.cars.active()
+
+    # -- advisor panels (Ask Simon / Ask Discord) --------------------------
+    def set_advisors_visible(self, visible: bool):
+        """Show or hide the Ask-Simon + Ask-Discord pills (closing any open window when
+        hiding). A task calls this to clear them off-screen -- e.g. the race hides them
+        while it's live and restores them when it concludes. No-op before the panels are
+        built (first hub entry)."""
+        self.advisors_visible = visible
+        for panel in (self.simon_panel, self.discord_panel):
+            if panel is None:
+                continue
+            if not visible:
+                panel.close()
+            panel.set_visible(visible)
 
     def log(self, message: str, kind: str = "dim"):
         self.logs.append((message, kind))

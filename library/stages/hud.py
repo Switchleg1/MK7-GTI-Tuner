@@ -32,6 +32,14 @@ class Hud(DirectObject):
         """Per-frame hook called by the app's render loop. Screens that animate
         (tasks, the garage turntable, toasts) override this; static panels don't."""
 
+    def set_visible(self, visible: bool):
+        """Show or hide this whole UI tree, including its mouse-pick regions. Uses
+        stash/unstash (not hide) so a hidden screen's buttons stop catching clicks."""
+        if visible:
+            self.root.unstash()
+        else:
+            self.root.stash()
+
     def clear(self):
         for node in self.nodes:
             node.destroy()

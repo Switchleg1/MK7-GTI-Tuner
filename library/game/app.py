@@ -42,9 +42,11 @@ TASK_CLASSES = {
 class MK7Tuner3D(ShowBase):
     """Thin shell: owns the window/lights, the Game model, a single active stage, and
     the game-level overlays (music + now-playing toast, the achievement/Dave
-    notifications, and the shared Simon/Discord panels). One render loop drives them
-    all (see ``_render``). Flow: UnlockStage (cinematic) -> GarageStage (hub) <-> a
-    task at a time."""
+    notifications). The shared Ask-Simon / Ask-Discord panels are owned by the Game
+    (``game.simon_panel`` / ``game.discord_panel``) so a task can toggle them; the app
+    still builds them on first hub entry and drives them from the one render loop (see
+    ``_render``). Flow: MenuStage (title) -> UnlockStage (cinematic) -> GarageStage
+    (hub) <-> a task at a time."""
 
     def __init__(self):
         super().__init__()
@@ -65,8 +67,9 @@ class MK7Tuner3D(ShowBase):
         self.toast = Toast(self)                          # "now playing" + generic toasts
         self.music = MusicPlayer(self)                    # per-stage background music
         self.notifications = Notifications(self, self.game)  # achievement/Dave overlay
-        self.simon = None                                 # shared Ask-Simon panel (built at hub)
-        self.discord = None                               # shared Ask-Discord panel (built at hub)
+        # The shared Ask-Simon / Ask-Discord panels are owned by the Game
+        # (game.simon_panel / game.discord_panel), built once on first hub entry, so
+        # tasks can toggle them via game.set_advisors_visible().
         self.stage = None
         self.session_started = False                      # a career is in progress (enables pause menu)
         # NB: ``self.config`` is ShowBase's Panda config -- don't shadow it; ours is ``options``.
@@ -89,11 +92,11 @@ class MK7Tuner3D(ShowBase):
         # 2. the current stage
         if self.stage is not None:
             self.stage.render(dt)
-        # 3. the shared panels (game-level, not task-dependent)
-        if self.simon is not None:
-            self.simon.render(dt)
-        if self.discord is not None:
-            self.discord.render(dt)
+        # 3. the shared advisor panels (owned by the game, not the task)
+        if self.game.simon_panel is not None:
+            self.game.simon_panel.render(dt)
+        if self.game.discord_panel is not None:
+            self.game.discord_panel.render(dt)
         return Task.cont
 
     # -- setup -------------------------------------------------------------
@@ -142,27 +145,24 @@ class MK7Tuner3D(ShowBase):
         self._sync_overlays(stage)
 
     def _sync_overlays(self, stage):
-        """Point the music + shared panels at the new stage's context key, then lift
-        the overlays so they sit above the freshly-built stage UI (visually AND for
-        mouse picking). The Simon/Discord "Ask" pills don't belong on the menu, so
-        they're stashed there (stash also pulls their click regions)."""
+        """Point the music + advisor panels at the new stage's context key, lift the
+        overlays above the freshly-built stage UI (visually AND for mouse picking), then
+        apply advisor visibility: hidden on the menu, shown by default on any real stage
+        (a task may then hide them itself -- e.g. the race hides them while it's live)."""
         key = getattr(stage, "music_key", "") or getattr(stage, "key", "")
         self.music.set_track(key)
-        for panel in (self.simon, self.discord):
+        for panel in (self.game.simon_panel, self.game.discord_panel):
             if panel is not None:
                 panel.set_context(key)
-        self._lift_overlays()  # reparents (which un-stashes) -- so stash AFTER it
-        if isinstance(stage, MenuStage):
-            for panel in (self.simon, self.discord):
-                if panel is not None:
-                    panel.root.stash()
+        self._lift_overlays()  # reparents (which un-stashes) -- so set visibility AFTER it
+        self.game.set_advisors_visible(not isinstance(stage, MenuStage))
 
     def _lift_overlays(self):
         """Reparent the overlays to the end of aspect2d so they're traversed AFTER the
         new stage's UI. PGTop assigns mouse-region priority by scene-graph order, so
         this is what lets the Discord modal shade actually block clicks to the task
         behind it (the cull bin only handles what's drawn on top, not what's clicked)."""
-        for overlay in (self.notifications, self.toast, self.simon, self.discord):
+        for overlay in (self.notifications, self.toast, self.game.simon_panel, self.game.discord_panel):
             if overlay is not None:
                 overlay.root.reparentTo(self.aspect2d)
 
@@ -219,10 +219,10 @@ class MK7Tuner3D(ShowBase):
                         "career stored" if ok else "could not write save file", TOAST_SECONDS)
 
     def enter_hub(self):
-        if self.simon is None:  # build the shared panels once, on first hub entry
-            self.simon = SimonPanel(self, self.game, "garage")
-            self.discord = DiscordPanel(self, self.game, "garage")
-            for panel in (self.simon, self.discord):
+        if self.game.simon_panel is None:  # build the shared panels once, on first hub entry
+            self.game.simon_panel = SimonPanel(self, self.game, "garage")
+            self.game.discord_panel = DiscordPanel(self, self.game, "garage")
+            for panel in (self.game.simon_panel, self.game.discord_panel):
                 panel.root.setBin(OVERLAY_BIN, OVERLAY_SORT["panel"])  # over stage UI, under toasts
         self.set_stage(GarageStage(self, self.game, on_pick=self.open_task,
                                    on_summon=self.open_wizard, on_menu=lambda: self.enter_menu(resumable=True)))

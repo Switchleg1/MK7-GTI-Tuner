@@ -301,6 +301,7 @@ class RaceTask(TaskBase):
             return "blown"
         now = time.perf_counter()
         self.allow_back = False
+        self.game.set_advisors_visible(False)  # clear the Ask pills while the race is live
         self.race = {"active": True, "green_at": now + 1.9, "rival_launch": now + 2.15,
                      "p": {"d": 0.0, "v": 0.0, "gear": 1, "launched": False, "done": False, "et": 0.0, "trap": 0.0},
                      "r": {"d": 0.0, "v": 0.0, "done": False, "et": 0.0, "trap": 0.0}}
@@ -362,6 +363,7 @@ class RaceTask(TaskBase):
         game.maybe_green()
         self.race["active"] = False
         self.allow_back = True
+        game.set_advisors_visible(True)  # race over -- bring the advisor pills back
 
     def _race_result_text(self) -> str:
         if not self.race:
