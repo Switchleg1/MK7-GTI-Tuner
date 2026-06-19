@@ -6,7 +6,8 @@ from panda3d.core import TextNode, Vec4
 
 import library.core.assets as assets
 from library.core.constants import (
-    AMBER, AUDIO, BLUE, BOX_LINE, DIM, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
+    AMBER, AUDIO, BLUE, BOX_LINE, DIM, ED_HEAL_ON_WIN, ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY,
+    ED_TAUNT_THRESHOLD, FINAL_DRIVE, GEAR_RATIOS, GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
 )
 from library.core.utils import clamp
 from library.game.geometry import make_box
@@ -220,6 +221,12 @@ class RaceTask(TaskBase):
                     self.bind(self._start_race), game.car.flashed and not staged, GREEN_2, 0.032)
         self.button(("Launch" if launching else "Shift") + " (SPACE)",
                     (left + 0.22, 0, 0.56), (0.40, 0.085), self.do_key, staged, None, 0.032)
+        # Emotional damage readout (it saps power + launch grip on the strip).
+        ed = game.bro.emotional_damage
+        ecol = RED if ed >= 60 else AMBER if ed >= 30 else DIM
+        self.label(f"EMOTIONAL DAMAGE  {round(ed)}%", (left + 0.22, 0, 0.47), 0.026, ecol, align=TextNode.ACenter)
+        if ed >= ED_TAUNT_THRESHOLD:
+            self.label("shaky hands - launches suffer", (left + 0.22, 0, 0.435), 0.020, DIM, align=TextNode.ACenter)
         self._build_dash(left, right)
 
     def _build_dash(self, left, right):
@@ -328,7 +335,11 @@ class RaceTask(TaskBase):
         foe = self.game.rivals[self.game.bro.selected_rival]
         if player["launched"] and not player["done"]:
             perf = self.game.car.car_perf()
-            self._step_car(player, perf["whp"], perf["weight"], perf["grip"], dt)
+            # Emotional damage = shaky hands: less power and launch grip.
+            ed = self.game.bro.emotional_damage / 100.0
+            whp = perf["whp"] * (1 - ed * ED_RACE_WHP_PENALTY)
+            grip = perf["grip"] * (1 - ed * ED_RACE_GRIP_PENALTY)
+            self._step_car(player, whp, perf["weight"], grip, dt)
             if player["d"] >= TRACK_M:
                 player["done"], player["et"], player["trap"] = True, time.perf_counter() - self.race["green_at"], player["v"] * 2.237
         if time.perf_counter() >= self.race["rival_launch"] and not rival["done"]:
@@ -357,8 +368,10 @@ class RaceTask(TaskBase):
             if game.bro.selected_rival == len(game.rivals) - 1:
                 game.unlock("king", "King of the Streets")
             game.dave("win")
+            game.soothe_bro(ED_HEAL_ON_WIN)  # a win settles the nerves
         else:
             game.dave("lose")
+            game.hurt_bro(ED_LOSS)
         game.log(("WIN" if won else "LOSS") + f" {player['et']:.2f}s @ {round(player['trap'])} mph", "ok" if won else "warn")
         game.maybe_green()
         self.race["active"] = False
