@@ -13,7 +13,7 @@ class ShopTask(TaskBase):
     title = "SHOP"
     key = "shop"
 
-    def build_objects(self):
+    def build_ui(self):
         game = self.game
         left, right = self.bounds()
         self.ui.add_frame("panel", frame_size=(left, right, -0.62, 0.48), border=None)
@@ -39,7 +39,7 @@ class ShopTask(TaskBase):
         self.ui.add_text("green2", "", (right - 0.06, 0, -0.345), 0.032, TEXT, TextNode.ARight, is_visible=False)
         self.ui.add_text("green3", "", (left + 0.06, 0, -0.55), 0.028, DIM, wordwrap=52, is_visible=False)
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         game = self.game
         bro = game.bro
         self.ui.get("cash").text(f"SHOP  -  CASH ${round(bro.cash)}")

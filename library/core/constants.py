@@ -674,10 +674,16 @@ UNLOCKABLE_MAPS = {**COMMUNITY_MAPS, **PRO_MAPS}
 # Karen meter: cools down whenever you're not making noise; if it tops out the
 # cops roll up and write a citation. Repeatable -- every cap-out is a new bust.
 KAREN_COOLDOWN_PER_SEC = 3.0   # 100% -> 0 in ~17 s of silence
-KAREN_HEAT_CONST = 9.0
+KAREN_HEAT_CONST = 5.0
 POP_CRED_CONST = 18.0
 BUST_FINE = 250                # base citation; scaled by your cred / rep
 KAREN_AFTER_BUST = 30.0        # they don't forget instantly
+
+POP_UNLOCKS = {
+    50: ("burble_brain", "Burble Brain"),
+    90: ("cat_delete", "Cat Delete Speedrun"),
+    150: ("onelow", "Onelow status"),
+}
 
 # --------------------------------------------------------------------------
 # Emotional Damage (0..100): getting clowned -- a bad Discord outcome, a blown

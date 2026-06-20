@@ -21,7 +21,6 @@ from library.core.constants import (
 )
 from library.game.geometry import make_box
 from library.stages.hud import Hud
-from library.core.ui.ui_object_controller import UIObjectController
 
 
 class TaskBase(Hud):
@@ -47,18 +46,15 @@ class TaskBase(Hud):
         self.flames = []
         self.reactions = []
         self.allow_back = True
-        # Each task owns a UIObjectController. Its UI objects are BUILT ONCE in
-        # build_objects() (on enter) and only tweaked afterwards (text/color/enabled/
-        # is_visible/frame_size) -- they persist across redraws (no destroy/recreate
-        # per render), so clicks aren't dropped and labels don't churn.
-        self.ui = UIObjectController(app, self.root.attachNewNode("task-ui"))
+        # Task UI objects are built once on enter and then only updated in place, so
+        # redraws do not destroy widgets, drop clicks, or churn labels.
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
         self.set_camera()
         self.build_scene()
         self._build_header_objects()
-        self.build_objects()  # create this task's UI objects once
+        self.build_ui()  # create this task's UI objects once
         self.redraw()
         self.bind_keys()
 
@@ -69,7 +65,6 @@ class TaskBase(Hud):
         back = self.game.ui.get("back") if self.game.ui is not None else None
         if back is not None:
             back.is_visible(False)  # hide the shared Back button leaving the task
-        self.ui.destroy()  # free this task's text + buttons + their layer
         self.scene.removeNode()
         self.destroy()
 
@@ -84,14 +79,14 @@ class TaskBase(Hud):
     def build_scene(self):
         self.add_garage_scene()
 
-    def build_objects(self):
+    def build_ui(self):
         """Create this task's persistent UI objects ONCE (on enter) via
         ``self.ui.add_text(key, ...)`` / ``self.ui.add_button(key, ...)`` /
         ``self.ui.add_frame(key, ...)`` / ``self.ui.add_image(key, ...)``. After this,
         only change their properties (``text``/``color``/``enabled``/``is_visible`` /
-        ``frame_size``), typically from ``build_ui`` or ``tick``."""
+        ``frame_size``), typically from ``update_ui`` or ``tick``."""
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         pass
 
     def bind_keys(self):
@@ -199,7 +194,7 @@ class TaskBase(Hud):
     # -- floating emoji reactions (crowd hype / Karen rage popups) ---------
     def spawn_reaction(self, key, x, z, scale, rise, life):
         """A 2D emoji that floats up and fades. Parented to the screen root (not
-        tracked in self.nodes) so it survives UI redraws and is freed on exit."""
+        managed by ``self.ui``) so it survives UI redraws and is freed on exit."""
         node = OnscreenImage(parent=self.root, image=assets.image_path(key), pos=(x, 0, z), scale=scale)
         node.setTransparency(TransparencyAttrib.MAlpha)
         self.reactions.append({"node": node, "life": life, "max": life, "rise": rise})
@@ -216,7 +211,7 @@ class TaskBase(Hud):
 
     def redraw(self):
         left, right = self.bounds()
-        self.build_ui(left, right)   # sync persistent UI-object props (not create)
+        self.update_ui(left, right)  # sync persistent UI-object props (not create)
         self._sync_header(left, right)
         self._sync_back()            # point the shared (game-level) Back button at this task
         self.ui.lift()
@@ -254,7 +249,7 @@ class TaskBase(Hud):
             back.is_visible(self.allow_back)
 
     def panel_boxes(self, left, right):
-        """The two panel-box extents (no drawing) so build_objects can place matching
+        """The two panel-box extents (no drawing) so build_ui can place matching
         persistent frames and controls from the same coordinates."""
         gap = 0.04
         mid = (left + right) / 2
@@ -283,7 +278,7 @@ class TaskBase(Hud):
             self.last_draw = now
 
     def _mouse_held(self) -> bool:
-        """True while the left mouse button is down (so we can defer UI rebuilds and
+        """True while the left mouse button is down (so we can defer UI resyncs and
         not drop the click). Safe when there's no mouse watcher (offscreen)."""
         watcher = self.app.mouseWatcherNode
         return watcher is not None and watcher.is_button_down(MouseButton.one())

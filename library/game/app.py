@@ -204,11 +204,14 @@ class MK7Tuner3D(ShowBase):
     def _on_escape(self):
         """Esc opens the pause menu from the hub, and resumes from the menu. Inert
         during the cinematic / inside a task (those have their own Back / flow)."""
-        if isinstance(self.stage, MenuStage):
-            if self.stage.resumable:
-                self.enter_hub()
-        elif isinstance(self.stage, GarageStage):
-            self.enter_menu(resumable=True)
+        handlers = (
+            (MenuStage, lambda: self.enter_hub() if self.stage.resumable else None),
+            (GarageStage, lambda: self.enter_menu(resumable=True)),
+        )
+        for stage_type, handler in handlers:
+            if isinstance(self.stage, stage_type):
+                handler()
+                return
 
     def _new_game(self):
         self.game.new_game()           # reset career in place (panels keep their ref)

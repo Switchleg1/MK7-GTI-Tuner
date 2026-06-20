@@ -133,7 +133,7 @@ class DynoTask(TaskBase):
             out.append((x + 0.012, z + 0.012, tile_w - 0.024, tile_h - 0.024, gauge))
         return out
 
-    def build_objects(self):
+    def build_ui(self):
         left, right = self.bounds()
         mid = (left + right) / 2
         self.ui.add_button("run", "Run Dyno Pull", ((mid + right) / 2, 0, -0.30), (0.46, 0.12),
@@ -161,7 +161,7 @@ class DynoTask(TaskBase):
         self.ui.add_text("grade", "", ((mid + right) / 2, 0, -0.54), 0.034, DIM, CENTER, wordwrap=30)
         self._build_graph_objects(mid + 0.04, right, -0.16, 0.50)
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         self._update_gauges()
         self._controls()
         self._draw_graph()
@@ -238,12 +238,14 @@ class DynoTask(TaskBase):
     def _controls(self):
         game = self.game
         self.ui.get("run").enabled(game.car.flashed and not self.running)
-        if self.running:
-            state, color = f"pulling... {round(self.values['rpm'])} rpm", AMBER
-        elif game.car.flashed:
-            state, color = "Loaded. Send it.", DIM
-        else:
-            state, color = "Flash a tune first.", DIM
+        state, color = next(
+            result for condition, result in (
+                (self.running, (f"pulling... {round(self.values['rpm'])} rpm", AMBER)),
+                (game.car.flashed, ("Loaded. Send it.", DIM)),
+                (True, ("Flash a tune first.", DIM)),
+            )
+            if condition
+        )
         status = self.ui.get("status")
         status.text(state)
         status.color(color)

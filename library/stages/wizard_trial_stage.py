@@ -13,7 +13,6 @@ from library.core.utils import rgba
 from library.game.geometry import make_box
 from library.stages.hud import Hud
 from library.stages.picker import Picker
-from library.core.ui.ui_object_controller import UIObjectController
 
 
 class WizardTrialStage(Hud):
@@ -33,7 +32,6 @@ class WizardTrialStage(Hud):
         self.game = game
         self.on_done = on_done
         self.scene = app.render.attachNewNode("scene-wizard")
-        self.ui = UIObjectController(app, self.root.attachNewNode("wizard-ui"))
         self.phase = 1
         self.msg = ""
         self.rig_done = 0
@@ -61,20 +59,28 @@ class WizardTrialStage(Hud):
 
     def exit(self):
         self._clear_board()
-        self.ui.destroy()
         self.scene.removeNode()
         self.destroy()
 
     def render(self, dt):
-        if self.phase == 3 and self.marker is not None:
-            self.t += dt
-            x0, x1, _, _ = self.track
-            frac = 0.5 + 0.5 * math.sin(self.t * 2.3)
-            self.marker.node.setX(x0 + frac * (x1 - x0))
-        elif self.phase == 2 and self.board_root is not None:
+        {
+            2: self._render_probe_phase,
+            3: self._render_sync_phase,
+        }.get(self.phase, lambda _dt: None)(dt)
+        self.ui.render(dt)  # 2D objects: visibility + the Abort/DROP/Continue click flash
+
+    def _render_probe_phase(self, dt):
+        if self.board_root is not None:
             self._animate_pin(dt)
             self._decay_flash(dt)
-        self.ui.render(dt)  # 2D objects: visibility + the Abort/DROP/Continue click flash
+
+    def _render_sync_phase(self, dt):
+        if self.marker is None:
+            return
+        self.t += dt
+        x0, x1, _, _ = self.track
+        frac = 0.5 + 0.5 * math.sin(self.t * 2.3)
+        self.marker.node.setX(x0 + frac * (x1 - x0))
 
     # -- header / draw router ---------------------------------------------
     def _header(self, backdrop=True):

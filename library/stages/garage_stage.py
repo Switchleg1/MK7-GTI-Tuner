@@ -5,7 +5,6 @@ from panda3d.core import ClockObject, TextNode
 import library.core.assets as assets
 from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT, VIOLET
 from library.stages.hud import Hud
-from library.core.ui.ui_object_controller import UIObjectController
 
 
 class GarageStage(Hud):
@@ -23,8 +22,6 @@ class GarageStage(Hud):
         self.on_menu = on_menu      # open the pause menu (save / load / options)
         self.scene = app.render.attachNewNode("scene-garage")
         self.car = None
-        # The hub's own UI objects (task cards in the "garage" style + MENU + the DM).
-        self.ui = UIObjectController(app, self.root.attachNewNode("garage-ui"))
 
     def enter(self):
         from library.core.constants import GARAGE_CAMERA
@@ -39,7 +36,6 @@ class GarageStage(Hud):
         self.draw()
 
     def exit(self):
-        self.ui.destroy()
         self.scene.removeNode()
         self.destroy()
 
@@ -50,9 +46,8 @@ class GarageStage(Hud):
 
     def draw(self):
         self.clear()
-        self.ui.clear()
         left, right = self.bounds()
-        self.draw_header(self.game)
+        self._draw_header(left, right)
         if self.on_menu:
             self.ui.add_button("menu", "MENU", (left + 0.21, 0, 0.66), (0.34, 0.09), self.on_menu, True, PANEL, 0.04)
         self.ui.add_text("title", "GARAGE", (0, 0, 0.66), 0.06, GREEN, align=TextNode.ACenter)
@@ -66,6 +61,18 @@ class GarageStage(Hud):
             x = left + width / 2 + index * (width + gap)
             self._task_button(key, title, blurb, x, width)
         self.ui.lift()  # keep the buttons above the header/labels
+
+    def _draw_header(self, left, right):
+        self.ui.add_frame("header-frame", frame_size=(left, right, -0.085, 0.085),
+                          pos=(0, 0, 0.86), color=PANEL, border=None)
+        self.ui.add_text("header-title", "MK7 GTI TUNER", (left + 0.05, 0, 0.89), 0.05, GREEN)
+        self.ui.add_text("header-subtitle", "EA888  .  SIMOS18.1  .  POPS & BANGS  .  CAREER",
+                         (left + 0.05, 0, 0.835), 0.026, DIM)
+        name = str(self.game.car.active_tune().get("name", "Stock"))[:16]
+        self.ui.add_text("header-cash", f"${round(self.game.bro.cash)}   .   ECU {self.game.car.ecu_status()}",
+                         (right - 0.04, 0, 0.888), 0.033, GREEN, align=TextNode.ARight)
+        self.ui.add_text("header-map", f"MAP {self.game.car.active_slot + 1} {name}   .   REP {self.game.bro.rep()}",
+                         (right - 0.04, 0, 0.832), 0.027, TEXT, align=TextNode.ARight)
 
     def _task_button(self, key, title, blurb, x, width):
         # The "garage" style draws the green top accent strip itself.

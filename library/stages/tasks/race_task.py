@@ -61,7 +61,7 @@ class RaceTask(TaskBase):
             self.app.camLens.setFov(CHASE_FOV)
         self.app.camera.setPos(*CHASE_CAM_POS)
         self.app.camera.lookAt(*CHASE_CAM_LOOK)
-        # Cached dash widgets, built once in build_objects and updated per-frame.
+        # Cached dash widgets, built once in build_ui and updated per-frame.
         self.dash = {}
         self.race = None
 
@@ -199,7 +199,7 @@ class RaceTask(TaskBase):
                 f"Rival ran {rival['et']:.2f}s. Tune up or buy parts, then run it back.")
 
     # -- UI ----------------------------------------------------------------
-    def build_objects(self):
+    def build_ui(self):
         game = self.game
         left, right = self.bounds()
         C, R = TextNode.ACenter, TextNode.ARight
@@ -236,7 +236,7 @@ class RaceTask(TaskBase):
         self.ui.add_text("t-mph", "MPH", (tx1 + 0.13, 0, -0.69), 0.022, DIM, C)
         self.ui.add_text("shift", "SHIFT", (0, 0, -0.555), 0.034, DIM, C)
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         game = self.game
         staged = self._race_active()
         self.ui.get("ladder-title").is_visible(not staged)
@@ -408,10 +408,3 @@ class RaceTask(TaskBase):
         self.allow_back = True
         game.set_advisors_visible(True)  # race over -- bring the advisor pills back
         self.dirty = True
-
-    def _race_result_text(self) -> str:
-        if not self.race:
-            return "Launch on green. Shift with Space."
-        if self._race_active():
-            return f"You {self.race['p']['d']:.0f}m / Rival {self.race['r']['d']:.0f}m"
-        return "Race complete. Check the log."

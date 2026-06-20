@@ -104,17 +104,27 @@ class UnlockStage(DirectObject):
         self.picker.clear()
         self.prompt.text(UNLOCK_PROMPTS.get(phase, ""))
         self.substep.text("")
-        if phase == "plug":
-            self.picker.register(self.port, "port", self._on_plug)
-            self._pulse(self.port)
-        elif phase == "phone":
-            self.phone.show()
-            self.picker.register(self.phone, "phone", self._on_phone)
-            self._pulse(self.phone)
-        elif phase == "flash":
-            self.phone_screen.arm_flash(self._on_flash)
-        elif phase == "done":
-            self._show_continue()
+        {
+            "plug": self._phase_plug,
+            "phone": self._phase_phone,
+            "flash": self._phase_flash,
+            "done": self._phase_done,
+        }.get(phase, lambda: None)()
+
+    def _phase_plug(self):
+        self.picker.register(self.port, "port", self._on_plug)
+        self._pulse(self.port)
+
+    def _phase_phone(self):
+        self.phone.show()
+        self.picker.register(self.phone, "phone", self._on_phone)
+        self._pulse(self.phone)
+
+    def _phase_flash(self):
+        self.phone_screen.arm_flash(self._on_flash)
+
+    def _phase_done(self):
+        self._show_continue()
 
     def _on_plug(self):
         self.picker.clear()

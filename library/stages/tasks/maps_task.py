@@ -22,7 +22,7 @@ class MapsTask(TaskBase):
     # Fixed button Z rows (the slider rows above them are static, so these don't move).
     FUEL_Z, PRESET_Z, UMAP_Z, SLOT_Z, ASSIGN_Z = -0.05, -0.23, -0.47, -0.28, -0.628
 
-    def build_objects(self):
+    def build_ui(self):
         car = self.game.car
         lbox, rbox = self.panel_boxes(*self.bounds())
         boxes = (lbox, rbox)
@@ -60,7 +60,7 @@ class MapsTask(TaskBase):
             setattr(self, attr, slider)
             self.ui.add_text(f"val-{attr}", "", (boxes[box_i][0] + 0.06, 0, z + 0.035), 0.030, TEXT)
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         self._ready = False
         car = self.game.car
         # Sliders are persistent; redraws only sync their values and labels.

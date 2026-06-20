@@ -8,7 +8,6 @@ from library.core.constants import (
     MENU_PANEL, MENU_VOL_RANGE, PANEL, PANEL_DARK, TEXT,
 )
 from library.stages.hud import Hud
-from library.core.ui.ui_object_controller import UIObjectController
 
 
 class MenuStage(Hud):
@@ -31,14 +30,12 @@ class MenuStage(Hud):
         self.actions = actions      # {"new","load","save","resume","quit"} -> callables
         self.config = app.options   # the player's options (Config); app.config is Panda's
         self.page = "root"
-        self.ui = UIObjectController(app, self.root.attachNewNode("menu-ui"))
 
     def enter(self):
         self.draw()
 
     def exit(self):
         self.config.save()  # persist any options tweaks on the way out
-        self.ui.destroy()
         self.destroy()
 
     def render(self, dt):
@@ -76,11 +73,11 @@ class MenuStage(Hud):
         self.ui.add_text("hint", hint, (0, 0, z - 0.02), 0.028, DIM, align=TextNode.ACenter)
 
     def _visible(self, visibility: str) -> bool:
-        if visibility == "pause":
-            return self.resumable
-        if visibility == "main":
-            return not self.resumable
-        return True
+        return {
+            "pause": self.resumable,
+            "main": not self.resumable,
+            "always": True,
+        }.get(visibility, True)
 
     def _draw_options(self):
         self.ui.add_text("opt-title", "OPTIONS", (0, 0, 0.50), 0.06, BLUE, align=TextNode.ACenter)

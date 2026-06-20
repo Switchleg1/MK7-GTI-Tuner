@@ -153,24 +153,6 @@ class Game:
             self.unlock("fully_built", "Fully Built (Wallet Empty)")
         self.dave("shop")
 
-    # -- street ------------------------------------------------------------
-    def register_pops(self) -> int:
-        """Apply cred/Karen from a pops blip; return a flame count for the scene."""
-        pop = self.car.active_pop()
-        self.bro.add_cred(pop / 18)
-        self.bro.add_heat(pop / 18)
-        self.total_pops += 1
-        if self.total_pops >= 50:
-            self.unlock("burble_brain", "Burble Brain")
-        if pop > 90:
-            self.unlock("cat_delete", "Cat Delete Speedrun")
-        # A big pop may earn a Dave quip -- unless the meter just capped, in which
-        # case the street task takes the bust (the cop penalty lives in street_task).
-        if self.bro.karen < 100 and random.random() < 0.18:
-            self.dave("bigbang")
-        self.maybe_green()
-        return max(4, round(pop / 10))
-
     # -- discord -----------------------------------------------------------
     def ask_discord(self, text: str) -> dict:
         """Submit a #help request: the Discord resolves it (text + who's online +

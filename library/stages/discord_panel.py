@@ -9,7 +9,6 @@ from library.core.constants import (
 )
 from library.core.utils import rgba
 from library.stages.hud import Hud
-from library.core.ui.ui_object_controller import UIObjectController
 
 RAIL_BG = rgba("#070b0e", 0.85)
 CHAN_ACTIVE = rgba("#1b242c", 0.9)
@@ -30,10 +29,8 @@ class DiscordPanel(Hud):
         self.game                   = game
         self.tab                    = tab
         self.open                   = False
-        self.open_changed           = False
         self.messages: list[dict]   = []
         self.entry                  = None
-        self.ui                     = UIObjectController(app, self.root.attachNewNode("discord-ui"))
 
     # -- actions -----------------------------------------------------------
     def ask(self):
@@ -91,19 +88,17 @@ class DiscordPanel(Hud):
     def _refresh_host(self):
         """The outcome moved cash / cred / ED on the model, but the task screen
         behind this window drew those values before the interaction. Mark it dirty
-        so its header (and any cash readout) rebuilds on the next frame."""
+        so its header (and any cash readout) resyncs on the next frame."""
         stage = getattr(self.app, "stage", None)
         if stage is not None and hasattr(stage, "dirty"):
             stage.dirty = True
             
             
     def _set_opened(self, value):
-        if self.open != value:
-            self.open = value
-            if self.open:
-                self._create_window()
-            else:
-                self._clear_window()
+        if self.open == value:
+            return
+        self.open = value
+        (self._create_window if value else self._clear_window)()
             
 
     def _create_window(self):

@@ -10,7 +10,7 @@ class BenchTask(TaskBase):
     title = "BENCH"
     key = "bench"
 
-    def build_objects(self):
+    def build_ui(self):
         game = self.game
         lbox, rbox = self.panel_boxes(*self.bounds())
         for index, box in enumerate((lbox, rbox)):
@@ -27,7 +27,7 @@ class BenchTask(TaskBase):
         for i in range(9):
             self.ui.add_text(f"log-{i}", "", (rbox[0] + 0.05, 0, 0.30 - i * 0.08), 0.031, DIM, wordwrap=30, is_visible=False)
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         game = self.game
         self.ui.get("loaded").text(f"Loaded tune: {game.car.tune.get('name', 'Your Tune')}")
         self.ui.get("switch").text(f"switch patch: {'ON' if game.car.switch_patch else 'OFF'}")

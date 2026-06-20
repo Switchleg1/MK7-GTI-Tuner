@@ -5,8 +5,9 @@ import random
 import time
 
 from library.core.constants import (
-    AMBER, BUST_FINE, DIM, ED_BUST, GREEN, GREEN_2, KAREN_AFTER_BUST,
-    KAREN_COOLDOWN_PER_SEC, PANEL, RED, TEXT,
+    AMBER, BUST_FINE, DIM, ED_BUST, GREEN, GREEN_2, POP_CRED_CONST,
+    KAREN_AFTER_BUST, KAREN_COOLDOWN_PER_SEC, KAREN_HEAT_CONST, 
+    PANEL, RED, TEXT, POP_UNLOCKS
 )
 from library.core.utils import clamp
 from library.stages.task_base import TaskBase
@@ -95,19 +96,37 @@ class StreetTask(TaskBase):
         self.dirty = True  # sync the header if a bust changed cash/rep
 
     # -- Karen / cops (street-only mechanics) ------------------------------
+    def _pops(self) -> int:
+        """Register a pop blip on the model (cred / Karen / quip) and, if that just
+        capped the Karen meter, take the bust. Returns the flame count for the scene."""
+        count = self._register_pops()
+        if self.game.bro.karen >= 100:
+            self._bust()
+        return count
+    
+    def _register_pops(self) -> int:
+        """Apply cred/Karen from a pops blip; return a flame count for the scene."""
+        game = self.game
+        pop = game.car.active_pop()
+        game.bro.add_cred(pop / POP_CRED_CONST)
+        game.bro.add_heat(pop / KAREN_HEAT_CONST)
+        game.total_pops += 1
+        for key, value in POP_UNLOCKS.items():
+            k, s = value
+            if game.total_pops >= key:
+                game.unlock(k, s)
+        # A big pop may earn a Dave quip -- unless the meter just capped, in which
+        # case the street task takes the bust (the cop penalty lives in street_task).
+        if game.bro.karen < 100 and random.random() < 0.18:
+            game.dave("bigbang")
+        game.maybe_green()
+        return max(4, round(pop / 10))
+    
     def _cool_karen(self, dt):
         """Karen cools down while the bro isn't making noise (throttle down).
         No-op once the meter is already at 0."""
         if self.game.bro.karen > 0:
             self.game.bro.add_heat(-dt * KAREN_COOLDOWN_PER_SEC)
-
-    def _pops(self) -> int:
-        """Register a pop blip on the model (cred / Karen / quip) and, if that just
-        capped the Karen meter, take the bust. Returns the flame count for the scene."""
-        count = self.game.register_pops()
-        if self.game.bro.karen >= 100:
-            self._bust()
-        return count
 
     def _bust(self):
         """Karen meter capped -> the cops roll up: a citation (scaled by rep), a
@@ -140,7 +159,7 @@ class StreetTask(TaskBase):
                                 scale=random.uniform(0.05, 0.075), rise=random.uniform(0.30, 0.50),
                                 life=random.uniform(0.9, 1.2))
 
-    def build_objects(self):
+    def build_ui(self):
         left, _ = self.bounds()
         flashed = self.game.car.flashed
         bar_x, bar_w = left + 0.06, 0.62
@@ -156,7 +175,7 @@ class StreetTask(TaskBase):
         self.ui.add_text("hint", "Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.",
                          (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)
 
-    def build_ui(self, left, right):
+    def update_ui(self, left, right):
         self._update_readouts()
 
     def _update_readouts(self):

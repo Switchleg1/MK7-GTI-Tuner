@@ -3,7 +3,6 @@ from __future__ import annotations
 from library.core.constants import DIM, LINE, PANEL_DARK, ROAST, TIP, VIOLET
 from library.game.simos import build_context, select_insight
 from library.stages.hud import Hud
-from library.core.ui.ui_object_controller import UIObjectController
 
 
 class SimonPanel(Hud):
@@ -20,8 +19,6 @@ class SimonPanel(Hud):
         self.tab        = tab
         self.open       = False
         self.current    = None
-        self.show       = True
-        self.ui         = UIObjectController(app, self.root.attachNewNode("simon-ui"))
 
 
     def ask(self):
@@ -45,8 +42,8 @@ class SimonPanel(Hud):
         
         
     def _set_opened(self, value):
-        if value == True:
-            self._create_window(self.open == False)
+        if value:
+            self._create_window(not self.open)
         else:
             self._clear_window()
         self.open = value

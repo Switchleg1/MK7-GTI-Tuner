@@ -22,10 +22,11 @@ class Toast(Hud):
         self.clear()
         x0, x1 = -TOAST_W / 2, TOAST_W / 2
         z0, z1 = TOAST_Z - TOAST_H / 2, TOAST_Z + TOAST_H / 2
-        self.frame((x0, x1, z0, z1), (0, 0, 0), PANEL_DARK, border=BOX_LINE)
-        self.frame((x0 + 0.012, x0 + 0.03, z0 + 0.012, z1 - 0.012), (0, 0, 0), GREEN, None)
-        self.label(title, (x0 + 0.06, 0, TOAST_Z + 0.022), 0.024, GREEN)
-        self.label(message, (x0 + 0.06, 0, TOAST_Z - 0.028), 0.038, WHITE, wordwrap=42)
+        self.ui.add_frame("frame", frame_size=(x0, x1, z0, z1), color=PANEL_DARK, border=BOX_LINE)
+        self.ui.add_frame("accent", frame_size=(x0 + 0.012, x0 + 0.03, z0 + 0.012, z1 - 0.012),
+                          color=GREEN, border=None)
+        self.ui.add_text("title", title, (x0 + 0.06, 0, TOAST_Z + 0.022), 0.024, GREEN)
+        self.ui.add_text("message", message, (x0 + 0.06, 0, TOAST_Z - 0.028), 0.038, WHITE, wordwrap=42)
         self.life = max(0.01, seconds)
         self.root.setColorScale(1, 1, 1, 1)
 
