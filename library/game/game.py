@@ -17,10 +17,21 @@ from library.game.tuner_bro import TunerBro
 
 
 class Game:
-    """Root of the save-ready model tree: a TunerBro, the RivalGreenName ladder, and
-    a CarLibrary, plus transient session state (logs, the active race). Cross-node
+    """Root of the save-ready model tree: a TunerBro, and a CarLibrary, plus transient 
+    session state (logs, the active race). Cross-node
     actions (buying, pops, racing) are orchestrated here; per-node logic lives on the
     nodes. Display reads go straight to ``game.bro`` / ``game.car``."""
+    
+    # How each Discord outcome effect lands on the bro/car -- table-dispatched
+    # instead of an if/elif staircase. An unknown/"none" effect falls through to
+    # just the emotional-damage swing and the log line.
+    _DISCORD_EFFECTS = {
+        "cash": lambda self, o: self.bro.earn(o["amount"]),
+        "cred": lambda self, o: self.bro.add_cred(o["amount"]),
+        "map": lambda self, o: self._grant_community_map(o["map_key"]),
+        "part": lambda self, o: self.bro.pay_repair(o["amount"]),
+        "clients": lambda self, o: self.bro.add_cred(-o["amount"]),
+    }
 
     def __init__(self):
         self.pros = ProTuner.roster()  # static reference data (never reset)
@@ -40,17 +51,15 @@ class Game:
     def new_game(self):
         """(Re)initialise a fresh career in place. Mutating the existing Game (rather
         than building a new one) keeps the shared panels' ``game`` references valid."""
-        self.bro = TunerBro()
-        self.rivals = RivalGreenName.ladder()
-        self.cars = CarLibrary()
-        self.discord = Discord()
-        self.logs: list[tuple[str, str]] = []
-        self.simon_tick = 0  # rotates Simon through his ranked insights
-        self.achievements: set[str] = set()  # unlocked ids
-        self.toast_queue: list[str] = []     # achievement labels awaiting a toast
-        self.dave_queue: list[str] = []       # Dyno Dave quips awaiting display
-        self.total_pops = 0
-        self.map_switches = 0
+        self.bro                            = TunerBro()
+        self.rivals                         = RivalGreenName.ladder()
+        self.cars                           = CarLibrary()
+        self.discord                        = Discord()
+        self.logs: list[tuple[str, str]]    = []
+        self.simon_tick                     = 0  # rotates Simon through his ranked insights
+        self.achievements: set[str]         = set()  # unlocked ids
+        self.toast_queue: list[str]         = []     # achievement labels awaiting a toast
+        self.dave_queue: list[str]          = []       # Dyno Dave quips awaiting display
 
     @property
     def car(self) -> Car:
@@ -82,6 +91,12 @@ class Game:
             self.log(*result)
 
     # -- achievements + Dave (drained by the Notifications overlay) ---------
+    def check_unlock(self, stat, table):
+        for key, value in table.items():
+            k, s = value
+            if stat >= key:
+                self.unlock(k, s)
+                
     def unlock(self, key: str, label: str) -> bool:
         if key in self.achievements:
             return False
@@ -138,8 +153,8 @@ class Game:
     def select_slot(self, index: int):
         self.car.select_slot(index)
         if 0 <= index < len(self.car.slots) and self.car.slots[index]:
-            self.map_switches += 1
-            if self.map_switches >= 10:
+            self.bro.map_switches += 1
+            if self.bro.map_switches >= 10:
                 self.unlock("stalk_wizard", "Stalk Wizard")
             if random.random() < 0.4:
                 self.dave("mapswitch")
@@ -179,17 +194,6 @@ class Game:
     def _grant_community_map(self, key: str):
         self.bro.unlock_map(key)
         self.unlock("community_map", "Community Map Plug")
-
-    # How each Discord outcome effect lands on the bro/car -- table-dispatched
-    # instead of an if/elif staircase. An unknown/"none" effect falls through to
-    # just the emotional-damage swing and the log line.
-    _DISCORD_EFFECTS = {
-        "cash": lambda self, o: self.bro.earn(o["amount"]),
-        "cred": lambda self, o: self.bro.add_cred(o["amount"]),
-        "map": lambda self, o: self._grant_community_map(o["map_key"]),
-        "part": lambda self, o: self.bro.pay_repair(o["amount"]),
-        "clients": lambda self, o: self.bro.add_cred(-o["amount"]),
-    }
 
     def _apply_discord(self, outcome: dict):
         handler = self._DISCORD_EFFECTS.get(outcome["effect"])
@@ -282,8 +286,6 @@ class Game:
             "cars": self.cars.to_dict(),
             "discord": self.discord.to_dict(),
             "achievements": sorted(self.achievements),
-            "total_pops": self.total_pops,
-            "map_switches": self.map_switches,
             "simon_tick": self.simon_tick,
         }
 
@@ -292,6 +294,4 @@ class Game:
         self.cars.from_dict(data.get("cars", {}))
         self.discord.from_dict(data.get("discord", {}))
         self.achievements = set(data.get("achievements", []))
-        self.total_pops = data.get("total_pops", 0)
-        self.map_switches = data.get("map_switches", 0)
         self.simon_tick = data.get("simon_tick", 0)

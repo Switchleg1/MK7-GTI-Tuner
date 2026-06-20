@@ -7,7 +7,7 @@ import time
 from library.core.constants import (
     AMBER, BUST_FINE, DIM, ED_BUST, GREEN, GREEN_2, POP_CRED_CONST,
     KAREN_AFTER_BUST, KAREN_COOLDOWN_PER_SEC, KAREN_HEAT_CONST, 
-    PANEL, RED, TEXT, POP_UNLOCKS
+    PANEL, RED, TEXT, POP_UNLOCKS, BUST_UNLOCKS
 )
 from library.core.utils import clamp
 from library.stages.task_base import TaskBase
@@ -110,11 +110,8 @@ class StreetTask(TaskBase):
         pop = game.car.active_pop()
         game.bro.add_cred(pop / POP_CRED_CONST)
         game.bro.add_heat(pop / KAREN_HEAT_CONST)
-        game.total_pops += 1
-        for key, value in POP_UNLOCKS.items():
-            k, s = value
-            if game.total_pops >= key:
-                game.unlock(k, s)
+        game.bro.total_pops += 1
+        game.check_unlock(game.bro.total_pops, POP_UNLOCKS)
         # A big pop may earn a Dave quip -- unless the meter just capped, in which
         # case the street task takes the bust (the cop penalty lives in street_task).
         if game.bro.karen < 100 and random.random() < 0.18:
@@ -139,7 +136,8 @@ class StreetTask(TaskBase):
         self.game.log(f"COPS rolled up - noise complaint citation: -${fine}", "err")
         self.game.hurt_bro(ED_BUST)
         self.game.dave("cops")
-        self.game.unlock("menace", "Neighborhood Menace")
+        self.game.bro.total_busts += 1
+        self.game.check_unlock(self.game.bro.total_busts, BUST_UNLOCKS)
 
     def _spawn_reactions(self):
         """Float crowd-hype emojis up on the right and Karen-rage on the left,

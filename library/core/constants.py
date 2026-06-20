@@ -616,6 +616,13 @@ DISCORD_OFFLINE_MAX = 5
 # --------------------------------------------------------------------------
 GREEN_NAME_CRED = 200  # cred needed before the community hands you the green name
 
+
+#-------------------------------------------------------------------------------
+# Minimum amount allowed in the bro's bank account when braking parts or getting 
+# fines
+#-------------------------------------------------------------------------------
+MINIMUM_BRO_BANK_VALUE = -10000
+
 # base payout + per-whp bonus, cred gained per clean sale, chance of a bad review.
 TUNE_SALE = {"base": 50, "per_whp": 0.7, "cred": 2.5, "bad_chance": 0.16}
 
@@ -683,6 +690,11 @@ POP_UNLOCKS = {
     50: ("burble_brain", "Burble Brain"),
     90: ("cat_delete", "Cat Delete Speedrun"),
     150: ("onelow", "Onelow status"),
+}
+
+BUST_UNLOCKS = {
+    1: ("menace", "Neighborhood Menace"),
+    2: ("karen_killer", "Karen Killer")
 }
 
 # --------------------------------------------------------------------------
