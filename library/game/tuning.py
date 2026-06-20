@@ -103,19 +103,18 @@ def _mod_curve_value(nodes: list, rpm: float):
     return (nodes[-1][1], nodes[-1][2])
 
 
-def build_whp_curve(base_curve: list, owned_mods: list, tune_peak=None,
+def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0,
                     idle: int = 900, redline: int = 6700, step: int = 100) -> list:
     """Compose a car's final rpm->whp curve from its stock ``base_curve`` + owned mods
-    (+ tune, for the player). Returns ``[(rpm, whp), ...]`` from idle to redline.
+    (+ tune). Returns ``[(rpm, whp), ...]`` from idle to redline.
 
-    - If ``tune_peak`` is given (player has a flashed/active tune), the base curve is
-      scaled so its peak matches that tune-driven figure (the calibration still drives
-      base output); rivals pass ``None`` and keep their real stock curve.
+    - ``tune_factor`` scales the whole base curve. It is a *relative* multiplier (this
+      tune's power vs the stock tune, per ``compute_tune``), so it is car-agnostic -- a
+      hot tune lifts any car's stock curve by the same percentage (1.0 = stock tune).
     - Each owned mod's ``spool`` shifts the sub-peak onset (- earlier / + later) and its
       ``curve`` nodes add whp, compounding (``base + scaler * running_total``). Mods are
       applied in the given order (MOD_TABLE order)."""
-    base_peak = max((w for _, w in base_curve), default=1) or 1
-    factor = (tune_peak / base_peak) if tune_peak else 1.0
+    factor = tune_factor
     peak_rpm = max(base_curve, key=lambda p: p[1])[0]
     lo_rpm, hi_rpm = base_curve[0][0], base_curve[-1][0]
     spool_delta = sum(MOD_TABLE[m]["spool"] for m in owned_mods)

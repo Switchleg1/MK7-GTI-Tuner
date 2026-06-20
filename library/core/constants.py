@@ -173,8 +173,8 @@ CAR_TABLE = {
         "name": "Civic Type R", "model": "civic_type_r", "weight": 1380, "grip": 1.00,
         "gears": [3.63, 2.12, 1.53, 1.13, 0.91, 0.73], "final_drive": 3.84, "tire_circ": 2.06,
         "idle": 850, "redline": 7000, "spool_rpm": 2800, "max_boost": 22, "boost_ceiling": 26,
-        "power_curve": [(1500, 55), (2500, 160), (3500, 235), (4500, 275), (5500, 280),
-                        (6500, 275), (7000, 255)],
+        "power_curve": [(1500, 55), (2500, 160), (3500, 235), (4500, 265), (5500, 270),
+                        (6500, 265), (7000, 255)],
     },
     "wrx_sti": {
         "name": "WRX STI", "model": "wrx_sti", "weight": 1520, "grip": 1.18,
@@ -195,11 +195,55 @@ CAR_TABLE = {
 # The street ladder: encounter metadata + the car_id each rival drives (its physics
 # come from CAR_TABLE). Ladder progression will later be tuned by giving rivals mods.
 RIVALS = [
-    {"name": "Stock Civic", "car_id": "stock_civic", "purse": 120, "color": rgba("#9fb3c0"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "Civic Si", "car_id": "civic_type_r", "purse": 230, "color": rgba("#e6e6e6"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "WRX STI", "car_id": "wrx_sti", "purse": 480, "color": rgba("#3a6ad6"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "BMW M2", "car_id": "bmw_m2", "purse": 850, "color": rgba("#222222"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "Rival Shop Mk7", "car_id": "mk7_gti", "purse": 1600, "color": rgba("#e7232b"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {
+        "name":         "Stock Civic",
+        "car_id":       "stock_civic",
+        "purse":        120,
+        "color":        rgba("#9fb3c0"),
+        "mods":         [],
+        "tune":         DEFAULT_TUNE,
+        "video_loss":   ["loss/ed_dis.mp4"],
+        "video_win":    []
+    },
+    {
+        "name":         "Civic R",
+        "car_id":       "civic_type_r",
+        "purse":        230,
+        "color":        rgba("#e6e6e6"),
+        "mods":         [],
+        "tune":         DEFAULT_TUNE,
+        "video_loss":   ["loss/ed_dis.mp4"],
+        "video_win":    []
+    },
+    {
+        "name":         "WRX STI",
+        "car_id":       "wrx_sti",
+        "purse":        480,
+        "color":        rgba("#3a6ad6"),
+        "mods":         ["intake", "dp", "fmic", "turbo"],
+        "tune":         DEFAULT_TUNE,
+        "video_loss":   ["loss/ed_dis.mp4"],
+        "video_win":    []
+    },
+    {
+        "name":         "BMW M2", "car_id": "bmw_m2",
+        "purse":        850,
+        "color":        rgba("#222222"),
+        "mods":         ["intake", "dp", "fmic"],
+        "tune":         DEFAULT_TUNE,
+        "video_loss":   ["loss/ed_dis.mp4"],
+        "video_win":    []
+    },
+    {
+        "name":         "Rival Shop Mk7",
+        "car_id":       "mk7_gti",
+        "purse":        1600,
+        "color":        rgba("#e7232b"),
+        "mods":         ["intake", "dp", "fmic", "clutch", "fuel", "turbo"],
+        "tune":         PRESETS["stage2"],
+        "video_loss":   ["loss/ed_dis.mp4"],
+        "video_win":    []
+    },
 ]
 
 REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"), (340, "Wanted by the HOA")]

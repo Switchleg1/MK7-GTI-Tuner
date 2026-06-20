@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import CAR_TABLE, MOD_TABLE, MODS, PRESETS, UNLOCKABLE_MAPS
+from library.core.constants import CAR_TABLE, MOD_TABLE, MODS, PRESETS, UNLOCKABLE_MAPS, DEFAULT_TUNE
 from library.game.tuning import (
     build_whp_curve, clone_tune, compute_tune, default_tune, grade_for_result, pop_score, whp_at,
 )
@@ -15,36 +15,38 @@ class Car:
     State-change methods return ``(message, kind)`` so the session (Game) can log them;
     Car itself does no logging. Built to serialize for save games."""
 
-    def __init__(self, car_id: str = "mk7_gti", mods: dict | None = None):
+    def __init__(self, car_id: str = "mk7_gti", mods: dict | None = None, tune: dict = DEFAULT_TUNE):
         spec = CAR_TABLE[car_id]
-        self.car_id = car_id
-        self.name = spec["name"]
-        self.model = spec["model"]
+        self.car_id                 = car_id
+        self.name                   = spec["name"]
+        self.model                  = spec["model"]
         # Physics spec (from the table -- not serialized; reloaded from car_id on load).
-        self.base_curve = list(spec["power_curve"])
-        self.gears = list(spec["gears"])
-        self.final_drive = spec["final_drive"]
-        self.tire_circ = spec["tire_circ"]
-        self.base_weight = spec["weight"]
-        self.base_grip = spec["grip"]
-        self.idle = spec["idle"]
-        self.redline = spec["redline"]
-        self.spool_rpm = spec["spool_rpm"]
-        self.boost_ceiling = spec["boost_ceiling"]
+        self.base_curve             = list(spec["power_curve"])
+        self.gears                  = list(spec["gears"])
+        self.final_drive            = spec["final_drive"]
+        self.tire_circ              = spec["tire_circ"]
+        self.base_weight            = spec["weight"]
+        self.base_grip              = spec["grip"]
+        self.idle                   = spec["idle"]
+        self.redline                = spec["redline"]
+        self.spool_rpm              = spec["spool_rpm"]
+        self.boost_ceiling          = spec["boost_ceiling"]
         # ECU / build state (player; defaults are inert for rivals).
-        self.connected = False
-        self.read = False
-        self.patched = False
-        self.flashed = False
-        self.switch_patch = False
-        self.dirty = False
-        self.tune = default_tune()
-        self.flashed_tune = None
-        self.slots = [clone_tune(PRESETS["stock"]), None, None, None]
-        self.active_slot = 0
-        self.mods = mods if mods is not None else {mod[0]: False for mod in MODS}
-        self.dyno_result = None
-        self.grade = ""
+        self.connected              = False
+        self.read                   = False
+        self.patched                = False
+        self.flashed                = False
+        self.switch_patch           = False
+        self.dirty                  = False
+        self.tune                   = clone_tune(tune) if tune is not None else default_tune()
+        self.flashed_tune           = None
+        self.slots                  = [clone_tune(self.tune), None, None, None]
+        self.active_slot            = 0
+        self.mods                   = mods if mods is not None else {mod[0]: False for mod in MODS}
+        self.dyno_result            = None
+        self.grade                  = ""
+        if tune is not None and tune != DEFAULT_TUNE:
+            self.flash_ecu()
 
     # -- queries -----------------------------------------------------------
     def ecu_status(self) -> str:
@@ -65,10 +67,18 @@ class Car:
         return [mod_id for mod_id in self.mods if self.mods[mod_id]]
 
     def build_whp(self) -> list:
-        """The car's final rpm->whp curve = base curve + owned mods (+ the flashed tune,
-        which scales the base for the player). Rivals (never flashed) use base + mods."""
-        tune_peak = compute_tune(self.flashed_tune or self.tune, self.mods)["whp"] if self.flashed else None
-        return build_whp_curve(self.base_curve, self.owned_mods(), tune_peak, self.idle, self.redline)
+        """The car's final rpm->whp curve = stock base curve scaled by the active tune,
+        plus owned mods. The tune scales in once the car is flashed (the player flashes to
+        write the map; rival cars are constructed already flashed, so their tune applies)."""
+        return build_whp_curve(self.base_curve, self.owned_mods(), self._tune_factor(), self.idle, self.redline)
+
+    def _tune_factor(self) -> float:
+        """The active tune's power *relative to the stock tune* (car-agnostic, since
+        ``compute_tune`` is GTI-calibrated and absolute). 1.0 = stock / unflashed."""
+        if not self.flashed:
+            return 1.0
+        stock = compute_tune(PRESETS["stock"], self.mods)["whp"] or 1.0
+        return compute_tune(self.flashed_tune or self.tune, self.mods)["whp"] / stock
 
     def whp_at(self, rpm: float, curve: list | None = None) -> float:
         return whp_at(curve if curve is not None else self.build_whp(), rpm)
@@ -146,7 +156,23 @@ class Car:
 
     # -- save --------------------------------------------------------------
     def to_dict(self) -> dict:
-        return {k: getattr(self, k) for k in ("car_id", "name", "connected", "read", "patched", "flashed", "switch_patch", "dirty", "tune", "flashed_tune", "slots", "active_slot", "mods", "dyno_result", "grade")}
+        return {k: getattr(self, k) for k in (
+            "car_id",
+            "name",
+            "connected",
+            "read",
+            "patched",
+            "flashed",
+            "switch_patch",
+            "dirty",
+            "tune",
+            "flashed_tune",
+            "slots",
+            "active_slot",
+            "mods",
+            "dyno_result",
+            "grade"
+        )}
 
     def from_dict(self, data: dict):
         for key, value in data.items():

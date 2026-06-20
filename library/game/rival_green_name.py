@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import RIVALS
+from library.core.constants import RIVALS, MODS
 from library.game.car import Car
 
 
@@ -10,20 +10,21 @@ class RivalGreenName:
     gearing, mass, grip) come from ``CAR_TABLE`` via ``car_id``. Rivals start mod-free;
     ladder progression will later be tuned by giving them mods (``Car.mods``)."""
 
-    def __init__(self, name: str, car_id: str, purse: int, color, video_loss=None, video_win=None):
-        self.name = name
-        self.car = Car(car_id)
-        self.model = self.car.model  # convenience (race_task loads the rival's glb by this)
-        self.purse = purse
-        self.color = color
-        self.video_loss = list(video_loss or [])
-        self.video_win = list(video_win or [])
+    def __init__(self, name: str, car_id: str, purse: int, color, mods: list, tune, video_loss=None, video_win=None):
+        self.name           = name
+        self.car            = Car(car_id, {mod[0]: mod[0] in mods for mod in MODS}, tune)
+        self.car.flashed    = True  # a rival's ECU is already flashed with its map, so its tune applies
+        self.model          = self.car.model  # convenience (race_task loads the rival's glb by this)
+        self.purse          = purse
+        self.color          = color
+        self.video_loss     = list(video_loss or [])
+        self.video_win      = list(video_win or [])
 
     @classmethod
     def from_spec(cls, spec: dict) -> "RivalGreenName":
         return cls(
             spec["name"], spec["car_id"], spec["purse"], spec["color"],
-            spec.get("video_loss"), spec.get("video_win"),
+            spec["mods"], spec["tune"], spec.get("video_loss"), spec.get("video_win"),
         )
 
     @classmethod
