@@ -8,11 +8,12 @@ from panda3d.core import CardMaker, MovieTexture, TextNode, Vec4
 import library.core.assets as assets
 from library.core.constants import (
     AMBER, AUDIO, BLUE, BOX_LINE, CHASE_CAM_LOOK, CHASE_CAM_POS, CHASE_FOV, DIM, ED_HEAL_ON_WIN,
-    ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY, ED_TAUNT_THRESHOLD, FINAL_DRIVE, GEAR_RATIOS,
-    GREEN, GREEN_2, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
+    ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY, ED_TAUNT_THRESHOLD,
+    GREEN, GREEN_2, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, RED, TEXT, TRACK_M, WHITE,
 )
 from library.core.utils import clamp
 from library.game.geometry import make_box
+from library.game.tuning import whp_at
 from library.stages.task_base import TaskBase
 
 SHIFT_RPM = 6500                # tach goes amber from 5500, red from here (chase cam lives in constants)
@@ -117,10 +118,11 @@ class RaceTask(TaskBase):
             # World scroll: lane dashes/cones travel backward at the player's speed.
             self._scroll_world(-player["v"] * SCROLL_SCALE * dt)
             # Spin each car's wheels at its own velocity (rival's may differ).
-            self._spin_wheels(self.player_wheels, player["v"], dt)
-            self._spin_wheels(self.rival_wheels, rival["v"], dt)
-            gear = clamp(player["gear"], 1, len(GEAR_RATIOS))
-            rpm = clamp(player["v"] / TIRE_CIRC * GEAR_RATIOS[gear - 1] * FINAL_DRIVE * 60, 850, 7300)
+            foe = self.game.rivals[self.game.bro.selected_rival]
+            self._spin_wheels(self.player_wheels, player["v"], dt, self.game.car.tire_circ)
+            self._spin_wheels(self.rival_wheels, rival["v"], dt, foe.car.tire_circ)
+            gear = int(clamp(player["gear"], 1, len(self.game.car.gears)))
+            rpm = self._engine_rpm(player, self.game.car)
             mph = player["v"] * 2.237
             load = AUDIO["pull_load"] if player["launched"] and not player["done"] else 0.2
             self.app.audio.set_engine(rpm, load)
@@ -128,16 +130,23 @@ class RaceTask(TaskBase):
             self._update_status()
         else:
             self.app.audio.idle(900)
-            self._update_dash(850, 1, 0)
+            self._update_dash(self.game.car.idle, 1, 0)
             self._update_status()
 
-    def _spin_wheels(self, wheels, velocity_mps, dt):
+    def _spin_wheels(self, wheels, velocity_mps, dt, tire_circ):
         # Roughly: angular velocity (deg/s) = v / circumference * 360.
         if not wheels:
             return
-        delta = velocity_mps / TIRE_CIRC * 360.0 * dt
+        delta = velocity_mps / tire_circ * 360.0 * dt
         for w in wheels:
             w.setP(w.getP() - delta)
+
+    def _engine_rpm(self, state, car) -> float:
+        """Engine rpm from road speed, the car's current gear, final drive and tire
+        circumference -- clamped to the car's idle..redline."""
+        gear = int(clamp(state.get("gear", 1), 1, len(car.gears)))
+        rpm = state["v"] / car.tire_circ * car.gears[gear - 1] * car.final_drive * 60
+        return clamp(rpm, car.idle, car.redline)
 
     def _update_status(self):
         # Status / hint / gap labels stay smooth without periodic redraws.
@@ -352,9 +361,16 @@ class RaceTask(TaskBase):
         now = time.perf_counter()
         self.allow_back = False
         self.game.set_advisors_visible(False)  # clear the Ask pills while the race is live
+        # Build each car's power curve + mass/grip ONCE for the run (avoids rebuilding the
+        # curve every physics frame); the race steps both off these.
+        foe = self.game.rivals[self.game.bro.selected_rival]
+        p_perf = self.game.car.car_perf()
+        r_perf = foe.car.car_perf()
         self.race = {"active": True, "green_at": now + 1.9, "rival_launch": now + 2.15,
                      "p": {"d": 0.0, "v": 0.0, "gear": 1, "launched": False, "done": False, "et": 0.0, "trap": 0.0},
-                     "r": {"d": 0.0, "v": 0.0, "done": False, "et": 0.0, "trap": 0.0}}
+                     "r": {"d": 0.0, "v": 0.0, "gear": 1, "done": False, "et": 0.0, "trap": 0.0},
+                     "p_curve": p_perf["curve"], "p_weight": p_perf["weight"], "p_grip": p_perf["grip"],
+                     "r_curve": r_perf["curve"], "r_weight": r_perf["weight"], "r_grip": r_perf["grip"]}
         self.game.log("staged - launch on green", "info")
         return "staged"
     
@@ -374,29 +390,45 @@ class RaceTask(TaskBase):
     def _step_race(self, dt: float):
         if time.perf_counter() < self.race["green_at"]:
             return
-        player, rival = self.race["p"], self.race["r"]
+        race = self.race
+        player, rival = race["p"], race["r"]
         foe = self.game.rivals[self.game.bro.selected_rival]
         if player["launched"] and not player["done"]:
-            perf = self.game.car.car_perf()
-            # Emotional damage = shaky hands: less power and launch grip.
+            # Emotional damage = shaky hands: less power and launch grip. The player
+            # shifts manually (SPACE); off-curve gears now cost you real time.
             ed = self.game.bro.emotional_damage / 100.0
-            whp = perf["whp"] * (1 - ed * ED_RACE_WHP_PENALTY)
-            grip = perf["grip"] * (1 - ed * ED_RACE_GRIP_PENALTY)
-            self._step_car(player, whp, perf["weight"], grip, dt)
+            self._step_car(player, self.game.car, race["p_curve"], race["p_weight"], race["p_grip"], dt,
+                           whp_scale=1 - ed * ED_RACE_WHP_PENALTY, grip_scale=1 - ed * ED_RACE_GRIP_PENALTY)
             if player["d"] >= TRACK_M:
-                player["done"], player["et"], player["trap"] = True, time.perf_counter() - self.race["green_at"], player["v"] * 2.237
-        if time.perf_counter() >= self.race["rival_launch"] and not rival["done"]:
-            self._step_car(rival, foe.whp, foe.weight, foe.grip, dt)
+                player["done"], player["et"], player["trap"] = True, time.perf_counter() - race["green_at"], player["v"] * 2.237
+        if time.perf_counter() >= race["rival_launch"] and not rival["done"]:
+            self._auto_shift(rival, foe.car)  # the rival bangs gears near its redline
+            self._step_car(rival, foe.car, race["r_curve"], race["r_weight"], race["r_grip"], dt)
             if rival["d"] >= TRACK_M:
-                rival["done"], rival["et"], rival["trap"] = True, time.perf_counter() - self.race["green_at"], rival["v"] * 2.237
+                rival["done"], rival["et"], rival["trap"] = True, time.perf_counter() - race["green_at"], rival["v"] * 2.237
         if player["done"] and rival["done"]:
             self._resolve_race(player, rival, foe)
 
-    def _step_car(self, car, whp, weight, grip, dt):
-        force = min(weight * 9.81 * grip, whp * 745.7 / max(car["v"], 2))
-        drag = 0.5 * 1.2 * 0.62 * car["v"] * car["v"]
-        car["v"] = max(0, car["v"] + ((force - drag) / weight) * dt)
-        car["d"] += car["v"] * dt
+    def _step_car(self, state, car, curve, weight, grip, dt, whp_scale=1.0, grip_scale=1.0):
+        """Power-limited launch: tractive force is grip-capped at low speed, then the
+        wheel power at the *current rpm* / velocity, minus drag. The current gear sets the
+        rpm, so being in the wrong gear costs power -- and bouncing off the rev limiter
+        (rpm >= redline) makes NO power until you upshift, so gearing genuinely matters."""
+        gear = int(clamp(state.get("gear", 1), 1, len(car.gears)))
+        rpm = state["v"] / car.tire_circ * car.gears[gear - 1] * car.final_drive * 60
+        whp_now = 0.0 if rpm >= car.redline else whp_at(curve, max(rpm, car.idle)) * whp_scale
+        force = min(weight * 9.81 * grip * grip_scale, whp_now * 745.7 / max(state["v"], 2))
+        drag = 0.5 * 1.2 * 0.62 * state["v"] * state["v"]
+        state["v"] = max(0, state["v"] + ((force - drag) / weight) * dt)
+        state["d"] += state["v"] * dt
+
+    def _auto_shift(self, state, car):
+        gear = int(clamp(state.get("gear", 1), 1, len(car.gears)))
+        if gear >= len(car.gears):
+            return
+        rpm = state["v"] / car.tire_circ * car.gears[gear - 1] * car.final_drive * 60
+        if rpm >= car.redline * 0.97:
+            state["gear"] = gear + 1
 
     def _resolve_race(self, player, rival, foe):
         game = self.game

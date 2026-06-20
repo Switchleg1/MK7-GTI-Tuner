@@ -8,7 +8,7 @@ class CarLibrary:
     later (and to serialize as a list in the save file)."""
 
     def __init__(self):
-        self.cars = [Car("MK7 GTI")]
+        self.cars = [Car("mk7_gti")]
         self.active_index = 0
 
     def active(self) -> Car:
@@ -21,8 +21,10 @@ class CarLibrary:
         self.active_index = data.get("active_index", 0)
         self.cars = []
         for car_data in data.get("cars", []):
-            car = Car()
+            # Construct from the saved car_id so the physics spec loads; then restore the
+            # build state. Old saves (no car_id) default to the MK7 GTI.
+            car = Car(car_data.get("car_id", "mk7_gti"))
             car.from_dict(car_data)
             self.cars.append(car)
         if not self.cars:
-            self.cars = [Car("MK7 GTI")]
+            self.cars = [Car("mk7_gti")]

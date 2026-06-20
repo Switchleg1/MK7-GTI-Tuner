@@ -12,10 +12,7 @@ DEFAULT_HEIGHT = 720
 DEFAULT_ASPECT = 16 / 9
 DEFAULT_FOV_DEG = 105
 
-TRACK_M = 402.336
-GEAR_RATIOS = [3.6, 2.1, 1.43, 1.03, 0.84, 0.69]
-FINAL_DRIVE = 3.65
-TIRE_CIRC = 1.96
+TRACK_M = 402.336  # quarter-mile (m). Per-car gearing/curve/tire now live in CAR_TABLE.
 
 UI_REFRESH_SECONDS = 0.25
 MAX_LOG_LINES = 20
@@ -128,12 +125,81 @@ MODS = [
     ("turbo", "Hybrid Turbo IS38+", 900, "Raises boost ceiling."),
 ]
 
+# --------------------------------------------------------------------------
+# Cars + mods (the curve-based performance model). CAR_TABLE is the single source
+# of each car's spec; MOD_TABLE carries the effect data behind the MODS bool ids
+# (its keys MUST match the ids in MODS). Both the player's Car and rival Cars pull
+# from CAR_TABLE and compose their final rpm->whp curve via tuning.build_whp_curve.
+# --------------------------------------------------------------------------
+
+# Per-mod effects. `curve` = [(rpm, base_add, scaler)] whp adders interpolated across
+# rpm; at each rpm the gain is base_add + scaler * (running total of earlier mods'
+# adds), so mods compound. `spool` shifts the boost onset (- earlier, + later),
+# `weight` kg +/-, `grip` traction +/-, `max_boost` raises the psi ceiling.
+MOD_TABLE = {
+    "intake": {"spool": -150, "weight": 0,   "grip": 0.00, "max_boost": 0,
+               "curve": [(3000, 3, 0.02), (5000, 6, 0.04), (6700, 6, 0.04)]},
+    "dp":     {"spool": -200, "weight": 0,   "grip": 0.00, "max_boost": 1,
+               "curve": [(3500, 6, 0.05), (5000, 10, 0.06), (6700, 12, 0.06)]},
+    "fmic":   {"spool": 0,    "weight": 5,   "grip": 0.00, "max_boost": 1,
+               "curve": [(4500, 4, 0.03), (6700, 8, 0.05)]},
+    "clutch": {"spool": 0,    "weight": 0,   "grip": 0.18, "max_boost": 0, "curve": []},
+    "wheels": {"spool": 0,    "weight": -50, "grip": 0.02, "max_boost": 0, "curve": []},
+    "fuel":   {"spool": 0,    "weight": 0,   "grip": 0.00, "max_boost": 0,
+               "curve": [(4000, 8, 0.05), (6000, 14, 0.08), (6700, 14, 0.08)]},
+    "turbo":  {"spool": 250,  "weight": 0,   "grip": 0.00, "max_boost": 5,
+               "curve": [(3500, -5, 0.0), (4500, 15, 0.10), (5500, 35, 0.15), (6700, 45, 0.15)]},
+}
+
+# Each car: real-world-derived stock wheel-power curve [(rpm, whp)] + gearing + tire +
+# mass + grip. `power_curve` is the STOCK base; the player's tune scales it and owned
+# mods reshape it in build_whp_curve. `model` is the .glb key (see CAR_MODEL_FILES).
+CAR_TABLE = {
+    "mk7_gti": {
+        "name": "MK7 GTI", "model": "mk7_gti", "weight": 1380, "grip": 0.92,
+        "gears": [3.76, 2.08, 1.46, 1.08, 0.97, 0.84], "final_drive": 3.65, "tire_circ": 2.00,
+        "idle": 900, "redline": 6700, "spool_rpm": 3000, "max_boost": 20, "boost_ceiling": 24,
+        "power_curve": [(1000, 30), (2000, 95), (3000, 165), (4000, 200), (4800, 210),
+                        (5500, 208), (6200, 195), (6700, 175)],
+    },
+    "stock_civic": {
+        "name": "Civic 1.5T", "model": "stock_civic", "weight": 1250, "grip": 0.90,
+        "gears": [3.64, 2.08, 1.36, 1.02, 0.79, 0.64], "final_drive": 4.11, "tire_circ": 2.03,
+        "idle": 850, "redline": 6500, "spool_rpm": 2500, "max_boost": 16, "boost_ceiling": 18,
+        "power_curve": [(1000, 22), (2000, 70), (3000, 120), (4000, 142), (5000, 150),
+                        (5500, 150), (6000, 140), (6500, 125)],
+    },
+    "civic_type_r": {
+        "name": "Civic Type R", "model": "civic_type_r", "weight": 1380, "grip": 1.00,
+        "gears": [3.63, 2.12, 1.53, 1.13, 0.91, 0.73], "final_drive": 3.84, "tire_circ": 2.06,
+        "idle": 850, "redline": 7000, "spool_rpm": 2800, "max_boost": 22, "boost_ceiling": 26,
+        "power_curve": [(1500, 55), (2500, 160), (3500, 235), (4500, 275), (5500, 280),
+                        (6500, 275), (7000, 255)],
+    },
+    "wrx_sti": {
+        "name": "WRX STI", "model": "wrx_sti", "weight": 1520, "grip": 1.18,
+        "gears": [3.64, 2.24, 1.59, 1.14, 0.97, 0.76], "final_drive": 3.90, "tire_circ": 2.05,
+        "idle": 850, "redline": 6700, "spool_rpm": 3200, "max_boost": 18, "boost_ceiling": 22,
+        "power_curve": [(2000, 70), (3000, 150), (4000, 220), (5000, 255), (6000, 265),
+                        (6500, 255), (6700, 240)],
+    },
+    "bmw_m2": {
+        "name": "BMW M2", "model": "bmw_m2", "weight": 1500, "grip": 1.00,
+        "gears": [4.11, 2.32, 1.54, 1.18, 1.00, 0.85], "final_drive": 3.46, "tire_circ": 2.05,
+        "idle": 800, "redline": 7000, "spool_rpm": 2200, "max_boost": 17, "boost_ceiling": 21,
+        "power_curve": [(1500, 80), (2500, 200), (3500, 290), (4500, 325), (5500, 330),
+                        (6500, 330), (7000, 310)],
+    },
+}
+
+# The street ladder: encounter metadata + the car_id each rival drives (its physics
+# come from CAR_TABLE). Ladder progression will later be tuned by giving rivals mods.
 RIVALS = [
-    {"name": "Stock Civic", "whp": 158, "weight": 1280, "grip": 0.90, "purse": 120, "color": rgba("#9fb3c0"), "model": "stock_civic", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "Civic Si", "whp": 218, "weight": 1300, "grip": 0.92, "purse": 230, "color": rgba("#e6e6e6"), "model": "civic_type_r", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "WRX STI", "whp": 300, "weight": 1520, "grip": 1.18, "purse": 480, "color": rgba("#3a6ad6"), "model": "wrx_sti", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "BMW M2", "whp": 385, "weight": 1560, "grip": 1.00, "purse": 850, "color": rgba("#222222"), "model": "bmw_m2", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
-    {"name": "Rival Shop Mk7", "whp": 365, "weight": 1370, "grip": 1.06, "purse": 1600, "color": rgba("#e7232b"), "model": "mk7_gti", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "Stock Civic", "car_id": "stock_civic", "purse": 120, "color": rgba("#9fb3c0"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "Civic Si", "car_id": "civic_type_r", "purse": 230, "color": rgba("#e6e6e6"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "WRX STI", "car_id": "wrx_sti", "purse": 480, "color": rgba("#3a6ad6"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "BMW M2", "car_id": "bmw_m2", "purse": 850, "color": rgba("#222222"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "Rival Shop Mk7", "car_id": "mk7_gti", "purse": 1600, "color": rgba("#e7232b"), "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
 ]
 
 REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"), (340, "Wanted by the HOA")]
@@ -174,8 +240,7 @@ WHEEL_STATIC = ("calliper", "caliper")  # name substrings of wheel parts that do
 # --------------------------------------------------------------------------
 # Dyno (SimosTools-style gauge cluster + live graph)
 # --------------------------------------------------------------------------
-DYNO_PULL_SECONDS = 4.0
-DYNO_RPM_RANGE = (2200, 6800)  # sweep range (matches tuning.dyno_curve)
+DYNO_PULL_SECONDS = 4.0  # the pull sweeps the car's own idle->redline (from CAR_TABLE)
 
 # Gauge tiles: (label, value-key, lo, hi, danger_above, unit, decimals)
 DYNO_GAUGES = [
@@ -309,7 +374,7 @@ TOAST_Z = -0.85
 # saved -- it's static reference data from RIVALS (v1 saved it and froze stale
 # specs). SAVE_VERSION lets a future load reject or migrate an old layout.
 # --------------------------------------------------------------------------
-SAVE_VERSION = 2
+SAVE_VERSION = 3  # v3: Car carries car_id (curve-based model); old saves load as mk7_gti
 CONFIG_FILE = "options.cfg"
 SAVE_FILE = "savegame.json"
 

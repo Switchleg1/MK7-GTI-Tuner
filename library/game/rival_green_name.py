@@ -1,28 +1,29 @@
 from __future__ import annotations
 
 from library.core.constants import RIVALS
+from library.game.car import Car
 
 
 class RivalGreenName:
-    """A bad-guy rival on the street ladder - a rival 'green name' tuner's car."""
+    """A bad-guy rival on the street ladder. Encounter metadata (name, purse, colour
+    tint, win/loss clips) plus the ``Car`` it drives -- the car's physics (curve,
+    gearing, mass, grip) come from ``CAR_TABLE`` via ``car_id``. Rivals start mod-free;
+    ladder progression will later be tuned by giving them mods (``Car.mods``)."""
 
-    def __init__(self, name: str, whp: float, weight: float, grip: float, purse: int,
-                 color, model: str, video_loss=None, video_win=None):
+    def __init__(self, name: str, car_id: str, purse: int, color, video_loss=None, video_win=None):
         self.name = name
-        self.whp = whp
-        self.weight = weight
-        self.grip = grip
+        self.car = Car(car_id)
+        self.model = self.car.model  # convenience (race_task loads the rival's glb by this)
         self.purse = purse
         self.color = color
-        self.model = model
         self.video_loss = list(video_loss or [])
         self.video_win = list(video_win or [])
 
     @classmethod
     def from_spec(cls, spec: dict) -> "RivalGreenName":
         return cls(
-            spec["name"], spec["whp"], spec["weight"], spec["grip"], spec["purse"],
-            spec["color"], spec["model"], spec.get("video_loss"), spec.get("video_win"),
+            spec["name"], spec["car_id"], spec["purse"], spec["color"],
+            spec.get("video_loss"), spec.get("video_win"),
         )
 
     @classmethod

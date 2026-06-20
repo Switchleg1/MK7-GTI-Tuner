@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import math
-
-from library.core.constants import DEFAULT_TUNE, FUEL, GRADE_TABLE, REPS, TUNE_THRESHOLDS
+from library.core.constants import DEFAULT_TUNE, FUEL, GRADE_TABLE, MOD_TABLE, REPS, TUNE_THRESHOLDS
 from library.core.utils import clamp
 
 
@@ -27,6 +25,10 @@ def rep_title(cred: float) -> str:
 
 
 def compute_tune(tune: dict, mods: dict) -> dict:
+    """The calibration sim: turns the tune (boost/timing/lambda/fuel) into a tune-driven
+    peak ``whp`` plus the safety diagnostics (knock/EGT/reliability/pop/blown). Power
+    from *hardware* (intake/dp/turbo/...) is NOT here -- it flows through the curve in
+    ``build_whp_curve``; mods still factor into headroom/EGT/reliability/boost ceiling."""
     fuel = FUEL[tune["fuel"]]
     headroom = fuel["head"] + (2 if mods["fmic"] else 0) + (3 if mods["fuel"] else 0)
     knock_idx = (tune["boost"] - 18) * 0.85 + (tune["timing"] - 9) * 1.25 + (tune["lambda"] - 0.82) * 14 - headroom
@@ -38,9 +40,6 @@ def compute_tune(tune: dict, mods: dict) -> dict:
         + (effective_timing - 9) * 3.8
         + fuel["pwr"]
         - abs(tune["lambda"] - 0.83) * 40
-        + (6 if mods["intake"] else 0)
-        + (12 if mods["dp"] else 0)
-        + ((tune["boost"] - 18) * 2.5 if mods["turbo"] else 0)
     )
     egt = (
         720
@@ -69,22 +68,74 @@ def compute_tune(tune: dict, mods: dict) -> dict:
     return {"whp": clamp(whp, 160, 640), "KR": kr, "knockIdx": knock_idx, "egt": egt, "rel": rel, "pop": pop, "blown": blown}
 
 
-def dyno_curve(peak_whp: float) -> list[dict]:
-    points = []
-    max_pw = 0
-    for rpm in range(2200, 6801, 100):
-        spool = clamp((rpm - 2100) / 1300, 0, 1)
-        mid = math.exp(-((rpm - 4300) / 2400) ** 2)
-        top = clamp(1 - (rpm - 5600) / 3600, 0.55, 1)
-        tq = 100 * spool * (0.55 + 0.55 * mid) * top
-        pw = tq * rpm / 5252
-        points.append({"rpm": rpm, "tq": tq, "pw": pw})
-        max_pw = max(max_pw, pw)
-    scale = peak_whp / max_pw if max_pw else 1
-    for point in points:
-        point["tq"] *= scale
-        point["pw"] *= scale
-    return points
+def whp_at(curve: list, rpm: float) -> float:
+    """Linear-interpolate whp at ``rpm`` on a sorted ``[(rpm, whp), ...]`` curve
+    (flat-held outside the curve's range)."""
+    if not curve:
+        return 0.0
+    if rpm <= curve[0][0]:
+        return curve[0][1]
+    if rpm >= curve[-1][0]:
+        return curve[-1][1]
+    for i in range(1, len(curve)):
+        r0, w0 = curve[i - 1]
+        r1, w1 = curve[i]
+        if rpm <= r1:
+            t = (rpm - r0) / (r1 - r0) if r1 > r0 else 0.0
+            return w0 + t * (w1 - w0)
+    return curve[-1][1]
+
+
+def _mod_curve_value(nodes: list, rpm: float):
+    """Interpolate a mod's ``[(rpm, base_add, scaler), ...]`` nodes at ``rpm`` -> (base,
+    scaler). Zero below the first node (the mod isn't in its band yet), held above the
+    last."""
+    if not nodes or rpm <= nodes[0][0]:
+        return (0.0, 0.0)
+    if rpm >= nodes[-1][0]:
+        return (nodes[-1][1], nodes[-1][2])
+    for i in range(1, len(nodes)):
+        r0, b0, s0 = nodes[i - 1]
+        r1, b1, s1 = nodes[i]
+        if rpm <= r1:
+            t = (rpm - r0) / (r1 - r0) if r1 > r0 else 0.0
+            return (b0 + t * (b1 - b0), s0 + t * (s1 - s0))
+    return (nodes[-1][1], nodes[-1][2])
+
+
+def build_whp_curve(base_curve: list, owned_mods: list, tune_peak=None,
+                    idle: int = 900, redline: int = 6700, step: int = 100) -> list:
+    """Compose a car's final rpm->whp curve from its stock ``base_curve`` + owned mods
+    (+ tune, for the player). Returns ``[(rpm, whp), ...]`` from idle to redline.
+
+    - If ``tune_peak`` is given (player has a flashed/active tune), the base curve is
+      scaled so its peak matches that tune-driven figure (the calibration still drives
+      base output); rivals pass ``None`` and keep their real stock curve.
+    - Each owned mod's ``spool`` shifts the sub-peak onset (- earlier / + later) and its
+      ``curve`` nodes add whp, compounding (``base + scaler * running_total``). Mods are
+      applied in the given order (MOD_TABLE order)."""
+    base_peak = max((w for _, w in base_curve), default=1) or 1
+    factor = (tune_peak / base_peak) if tune_peak else 1.0
+    peak_rpm = max(base_curve, key=lambda p: p[1])[0]
+    lo_rpm, hi_rpm = base_curve[0][0], base_curve[-1][0]
+    spool_delta = sum(MOD_TABLE[m]["spool"] for m in owned_mods)
+    grid = []
+    rpm = idle
+    while rpm <= redline + 1:
+        # Spool only reshapes the rising (sub-peak) side so a bigger turbo doesn't lose
+        # top-end; above the peak the base is untouched and mods add the top-end gains.
+        look = rpm - spool_delta if rpm <= peak_rpm else rpm
+        look = clamp(look, lo_rpm, hi_rpm)
+        whp = whp_at(base_curve, look) * factor
+        accumulated = 0.0
+        for mod_id in owned_mods:
+            base, scaler = _mod_curve_value(MOD_TABLE[mod_id]["curve"], rpm)
+            add = base + scaler * accumulated
+            whp += add
+            accumulated += add
+        grid.append((rpm, max(0.0, whp)))
+        rpm += step
+    return grid
 
 
 def grade_for_result(result: dict) -> str:

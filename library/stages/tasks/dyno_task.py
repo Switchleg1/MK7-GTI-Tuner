@@ -9,7 +9,6 @@ from library.core.constants import (
     DYNO_GAUGES,
     DYNO_GRID,
     DYNO_PULL_SECONDS,
-    DYNO_RPM_RANGE,
     DYNO_TILE,
     DYNO_TRACE,
     DYNO_ZONE_GREEN,
@@ -22,7 +21,6 @@ from library.core.constants import (
     WHITE,
 )
 from library.core.utils import clamp
-from library.game.tuning import dyno_curve
 from library.stages.task_base import TaskBase
 
 CENTER = TextNode.ACenter
@@ -44,6 +42,7 @@ class DynoTask(TaskBase):
         self.pull_t = 0.0
         self.result = None
         self.points = []
+        self.rpm_lo, self.rpm_hi = self.game.car.idle, self.game.car.redline  # sweep window (the car's range)
         self.graph = None
         self.values = self._idle_values()
         self.vmin = {}
@@ -58,13 +57,24 @@ class DynoTask(TaskBase):
     def start_pull(self):
         if self.running or not self.game.car.flashed:
             return
-        self.result = self.game.car.compute()
-        self.points = dyno_curve(self.result["whp"])
+        car = self.game.car
+        self.result = car.compute()
+        self.points = self._points_from_curve(car.build_whp())  # the car's real composed curve
+        # Grade off the actual built peak (curve), not the tune-only compute() figure.
+        self.result["whp"] = max((p["pw"] for p in self.points), default=self.result["whp"])
+        self.rpm_lo = self.points[0]["rpm"] if self.points else car.idle
+        self.rpm_hi = self.points[-1]["rpm"] if self.points else car.redline
         self.running = True
         self.pull_t = 0.0
         self.vmin, self.vmax = {}, {}
         self.game.log("dyno pull started", "info")
         self.dirty = True
+
+    @staticmethod
+    def _points_from_curve(curve):
+        """``[(rpm, whp)] -> [{rpm, pw, tq}]`` for the gauge/graph code (``pw`` = wheel
+        power; torque derived for completeness)."""
+        return [{"rpm": rpm, "pw": whp, "tq": (whp * 5252 / rpm if rpm else 0.0)} for rpm, whp in curve]
 
     def tick(self, dt):
         if not self.running:
@@ -90,7 +100,7 @@ class DynoTask(TaskBase):
         self._draw_graph()
 
     def _sample(self):
-        lo, hi = DYNO_RPM_RANGE
+        lo, hi = self.rpm_lo, self.rpm_hi
         rpm = lo + (hi - lo) * self.pull_t
         spool = clamp((rpm - 2100) / 1300, 0, 1)
         car = self.game.car
@@ -173,7 +183,7 @@ class DynoTask(TaskBase):
         gx0p = mid + 0.04
         self.ui.add_text("graph-title", "POWER  whp : rpm", (gx0p + 0.03, 0, 0.45), 0.026, DYNO_TRACE)
         self.ui.add_text("graph-z", "", (gx0p + 0.03, 0, 0.40), 0.022, DIM)
-        self.ui.add_text("graph-t", f"T[{round(DYNO_RPM_RANGE[1])}]", (right - 0.03, 0, 0.40), 0.022, DIM, TextNode.ARight)
+        self.ui.add_text("graph-t", f"T[{round(self.rpm_hi)}]", (right - 0.03, 0, 0.40), 0.022, DIM, TextNode.ARight)
         self.ui.add_text("status", "", ((mid + right) / 2, 0, -0.42), 0.034, DIM, CENTER)
         self.ui.add_text("grade", "", ((mid + right) / 2, 0, -0.54), 0.034, DIM, CENTER, wordwrap=30)
         self._build_graph_objects(mid + 0.04, right, -0.16, 0.50)
@@ -235,7 +245,7 @@ class DynoTask(TaskBase):
         if not box or not self.points:
             return
         gx0, gx1, gz0, gz1 = box
-        lo, hi = DYNO_RPM_RANGE
+        lo, hi = self.rpm_lo, self.rpm_hi
         peak = max((p["pw"] for p in self.points), default=1) or 1
         cur_rpm = lo + (hi - lo) * self.pull_t
         segs = LineSegs()
@@ -250,7 +260,9 @@ class DynoTask(TaskBase):
             segs.drawTo(gx, 0, gz) if started else segs.moveTo(gx, 0, gz)
             started = True
         if started:
-            self.graph = self.root.attachNewNode(segs.create())
+            # Attach to the UI-object layer (not self.root) so the trace draws ABOVE the
+            # managed graph panel/gridlines, which the controller lifts over self.root.
+            self.graph = self.ui.parent.attachNewNode(segs.create())
 
     def _controls(self):
         game = self.game

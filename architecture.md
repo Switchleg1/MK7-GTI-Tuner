@@ -120,7 +120,12 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   `sys._MEIPASS` when packaged, project root from source).
 - `constants.py` — **all** defaults, thresholds, colors, asset paths, the cinematic
   camera/placements, phase prompts, flash-step / ECU-readout / character-pose tables,
-  and the mode list. The single source of tunable values.
+  and the mode list. The single source of tunable values. Includes **`CAR_TABLE`** (each
+  car's real-world spec: stock rpm→whp `power_curve`, gears, final drive, tire circ, mass,
+  grip, redline, spool, boost ceiling — keyed by `car_id`) and **`MOD_TABLE`** (per-mod
+  spool/weight/grip/boost-ceiling deltas + compounding rpm `curve` adders; its keys match
+  the `MODS` ids). `TRACK_M` is the only global gearing value left (per-car gearing moved
+  into `CAR_TABLE`).
 - `utils.py` — `clamp`, `pick`, `rgba`.
 - `audio.py` — `GameAudio`: the runtime sound service on the shell. A looping engine
   note (+ intake roar + turbo whistle) pitched by RPM via `setPlayRate` and leveled by
@@ -296,11 +301,21 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
 - `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress,
   `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`). Room
   for emotional damage / route / skills.
-- `rival_green_name.py` — `RivalGreenName`: a bad-guy ladder rival (from `RIVALS`).
-- `car.py` — `Car`: ECU state, tune/slots/mods, last dyno; state-change methods return
-  `(message, kind)` so `Game` logs them. `apply_preset` accepts `PRESETS` **and**
-  `COMMUNITY_MAPS` keys. `car_perf`/`compute` feed the dyno + race.
-- `car_library.py` — `CarLibrary`: the bro's car(s) + active index (`active()`).
+- `rival_green_name.py` — `RivalGreenName`: a ladder rival = encounter metadata
+  (`name`/`purse`/`color`/win-loss clips) **plus a `Car`** built from the spec's `car_id`
+  (from `RIVALS`). Rivals start mod-free; the ladder will be tuned later by giving them
+  mods.
+- `car.py` — `Car(car_id)`: one class for the player AND rivals. Pulls its physics spec
+  (real-world rpm→whp curve, gears, final drive, tire circ, mass, grip, redline, spool,
+  boost ceiling) from `CAR_TABLE[car_id]`; ECU/tune/slot state is the player's (inert on
+  rivals, which never flash). **`build_whp()`** composes the final rpm→whp curve = base
+  curve + owned mods (+ the flashed tune, which scales it) via `tuning.build_whp_curve`;
+  `whp_at(rpm)` interpolates it; `car_perf()` returns the curve + peak whp + mass/grip
+  (base ± mod deltas) + blown/rel. State-change methods return `(message, kind)` so `Game`
+  logs them. `apply_preset` accepts `PRESETS` **and** `COMMUNITY_MAPS` keys. Adds `car_id`
+  to its save dict (old saves load as `mk7_gti`).
+- `car_library.py` — `CarLibrary`: the bro's car(s) + active index (`active()`);
+  reconstructs each car from its saved `car_id` so the physics spec reloads.
 - `discord.py` — `Discord`: the *MQB Vibe Coders* server. Builds the roster from
   `DISCORD_ROSTER` (each row → an `Admin`/`GreenName`/`NormalUser`), samples who's
   online (`refresh_online`), supplies channel `backlog` chatter, and `resolve(text, ctx)`
@@ -310,13 +325,26 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   role subclasses (Admin trusts good, GreenName pulls money, NormalUser is persona-only).
 - `app.py` — `MK7Tuner3D`: the ShowBase shell + stage manager + `TASK_CLASSES`.
 - `geometry.py` — box/grid builders (the exhaust-flame cubes).
-- `tuning.py` — tune math: `compute_tune`, `dyno_curve`, grading, pops, rep.
-- `simos.py` — "Ask Simon" rules engine; `build_context(game, tab)` reads bro + car.
+- `tuning.py` — tune + curve math: `compute_tune` (calibration → tune-only peak whp +
+  knock/EGT/reliability/pop/blown; **hardware power lives in the mod curves now, not
+  here**), `build_whp_curve(base, owned_mods, tune_peak, idle, redline)` + `whp_at(curve,
+  rpm)` (the curve engine), plus grading, pops, rep.
+- `simos.py` — "Ask Simon" rules engine; `build_context(game, tab)` reads bro + car (and
+  shows Simon the real **built** peak whp, not the tune-only figure).
 
 The **DynoTask** (`library/stages/tasks/dyno_task.py`) is SimosTools-style: a pull
-sweeps RPM idle→redline (`tick`), driving gauge **tiles** (scale, big value, `min:max`,
-unit, green fill + red danger band, from `constants.DYNO_GAUGES`) and a live power-vs-RPM
-`LineSegs` graph, then records the peak + `grade_for_result` on the `Car`.
+sweeps the car's idle→redline (`tick`), sampling the car's real `build_whp()` curve to
+drive gauge **tiles** (scale, big value, `min:max`, unit, green fill + red danger band,
+from `constants.DYNO_GAUGES`) and a live power-vs-RPM `LineSegs` graph (drawn on the UI
+layer so it sits above the panel), then records the built peak + `grade_for_result` on the
+`Car`.
+
+The **RaceTask** (`library/stages/tasks/race_task.py`) accelerates both cars off their
+`Car` curves through their own gearing: `_engine_rpm` derives rpm from speed + the current
+gear + final drive + tire circ, `_step_car` makes power = `whp_at(curve, rpm)` (grip-capped
+at low speed, **zero on the rev limiter** so you must shift), and the rival `_auto_shift`s
+near its redline (the player shifts on SPACE). Each car's curve + mass/grip are built once
+per run in `_start_race`.
 
 ## Key conventions
 

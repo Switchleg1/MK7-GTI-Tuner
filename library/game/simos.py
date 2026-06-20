@@ -9,6 +9,9 @@ def build_context(game, tab: str = "") -> dict:
     car, bro = game.car, game.bro
     tune = car.flashed_tune if car.flashed and car.flashed_tune else car.tune
     result = compute_tune(tune, car.mods)
+    # compute_tune's whp is tune-only now; show Simon the real BUILT peak (curve + mods)
+    # so his power roasts/thresholds reflect the actual car.
+    result["whp"] = max((w for _, w in car.build_whp()), default=result["whp"])
     owned_mods = [name for name, owned in car.mods.items() if owned]
     return {
         "connected": car.connected,
