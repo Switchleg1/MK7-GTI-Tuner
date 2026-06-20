@@ -38,10 +38,12 @@ BUTTON_CLICK_HOLD = 0.18
 BUTTON_CLICK_BRIGHTEN = 1.8
 BUTTON_FLASH_SCALE = 1.6
 # Visual styles: the frame texture, an optional ring texture, whether `color` tints the
-# FILL (box) or the TEXT (pill), a text vertical nudge, and the click-flash mode.
+# FILL (box) or the TEXT (pill), a text vertical nudge, the click-flash mode, and an
+# optional top accent-strip colour (hex) -- the garage task cards' green stripe.
 BUTTON_STYLES = {
-    "box":  {"texture": "ui_box",       "ring": "ui_ring", "tint": "fill", "text_dy": 0.0,    "flash": "fill"},
-    "pill": {"texture": "simon_button", "ring": None,       "tint": "text", "text_dy": -0.016, "flash": "scale"},
+    "box":    {"texture": "ui_box",       "ring": "ui_ring", "tint": "fill", "text_dy": 0.0,    "flash": "fill"},
+    "pill":   {"texture": "simon_button", "ring": None,       "tint": "text", "text_dy": -0.016, "flash": "scale"},
+    "garage": {"texture": "ui_box",       "ring": "ui_ring", "tint": "fill", "text_dy": 0.0,    "flash": "fill", "accent": "#36e07a"},
 }
 
 # Dedicated cull bin for game-level overlays (Simon/Discord panels, the toast, and

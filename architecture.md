@@ -158,7 +158,9 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   `enabled()` / `is_visible()` / `command_fn()` (no arg = read, one arg = set).
   **`is_visible`** defaults True; `render(dt)` enforces it (a not-visible button is
   *stashed* — off-screen and unclickable) and advances the flash. Never destroyed by a
-  redraw. (Task buttons are `box`; the game-level Ask/Back chrome buttons are `pill`.)
+  redraw. A third style, **garage**, is a box with a green top **accent** strip (baked
+  into the button) for the hub's task cards. (Task buttons are `box`; the game-level
+  Ask/Back chrome buttons are `pill`; the hub task cards are `garage`.)
 - `button_controller.py` — `ButtonController`: owns a set of buttons (per-task, or the
   game-level chrome set). Buttons are **built once** via `add(key, …, style=…, icon=…)`
   and then changed in place — `get(key).text(…)` / `.is_visible(…)` / … or
@@ -195,8 +197,9 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   the "wheels fly off" bug). Falls back to the old procedural `tire_`/`rim_` nodes if a
   model has no `w:` geometry.
 - `garage_stage.py` — `GarageStage(Hud)`: the home hub — ground + glb GTI on a slow
-  turntable, header, a **MENU** button (`on_menu`), a row of task buttons from `MODES`,
-  and Simon. `on_pick(key)`.
+  turntable, header, a **MENU** button (`on_menu`), and a row of task cards from `MODES`.
+  Its buttons go through its own `ButtonController` (`self.buttons`): the task cards use
+  the **garage** style (green accent), MENU + the wizard DM use `box`. `on_pick(key)`.
 - `menu_stage.py` — `MenuStage(Hud)`: the title + pause menu. One stage walking three
   pages (root / options / graphics) on a centred glass card. Root rows come from
   `MENU_ITEMS` filtered by `resumable` (Resume/Save only mid-career; Load auto-disabled

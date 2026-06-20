@@ -10,12 +10,16 @@ from library.core.constants import (
     BTN_DISABLED_FILL, BTN_DISABLED_TEXT, BTN_LINE, BUTTON_CLICK_BRIGHTEN, BUTTON_CLICK_HOLD,
     BUTTON_FLASH_SCALE, BUTTON_STYLES, GREEN_2, LINE, WHITE,
 )
+from library.core.utils import rgba
 
 _UNSET = object()  # "argument not supplied" sentinel (so None can be a real value)
 _FLASH_SCALE = Vec4(BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, 1.0)
+_ACCENT_H = 0.015  # height of the garage-style top accent strip
 
 
 def _vec(color) -> Vec4:
+    if isinstance(color, str):
+        return rgba(color)
     return color if isinstance(color, Vec4) else Vec4(*color)
 
 
@@ -74,6 +78,12 @@ class Button:
             self.icon = OnscreenImage(parent=self.node, image=assets.image_path(icon),
                                       pos=(-w / 2 + 0.09, 0, 0), scale=0.058)
             self.icon.setTransparency(TransparencyAttrib.MAlpha)
+        self.accent = None
+        if self.style.get("accent"):  # garage style: a coloured strip across the top
+            self.accent = DirectFrame(parent=self.node, frameSize=(-w / 2, w / 2, h / 2 - _ACCENT_H, h / 2),
+                                      frameColor=_vec(self.style["accent"]), relief=DGG.FLAT,
+                                      frameTexture=assets.image_path("ui_box"))
+            self.accent.setTransparency(TransparencyAttrib.MAlpha)
         if not self._visible:
             self.node.stash()
 
@@ -192,6 +202,8 @@ class Button:
                 self.ring["frameSize"] = fs
             if self.icon is not None:
                 self.icon.setPos(-w / 2 + 0.09, 0, 0)
+            if self.accent is not None:
+                self.accent["frameSize"] = (-w / 2, w / 2, h / 2 - _ACCENT_H, h / 2)
         if command is not _UNSET:
             self.command = command
         if enabled is not None:
