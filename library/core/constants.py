@@ -129,11 +129,11 @@ MODS = [
 ]
 
 RIVALS = [
-    {"name": "Stock Civic", "whp": 158, "weight": 1280, "grip": 0.90, "purse": 120, "color": rgba("#9fb3c0"), "model": "stock_civic", "video_loss": ["loss/ed_dis.mp4"], "video_win": []},
-    {"name": "Civic Si", "whp": 218, "weight": 1300, "grip": 0.92, "purse": 230, "color": rgba("#e6e6e6"), "model": "civic_type_r", "video_loss": ["loss/ed_dis.mp4"], "video_win": []},
-    {"name": "WRX STI", "whp": 300, "weight": 1520, "grip": 1.18, "purse": 480, "color": rgba("#3a6ad6"), "model": "wrx_sti", "video_loss": ["loss/ed_dis.mp4"], "video_win": []},
-    {"name": "BMW M2", "whp": 385, "weight": 1560, "grip": 1.00, "purse": 850, "color": rgba("#222222"), "model": "bmw_m2", "video_loss": ["loss/ed_dis.mp4"], "video_win": []},
-    {"name": "Rival Shop Mk7", "whp": 365, "weight": 1370, "grip": 1.06, "purse": 1600, "color": rgba("#e7232b"), "model": "mk7_gti", "video_loss": ["loss/ed_dis.mp4"], "video_win": []},
+    {"name": "Stock Civic", "whp": 158, "weight": 1280, "grip": 0.90, "purse": 120, "color": rgba("#9fb3c0"), "model": "stock_civic", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "Civic Si", "whp": 218, "weight": 1300, "grip": 0.92, "purse": 230, "color": rgba("#e6e6e6"), "model": "civic_type_r", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "WRX STI", "whp": 300, "weight": 1520, "grip": 1.18, "purse": 480, "color": rgba("#3a6ad6"), "model": "wrx_sti", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "BMW M2", "whp": 385, "weight": 1560, "grip": 1.00, "purse": 850, "color": rgba("#222222"), "model": "bmw_m2", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
+    {"name": "Rival Shop Mk7", "whp": 365, "weight": 1370, "grip": 1.06, "purse": 1600, "color": rgba("#e7232b"), "model": "mk7_gti", "video_loss": ["loss/ed_dis_repaired.mp4"], "video_win": []},
 ]
 
 REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"), (340, "Wanted by the HOA")]

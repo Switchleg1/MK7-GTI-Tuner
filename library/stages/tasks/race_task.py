@@ -27,7 +27,7 @@ MARKER_PAST_Y = -4.0
 DASH_SPACING_M = 7.0            # one centerline dash every ~7 metres
 SCROLL_SCALE = 0.22             # scene units per metre of player travel
 RESULT_VIDEO_FALLBACK_SECONDS = 5.0
-RESULT_VIDEO_AUDIO_DELAY_SECONDS = 0.12
+RESULT_VIDEO_AUDIO_DELAY_SECONDS = 0.50
 
 
 class RaceTask(TaskBase):
@@ -441,25 +441,22 @@ class RaceTask(TaskBase):
             self.game.log(f"could not play race video {clip}", "warn")
             return False
         audio = self._load_result_video_audio(path, clip)
-        synchronized = self._sync_video_to_audio(tex, audio)
 
         self._clear_result_video(restore_controls=False)
         card = CardMaker("race-result-video")
         card.setFrameFullscreenQuad()
+        card.setUvRange(tex)
         node = self.app.render2d.attachNewNode(card.generate())
         node.setTexture(tex)
         node.setBin(OVERLAY_BIN, OVERLAY_SORT["toast"] - 1)
+        tex.play()
         audio_delay = RESULT_VIDEO_AUDIO_DELAY_SECONDS if audio is not None else 0.0
-        if not synchronized:
-            tex.play()
         self.result_video = {
             "node": node,
             "texture": tex,
             "audio": audio,
             "audio_delay": audio_delay,
             "audio_started": audio is None,
-            "synchronized": synchronized,
-            "texture_started": not synchronized,
             "life": self._result_video_duration(tex, audio) + audio_delay,
         }
         self._pause_music_for_video()
@@ -483,9 +480,6 @@ class RaceTask(TaskBase):
     def _start_result_video_audio(self):
         if self.result_video is None:
             return
-        if not self.result_video["texture_started"]:
-            self.result_video["texture"].play()
-            self.result_video["texture_started"] = True
         audio = self.result_video["audio"]
         if audio is not None:
             audio.play()
@@ -495,7 +489,7 @@ class RaceTask(TaskBase):
         if self.result_video is None:
             return
         texture = self.result_video["texture"]
-        if hasattr(texture, "stop"):
+        if texture is not None and hasattr(texture, "stop"):
             texture.stop()
         audio = self.result_video.get("audio")
         if audio is not None:
@@ -527,21 +521,6 @@ class RaceTask(TaskBase):
         audio.setLoop(False)
         audio.setVolume(1.0)
         return audio
-
-    def _sync_video_to_audio(self, texture, audio) -> bool:
-        if audio is None:
-            return False
-        for method_name in ("synchronizeTo", "synchronize_to"):
-            sync = getattr(texture, method_name, None)
-            if not callable(sync):
-                continue
-            try:
-                sync(audio)
-            except Exception as exc:  # noqa: BLE001
-                self.game.log(f"could not sync race video audio: {exc}", "warn")
-                return False
-            return True
-        return False
 
     def _pause_music_for_video(self):
         music = getattr(self.app, "music", None)
