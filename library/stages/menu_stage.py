@@ -8,6 +8,7 @@ from library.core.constants import (
     MENU_PANEL, MENU_VOL_RANGE, PANEL, PANEL_DARK, TEXT,
 )
 from library.stages.hud import Hud
+from library.core.ui.ui_object_controller import UIObjectController
 
 
 class MenuStage(Hud):
@@ -16,8 +17,10 @@ class MenuStage(Hud):
     and graphics (a placeholder for later) -- on a centred glass card. The app passes
     the actions in ``actions``; New Game runs the same cinematic the app boots into.
 
-    ``resumable`` is True when a career is in progress (opened as a pause menu, so
-    Resume + Save Game show); False on the title screen."""
+    All UI is managed objects on ``self.ui`` (a UIObjectController); each ``draw()``
+    clears and re-adds them for the current page. ``resumable`` is True when a career is
+    in progress (opened as a pause menu, so Resume + Save Game show); False on the title
+    screen."""
 
     music_key = MENU_MUSIC_KEY  # share the hub track so music is continuous
 
@@ -28,13 +31,18 @@ class MenuStage(Hud):
         self.actions = actions      # {"new","load","save","resume","quit"} -> callables
         self.config = app.options   # the player's options (Config); app.config is Panda's
         self.page = "root"
+        self.ui = UIObjectController(app, self.root.attachNewNode("menu-ui"))
 
     def enter(self):
         self.draw()
 
     def exit(self):
         self.config.save()  # persist any options tweaks on the way out
+        self.ui.destroy()
         self.destroy()
+
+    def render(self, dt):
+        self.ui.render(dt)  # menu buttons: visibility + click flash
 
     # -- pages -------------------------------------------------------------
     def go(self, page: str):
@@ -42,16 +50,16 @@ class MenuStage(Hud):
         self.draw()
 
     def draw(self):
-        self.clear()
+        self.ui.clear()
         left, right = self.bounds()
-        self.frame((left, right, -1.0, 1.0), color=PANEL_DARK, border=None)  # full backdrop
-        self.frame(MENU_PANEL, (0, 0, 0), PANEL)                              # centred card
+        self.ui.add_frame("backdrop", frame_size=(left, right, -1.0, 1.0), color=PANEL_DARK, border=None)
+        self.ui.add_frame("card", frame_size=MENU_PANEL, color=PANEL)  # centred card (default border)
         {"root": self._draw_root, "options": self._draw_options,
          "graphics": self._draw_graphics}[self.page]()
 
     def _draw_root(self):
-        self.image("logo", (0, 0, 0.50), (0.34, 1, 0.09))
-        self.label("CAREER", (0, 0, 0.37), 0.034, DIM, align=TextNode.ACenter)
+        self.ui.add_image("logo", "logo", (0, 0, 0.50), (0.34, 1, 0.09))
+        self.ui.add_text("career", "CAREER", (0, 0, 0.37), 0.034, DIM, align=TextNode.ACenter)
         handlers = {
             "resume": self.actions["resume"], "new": self.actions["new"],
             "load": self.actions["load"], "save": self.actions["save"],
@@ -62,10 +70,10 @@ class MenuStage(Hud):
         for key, text, _ in items:
             enabled = storage.has_save() if key == "load" else True
             color = GREEN_2 if key in ("resume", "new") else None
-            self.button(text, (0, 0, z), MENU_BTN, handlers[key], enabled, color, 0.05)
+            self.ui.add_button(f"item-{key}", text, (0, 0, z), MENU_BTN, handlers[key], enabled, color, 0.05)
             z -= MENU_BTN_GAP
         hint = "Esc resumes" if self.resumable else "Pick New Game to start the cinematic"
-        self.label(hint, (0, 0, z - 0.02), 0.028, DIM, align=TextNode.ACenter)
+        self.ui.add_text("hint", hint, (0, 0, z - 0.02), 0.028, DIM, align=TextNode.ACenter)
 
     def _visible(self, visibility: str) -> bool:
         if visibility == "pause":
@@ -75,35 +83,35 @@ class MenuStage(Hud):
         return True
 
     def _draw_options(self):
-        self.label("OPTIONS", (0, 0, 0.50), 0.06, BLUE, align=TextNode.ACenter)
-        self.label("SOUND", (-0.58, 0, 0.34), 0.03, DIM)
-        self.sl_music, self.lbl_music = self._volume_row("Music", self.config.music_volume, 0.20, self._on_music)
-        self.sl_fx, self.lbl_fx = self._volume_row("Effects", self.config.fx_volume, 0.02, self._on_fx)
-        self.button("Graphics", (0, 0, -0.24), (0.7, 0.11), lambda: self.go("graphics"), True, None, 0.046)
-        self.button("Back", (0, 0, -0.42), (0.7, 0.11), lambda: self.go("root"), True, GREEN_2, 0.046)
+        self.ui.add_text("opt-title", "OPTIONS", (0, 0, 0.50), 0.06, BLUE, align=TextNode.ACenter)
+        self.ui.add_text("sound-h", "SOUND", (-0.58, 0, 0.34), 0.03, DIM)
+        self.sl_music, self.lbl_music = self._volume_row("music", "Music", self.config.music_volume, 0.20, self._on_music)
+        self.sl_fx, self.lbl_fx = self._volume_row("fx", "Effects", self.config.fx_volume, 0.02, self._on_fx)
+        self.ui.add_button("graphics", "Graphics", (0, 0, -0.24), (0.7, 0.11), lambda: self.go("graphics"), True, None, 0.046)
+        self.ui.add_button("opt-back", "Back", (0, 0, -0.42), (0.7, 0.11), lambda: self.go("root"), True, GREEN_2, 0.046)
 
-    def _volume_row(self, name, value, z, command):
-        self.label(name, (-0.58, 0, z + 0.018), 0.04, TEXT)
-        node = self.slider((0.10, 0, z), MENU_VOL_RANGE, value, width=0.6)
-        node["command"] = command  # wired after creation so it doesn't fire on init
-        pct = self.label(f"{round(value * 100)}%", (0.58, 0, z + 0.018), 0.04, GREEN, align=TextNode.ARight)
-        return node, pct
+    def _volume_row(self, slot, name, value, z, command):
+        self.ui.add_text(f"{slot}-name", name, (-0.58, 0, z + 0.018), 0.04, TEXT)
+        slider = self.ui.add_slider(f"{slot}-slider", (0.10, 0, z), MENU_VOL_RANGE, value, 0.6)
+        slider.command_fn(command)  # wired after creation so it doesn't fire on init
+        pct = self.ui.add_text(f"{slot}-pct", f"{round(value * 100)}%", (0.58, 0, z + 0.018), 0.04, GREEN, align=TextNode.ARight)
+        return slider, pct
 
     def _draw_graphics(self):
-        self.label("GRAPHICS", (0, 0, 0.50), 0.06, BLUE, align=TextNode.ACenter)
-        self.label("Resolution, V-Sync and display options are coming soon.",
-                   (0, 0, 0.16), 0.036, DIM, align=TextNode.ACenter, wordwrap=22)
-        self.button("Back", (0, 0, -0.34), (0.7, 0.11), lambda: self.go("options"), True, GREEN_2, 0.046)
+        self.ui.add_text("gfx-title", "GRAPHICS", (0, 0, 0.50), 0.06, BLUE, align=TextNode.ACenter)
+        self.ui.add_text("gfx-soon", "Resolution, V-Sync and display options are coming soon.",
+                         (0, 0, 0.16), 0.036, DIM, align=TextNode.ACenter, wordwrap=22)
+        self.ui.add_button("gfx-back", "Back", (0, 0, -0.34), (0.7, 0.11), lambda: self.go("options"), True, GREEN_2, 0.046)
 
     # -- volume handlers (apply live + persist) ----------------------------
     def _on_music(self):
-        self.config.music_volume = round(self.sl_music["value"], 2)
+        self.config.music_volume = round(self.sl_music.value(), 2)
         self.app.music.set_volume(self.config.music_volume)
-        self.lbl_music["text"] = f"{round(self.config.music_volume * 100)}%"
+        self.lbl_music.text(f"{round(self.config.music_volume * 100)}%")
         self.config.save()
 
     def _on_fx(self):
-        self.config.fx_volume = round(self.sl_fx["value"], 2)
+        self.config.fx_volume = round(self.sl_fx.value(), 2)
         self.app.audio.set_fx_volume(self.config.fx_volume)
-        self.lbl_fx["text"] = f"{round(self.config.fx_volume * 100)}%"
+        self.lbl_fx.text(f"{round(self.config.fx_volume * 100)}%")
         self.config.save()

@@ -13,6 +13,7 @@ from library.core.utils import rgba
 from library.game.geometry import make_box
 from library.stages.hud import Hud
 from library.stages.picker import Picker
+from library.core.ui.ui_object_controller import UIObjectController
 
 
 class WizardTrialStage(Hud):
@@ -32,6 +33,7 @@ class WizardTrialStage(Hud):
         self.game = game
         self.on_done = on_done
         self.scene = app.render.attachNewNode("scene-wizard")
+        self.ui = UIObjectController(app, self.root.attachNewNode("wizard-ui"))
         self.phase = 1
         self.msg = ""
         self.rig_done = 0
@@ -59,6 +61,7 @@ class WizardTrialStage(Hud):
 
     def exit(self):
         self._clear_board()
+        self.ui.destroy()
         self.scene.removeNode()
         self.destroy()
 
@@ -67,58 +70,58 @@ class WizardTrialStage(Hud):
             self.t += dt
             x0, x1, _, _ = self.track
             frac = 0.5 + 0.5 * math.sin(self.t * 2.3)
-            self.marker.setX(x0 + frac * (x1 - x0))
+            self.marker.node.setX(x0 + frac * (x1 - x0))
         elif self.phase == 2 and self.board_root is not None:
             self._animate_pin(dt)
             self._decay_flash(dt)
+        self.ui.render(dt)  # 2D objects: visibility + the Abort/DROP/Continue click flash
 
     # -- header / draw router ---------------------------------------------
     def _header(self, backdrop=True):
         left, right = self.bounds()
         if backdrop:
-            self.frame((-2.0, 2.0, -1.0, 1.0), (0, 0, 0), PANEL_DARK, border=None)  # 2D modal backdrop
-        self.frame((left, right, 0.74, 0.94), (0, 0, 0.84), PANEL, border=None)
-        av = self.image("avatar", (left + 0.12, 0, 0.84), 0.06)
-        av.setColorScale(VIOLET)
-        self.label("THE BENCH WIZARD", (left + 0.22, 0, 0.85), 0.046, VIOLET)
-        self.label("Pass the Trial. Three parts. No hints. No mercy.", (left + 0.22, 0, 0.79), 0.026, DIM)
-        self.button("Abort", (right - 0.12, 0, 0.84), (0.16, 0.09), self.on_done, True, PANEL, 0.034)
+            self.ui.add_frame("backdrop", frame_size=(-2.0, 2.0, -1.0, 1.0), color=PANEL_DARK, border=None)  # 2D modal backdrop
+        self.ui.add_frame("hdr-bg", frame_size=(left, right, 0.74, 0.94), pos=(0, 0, 0.84), color=PANEL, border=None)
+        self.ui.add_image("hdr-av", "avatar", (left + 0.12, 0, 0.84), 0.06, color_scale=VIOLET)
+        self.ui.add_text("hdr-title", "THE BENCH WIZARD", (left + 0.22, 0, 0.85), 0.046, VIOLET)
+        self.ui.add_text("hdr-sub", "Pass the Trial. Three parts. No hints. No mercy.", (left + 0.22, 0, 0.79), 0.026, DIM)
+        self.ui.add_button("abort", "Abort", (right - 0.12, 0, 0.84), (0.16, 0.09), self.on_done, True, PANEL, 0.034)
 
     def draw(self):
-        self.clear()
+        self.ui.clear()
         self.marker = None
         if self.phase == 2:
             if self.board_root is None:
                 self._build_board()
             self._header(backdrop=False)  # keep the 3D board visible
-            self.label("PART 2 / 3", (0, 0, 0.66), 0.04, BLUE, align=TextNode.ACenter)
-            self.label("PROBE THE BOARD - drop the pogo pin on the live pads: V+, DATA, CLK, GND.  Avoid the rest.",
-                       (0, 0, 0.585), 0.027, TEXT, align=TextNode.ACenter, wordwrap=46)
-            self.label(f"live pads probed: {len(self.pad_hits)}/{len(PADS_LIVE)}", (0, 0, -0.86), 0.030, DIM, align=TextNode.ACenter)
+            self.ui.add_text("part", "PART 2 / 3", (0, 0, 0.66), 0.04, BLUE, align=TextNode.ACenter)
+            self.ui.add_text("p2-instr", "PROBE THE BOARD - drop the pogo pin on the live pads: V+, DATA, CLK, GND.  Avoid the rest.",
+                             (0, 0, 0.585), 0.027, TEXT, align=TextNode.ACenter, wordwrap=46)
+            self.ui.add_text("p2-progress", f"live pads probed: {len(self.pad_hits)}/{len(PADS_LIVE)}", (0, 0, -0.86), 0.030, DIM, align=TextNode.ACenter)
             if self.msg:
-                self.label(self.msg, (0, 0, -0.92), 0.028, RED, align=TextNode.ACenter)
+                self.ui.add_text("p2-msg", self.msg, (0, 0, -0.92), 0.028, RED, align=TextNode.ACenter)
             return
         if self.board_root is not None:
             self._clear_board()
         self._header(backdrop=True)
-        self.label(f"PART {self.phase} / 3" if self.phase in (1, 3) else "", (0, 0, 0.66), 0.04, BLUE, align=TextNode.ACenter)
+        self.ui.add_text("part", f"PART {self.phase} / 3" if self.phase in (1, 3) else "", (0, 0, 0.66), 0.04, BLUE, align=TextNode.ACenter)
         if self.msg:
-            self.label(self.msg, (0, 0, 0.58), 0.032, RED, align=TextNode.ACenter)
+            self.ui.add_text("msg", self.msg, (0, 0, 0.58), 0.032, RED, align=TextNode.ACenter)
         {1: self._draw_rig, 3: self._draw_sync, "win": self._draw_win}[self.phase]()
 
     # -- part 1: power the rig (2D) ---------------------------------------
     def _draw_rig(self):
-        self.label("POWER THE RIG", (0, 0, 0.46), 0.05, GREEN, align=TextNode.ACenter)
-        self.label("Bring the lines up in order:  POWER -> GROUND -> DATA -> CLOCK -> ENABLE",
-                   (0, 0, 0.38), 0.030, TEXT, align=TextNode.ACenter)
+        self.ui.add_text("rig-title", "POWER THE RIG", (0, 0, 0.46), 0.05, GREEN, align=TextNode.ACenter)
+        self.ui.add_text("rig-instr", "Bring the lines up in order:  POWER -> GROUND -> DATA -> CLOCK -> ENABLE",
+                         (0, 0, 0.38), 0.030, TEXT, align=TextNode.ACenter)
         done = set(RIG_ORDER[:self.rig_done])
         for i, label in enumerate(self.rig_slots):
             x = -0.84 + i * 0.42
             on = label in done
-            self.button(label + (" *" if on else ""), (x, 0, 0.10), (0.38, 0.16),
-                        None if on else (lambda l=label: self._rig(l)), not on,
-                        GREEN_2 if on else BLUE, 0.046)
-        self.label(f"lines up: {self.rig_done}/{len(RIG_ORDER)}", (0, 0, -0.18), 0.030, DIM, align=TextNode.ACenter)
+            self.ui.add_button(f"rig-{i}", label + (" *" if on else ""), (x, 0, 0.10), (0.38, 0.16),
+                               None if on else (lambda l=label: self._rig(l)), not on,
+                               GREEN_2 if on else BLUE, 0.046)
+        self.ui.add_text("rig-count", f"lines up: {self.rig_done}/{len(RIG_ORDER)}", (0, 0, -0.18), 0.030, DIM, align=TextNode.ACenter)
 
     def _rig(self, label):
         if label == RIG_ORDER[self.rig_done]:
@@ -245,20 +248,20 @@ class WizardTrialStage(Hud):
 
     # -- part 3: sync window (2D) -----------------------------------------
     def _draw_sync(self):
-        self.label("SYNC WINDOW", (0, 0, 0.46), 0.05, GREEN, align=TextNode.ACenter)
-        self.label("Hit DROP while the marker is in the green band.", (0, 0, 0.38), 0.030, TEXT, align=TextNode.ACenter)
+        self.ui.add_text("sync-title", "SYNC WINDOW", (0, 0, 0.46), 0.05, GREEN, align=TextNode.ACenter)
+        self.ui.add_text("sync-instr", "Hit DROP while the marker is in the green band.", (0, 0, 0.38), 0.030, TEXT, align=TextNode.ACenter)
         x0, x1, win_lo, win_hi = -0.7, 0.7, -0.10, 0.10
         self.track = (x0, x1, win_lo, win_hi)
-        self.frame((x0, x1, 0.02, 0.12), (0, 0, 0), PANEL, border=LINE)
-        self.frame((win_lo, win_hi, 0.02, 0.12), (0, 0, 0), GREEN_2, border=None)
-        self.marker = self.frame((-0.012, 0.012, -0.01, 0.15), (0, 0, 0), WHITE, border=None)
-        self.button("DROP", (0, 0, -0.18), (0.5, 0.16), self._drop, True, BLUE, 0.05)
+        self.ui.add_frame("sync-track", frame_size=(x0, x1, 0.02, 0.12), color=PANEL, border=LINE)
+        self.ui.add_frame("sync-band", frame_size=(win_lo, win_hi, 0.02, 0.12), color=GREEN_2, border=None)
+        self.marker = self.ui.add_frame("sync-marker", frame_size=(-0.012, 0.012, -0.01, 0.15), color=WHITE, border=None)
+        self.ui.add_button("drop", "DROP", (0, 0, -0.18), (0.5, 0.16), self._drop, True, BLUE, 0.05)
 
     def _drop(self):
         if self.marker is None:
             return
         _, _, lo, hi = self.track
-        if lo <= self.marker.getX() <= hi:
+        if lo <= self.marker.node.getX() <= hi:
             self.phase = "win"
             self.game.grant_god()
             self.draw()
@@ -268,8 +271,8 @@ class WizardTrialStage(Hud):
 
     # -- win ---------------------------------------------------------------
     def _draw_win(self):
-        self.label("TRIAL PASSED", (0, 0, 0.44), 0.075, GREEN, align=TextNode.ACenter)
-        self.label("The Wizard nods. You have achieved GOD STATUS.", (0, 0, 0.31), 0.040, VIOLET, align=TextNode.ACenter)
-        self.label(f"+${GOD_PAYOUT:,} dropped into your account.", (0, 0, 0.21), 0.040, GREEN, align=TextNode.ACenter)
-        self.label("Nobody can tell you anything now.", (0, 0, 0.13), 0.030, DIM, align=TextNode.ACenter)
-        self.button("Continue", (0, 0, -0.10), (0.5, 0.14), self.on_done, True, GREEN_2, 0.05)
+        self.ui.add_text("win-title", "TRIAL PASSED", (0, 0, 0.44), 0.075, GREEN, align=TextNode.ACenter)
+        self.ui.add_text("win-1", "The Wizard nods. You have achieved GOD STATUS.", (0, 0, 0.31), 0.040, VIOLET, align=TextNode.ACenter)
+        self.ui.add_text("win-2", f"+${GOD_PAYOUT:,} dropped into your account.", (0, 0, 0.21), 0.040, GREEN, align=TextNode.ACenter)
+        self.ui.add_text("win-3", "Nobody can tell you anything now.", (0, 0, 0.13), 0.030, DIM, align=TextNode.ACenter)
+        self.ui.add_button("continue", "Continue", (0, 0, -0.10), (0.5, 0.14), self.on_done, True, GREEN_2, 0.05)

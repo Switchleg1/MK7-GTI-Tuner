@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from panda3d.core import TextNode
-
 from library.core.constants import DIM, LINE, PANEL_DARK, ROAST, TIP, VIOLET
 from library.game.simos import build_context, select_insight
 from library.stages.hud import Hud
+from library.core.ui.ui_object_controller import UIObjectController
 
 
 class SimonPanel(Hud):
-    """The reusable Ask-Simon widget: a pill button plus a roast/tip popup.
+    """The reusable Ask-Simon widget: a roast/tip popup (the trigger is a game-level
+    chrome button that calls ``ask()``).
 
     Owns its own node tree so it sits above a screen's UI and toggles open/closed
-    without that screen redrawing. ``tab`` feeds Simon's context rules."""
+    without that screen redrawing. All UI is managed objects on ``self.ui``, rebuilt on
+    each ``draw()``. ``tab`` feeds Simon's context rules."""
 
     def __init__(self, app, game, tab: str = ""):
         super().__init__(app, "simon-panel")
@@ -20,6 +21,7 @@ class SimonPanel(Hud):
         self.open = False
         self.current = None
         self.show = True
+        self.ui = UIObjectController(app, self.root.attachNewNode("simon-ui"))
         self.draw()
 
     def ask(self):
@@ -39,10 +41,11 @@ class SimonPanel(Hud):
         self.current = None
         self.draw()
 
+    def render(self, dt):
+        self.ui.render(dt)  # popup objects: visibility + the X button's click flash
+
     def draw(self):
-        # Only the roast/tip popup lives here now; the "Ask Simon" trigger is a
-        # game-level chrome button (game.buttons) that calls self.ask().
-        self.clear()
+        self.ui.clear()
         if not self.open or not self.current:
             return
         right = self.bounds()[1]
@@ -51,12 +54,12 @@ class SimonPanel(Hud):
         left = cx - pw / 2 + 0.10
         right_in = cx + pw / 2 - 0.10
         top, bottom = cz + ph / 2, cz - ph / 2
-        self.image("simon_panel", (cx, 0, cz), (pw / 2, 1, ph / 2))
-        self.image("simon", (left + 0.09, 0, top - 0.13), 0.085)
-        self.label("SIMON", (left + 0.22, 0, top - 0.10), 0.060, VIOLET)
-        self.label("master tuner . zero chill", (left + 0.22, 0, top - 0.18), 0.030, DIM)
-        self.button("X", (right_in, 0, top - 0.10), (0.10, 0.10), self.close, True, PANEL_DARK, 0.05)
-        self.label(self.current["roast"], (left, 0, cz + 0.12), 0.043, ROAST, wordwrap=23)
-        self.frame((left, right_in, cz - 0.14, cz - 0.135), (0, 0, 0), LINE, None)
-        self.image("tip_bulb", (left + 0.04, 0, bottom + 0.21), 0.038)
-        self.label(self.current["tip"], (left + 0.12, 0, bottom + 0.23), 0.036, TIP, wordwrap=25)
+        self.ui.add_image("panel", "simon_panel", (cx, 0, cz), (pw / 2, 1, ph / 2))
+        self.ui.add_image("avatar", "simon", (left + 0.09, 0, top - 0.13), 0.085)
+        self.ui.add_text("name", "SIMON", (left + 0.22, 0, top - 0.10), 0.060, VIOLET)
+        self.ui.add_text("subtitle", "master tuner . zero chill", (left + 0.22, 0, top - 0.18), 0.030, DIM)
+        self.ui.add_button("close", "X", (right_in, 0, top - 0.10), (0.10, 0.10), self.close, True, PANEL_DARK, 0.05)
+        self.ui.add_text("roast", self.current["roast"], (left, 0, cz + 0.12), 0.043, ROAST, wordwrap=23)
+        self.ui.add_frame("divider", frame_size=(left, right_in, cz - 0.14, cz - 0.135), color=LINE, border=None)
+        self.ui.add_image("bulb", "tip_bulb", (left + 0.04, 0, bottom + 0.21), 0.038)
+        self.ui.add_text("tip", self.current["tip"], (left + 0.12, 0, bottom + 0.23), 0.036, TIP, wordwrap=25)

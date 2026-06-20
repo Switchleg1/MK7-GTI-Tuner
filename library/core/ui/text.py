@@ -4,7 +4,7 @@ from direct.gui.DirectGui import DirectLabel
 from panda3d.core import TextNode
 
 from library.core.constants import TEXT
-from library.stages.base_object import _UNSET, BaseObject
+from library.core.ui.base_object import _UNSET, BaseObject
 
 
 class Text(BaseObject):

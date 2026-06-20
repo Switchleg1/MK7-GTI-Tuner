@@ -5,7 +5,7 @@ from panda3d.core import ClockObject, TextNode
 import library.core.assets as assets
 from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT, VIOLET
 from library.stages.hud import Hud
-from library.stages.ui_object_controller import UIObjectController
+from library.core.ui.ui_object_controller import UIObjectController
 
 
 class GarageStage(Hud):

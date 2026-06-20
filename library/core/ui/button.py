@@ -11,7 +11,7 @@ from library.core.constants import (
     BUTTON_FLASH_SCALE, BUTTON_STYLES, GREEN_2, LINE, WHITE,
 )
 from library.core.utils import rgba
-from library.stages.base_object import _UNSET, BaseObject
+from library.core.ui.base_object import _UNSET, BaseObject
 
 _FLASH_SCALE = Vec4(BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, 1.0)
 _ACCENT_H = 0.015  # height of the garage-style top accent strip

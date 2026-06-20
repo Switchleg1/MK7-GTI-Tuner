@@ -22,7 +22,7 @@ from library.stages.garage_stage import GarageStage
 from library.stages.menu_stage import MenuStage
 from library.stages.notifications import Notifications
 from library.stages.simon_panel import SimonPanel
-from library.stages.ui_object_controller import UIObjectController
+from library.core.ui.ui_object_controller import UIObjectController
 from library.stages.tasks.bench_task import BenchTask
 from library.stages.tasks.dyno_task import DynoTask
 from library.stages.tasks.maps_task import MapsTask

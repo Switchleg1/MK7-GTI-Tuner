@@ -10,7 +10,7 @@ from library.core.assets import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS, WHEEL_PREFIX, WHEEL_STATIC
 from library.game.geometry import make_box
 from library.stages.hud import Hud
-from library.stages.ui_object_controller import UIObjectController
+from library.core.ui.ui_object_controller import UIObjectController
 
 
 class TaskBase(Hud):

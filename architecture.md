@@ -98,9 +98,10 @@ library/
   game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
              discord.py discord_user.py discord_admin.py discord_green_name.py
              discord_normal_user.py geometry.py tuning.py simos.py
-  stages/    hud.py task_base.py base_object.py text.py button.py ui_object_controller.py garage_stage.py menu_stage.py
-             simon_panel.py discord_panel.py toast.py notifications.py unlock_stage.py
-             phone_screen.py character.py picker.py progress_bar.py
+  stages/    hud.py task_base.py garage_stage.py menu_stage.py simon_panel.py discord_panel.py
+             wizard_trial_stage.py unlock_stage.py toast.py notifications.py phone_screen.py
+             character.py picker.py progress_bar.py
+             base_object.py text.py button.py frame.py image.py slider.py entry.py ui_object_controller.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
 data/        models/*.glb  images/*.png  audio/*.wav
@@ -152,8 +153,9 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `base_object.py` — `BaseObject`: base for a managed UI object — wraps one DirectGui
   NodePath with shared **`is_visible`** / **`enabled`** / `pos()` getter/setters.
   `render(dt)` enforces visibility by stash/unstash (a hidden object is off-screen AND
-  unclickable). Built once, tweaked over its life, never destroyed by a redraw. `Text`
-  and `Button` derive from it.
+  unclickable). Built once, tweaked over its life, never destroyed by a redraw. **Every
+  `Hud` primitive has a `BaseObject`-derived equivalent:** `Text`, `Button`, `Frame`,
+  `Image`, `Slider`, `Entry`.
 - `text.py` — `Text(BaseObject)`: a managed `DirectLabel`. `text()` / `color()` /
   `is_visible()` / `enabled()` change it in place (instead of destroy+recreate each
   redraw). `enabled(False)` dims to an optional `disabled_color`.
@@ -165,12 +167,26 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   task cards). Flash holds `BUTTON_CLICK_HOLD`s then reverts. Extra setters: `text()` /
   `color()` / `command_fn()` (visibility/enabled/pos come from `BaseObject`). (Task
   buttons = `box`; game-level Ask/Back chrome = `pill`; hub task cards = `garage`.)
-- `ui_object_controller.py` — `UIObjectController`: owns a set of managed UI objects (Text
-  + Button) for one task or screen. Objects are **built once** — `add_text(key, …)` /
-  `add_button(key, …)` at task start — and then changed in place (`get(key).text(…)` /
-  `.is_visible(…)` / …), never destroyed/recreated each redraw. `render(dt)` ticks every
-  object (visibility + any flash); `lift()` keeps them drawn above the frames a redraw
-  just rebuilt; `destroy()` frees them when the task ends.
+- `frame.py` — `Frame(BaseObject)`: a managed rectangle — by default a translucent rounded
+  `ui_box` tinted by `color` with an optional `ui_ring` border child (the glass look);
+  `texture=None` gives a plain flat frame and `state=DGG.NORMAL` makes it catch clicks (the
+  Discord modal shade). Setters: `color()` / `frame_size()`.
+- `image.py` — `Image(BaseObject)`: a managed `OnscreenImage` keyed by an asset name.
+  Setters: `color_scale()` / `scale()` (used for the Discord avatars, Simon art, logos).
+- `slider.py` — `Slider(BaseObject)`: a managed `DirectSlider` (round `knob` thumb on a
+  rounded track). `value()` reads/sets the value; `command_fn()` wires the callback after
+  build so it doesn't fire on init (the options-menu volume sliders).
+- `entry.py` — `Entry(BaseObject)`: a managed single-line `DirectEntry`; `command` fires
+  with the typed text on Enter. `text()` reads/clears, `focus()` re-grabs the caret (the
+  Discord help-request box).
+- `ui_object_controller.py` — `UIObjectController`: owns a set of managed UI objects — every
+  `Hud` primitive has an `add_*` here: `add_text` / `add_button` / `add_frame` / `add_image`
+  / `add_slider` / `add_entry`. Objects are changed in place (`get(key).text(…)` /
+  `.is_visible(…)` / …). **Persistent screens** (tasks) build them once on enter and only
+  tweak them; **event-driven screens** (the panels, the hub) instead `clear()` and re-add on
+  each `draw()` (they redraw only on a user action, never on a per-frame timer, so a rebuild
+  can't drop a click). `render(dt)` ticks every object (visibility + any flash); `lift()`
+  keeps them drawn above the frames a redraw just rebuilt; `destroy()` frees them.
 - `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node and a
   `UIObjectController` (`self.ui`); `enter()` sets the camera, builds the scene, **builds
   the UI objects once (`build_objects()`)**, draws, and binds keys; the app's render loop
@@ -204,20 +220,28 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   turntable, header, a **MENU** button (`on_menu`), and a row of task cards from `MODES`.
   Its buttons go through its own `UIObjectController` (`self.ui`): the task cards use
   the **garage** style (green accent), MENU + the wizard DM use `box`. `on_pick(key)`.
+  All four of these screens express their UI as **managed objects on `self.ui`** (a
+  `UIObjectController`), rebuilt on each `draw()` (event-driven, not per-frame) — they use
+  no raw `Hud` primitives. Each overrides `render(dt)` to tick its controller (visibility +
+  the button click-flash).
 - `menu_stage.py` — `MenuStage(Hud)`: the title + pause menu. One stage walking three
   pages (root / options / graphics) on a centred glass card. Root rows come from
   `MENU_ITEMS` filtered by `resumable` (Resume/Save only mid-career; Load auto-disabled
   with no save). The app passes the actions (`new`/`load`/`save`/`resume`/`quit`); the
-  options page hosts the music + FX volume sliders (apply live + persist to `options.cfg`).
+  options page hosts the music + FX volume `Slider`s (apply live + persist to `options.cfg`).
 - `simon_panel.py` — `SimonPanel(Hud)`: the Ask-Simon roast/tip popup (own node tree,
   toggles independently of the host screen), fed by `simos`. The trigger is the
   game-level `ask_simon` button (`game.ui`), which calls `SimonPanel.ask()`.
 - `discord_panel.py` — `DiscordPanel(Hud)`: the **Ask-Discord chat window** (server rail,
-  channel list, `#ecu-tuning` message area with a `DirectEntry`, online/offline member
-  list). Opened by the game-level `ask_discord` button (`game.ui.get("ask_discord")` →
-  `DiscordPanel.ask()`).
+  channel list, `#ecu-tuning` message area with a managed `Entry`, online/offline member
+  list, and a click-eating modal `Frame` shade). Opened by the game-level `ask_discord`
+  button (`game.ui.get("ask_discord")` → `DiscordPanel.ask()`).
   Typing + Enter calls `game.ask_discord(text)` and appends the replies + the result
   line. Own node tree; companion to `SimonPanel`.
+- `wizard_trial_stage.py` — `WizardTrialStage(Hud)`: the Bench Wizard's three-part Trial
+  (power the rig → probe a 3D pogo board → hit the sync window) → `Game.grant_god()`. Its 2D
+  overlay is managed objects on `self.ui` (the animated sync marker is a persistent `Frame`
+  moved in `render`); the 3D board lives under its own `scene` node.
 - `notifications.py` — `Notifications`: a session-long top-screen overlay (achievement
   toasts + Dyno Dave bubbles) drained from `game.toast_queue` / `game.dave_queue`.
   `render(dt)` is called by the app loop (no task of its own).
