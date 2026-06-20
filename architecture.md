@@ -334,10 +334,14 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
 
 The **DynoTask** (`library/stages/tasks/dyno_task.py`) is SimosTools-style: a pull
 sweeps the car's idle→redline (`tick`), sampling the car's real `build_whp()` curve to
-drive gauge **tiles** (scale, big value, `min:max`, unit, green fill + red danger band,
-from `constants.DYNO_GAUGES`) and a live power-vs-RPM `LineSegs` graph (drawn on the UI
-layer so it sits above the panel), then records the built peak + `grade_for_result` on the
-`Car`.
+drive compact gauge **tiles** on the left (scale, big value, `min:max`, unit, green fill +
+red danger band, from `constants.DYNO_GAUGES`) and a large **power + torque graph** on the
+right. The graph (`_draw_graph`/`_trace`, `LineSegs` on the UI layer so it draws above the
+panel) plots **whp (cyan) and torque (amber)** for the current build, plus the car's
+**stock `base_curve` faint** behind them as a reference, with rpm tick labels on the X axis
+and peak whp/lb-ft readouts; the current curve animates up to the live rpm during a pull,
+shows full at rest. Records the built peak + `grade_for_result` on the `Car`. (NB:
+`LineSegs.getNumVertices()` is unreliable — use `isEmpty()` to test for geometry.)
 
 The **RaceTask** (`library/stages/tasks/race_task.py`) accelerates both cars off their
 `Car` curves through their own gearing: `_engine_rpm` derives rpm from speed + the current

@@ -254,7 +254,8 @@ DYNO_GAUGES = [
 DYNO_ZONE_GREEN = rgba("#0e5a31")   # in-spec band
 DYNO_ZONE_RED = rgba("#5e1410")     # danger band
 DYNO_TILE = rgba("#0a0f13", 1.0)
-DYNO_TRACE = rgba("#4fe0ff")        # power trace (cyan)
+DYNO_TRACE = rgba("#4fe0ff")        # power (whp) trace (cyan)
+DYNO_TRACE_TQ = rgba("#ffb454")     # torque (lb-ft) trace (amber)
 DYNO_GRID = rgba("#1c2630")
 
 # --------------------------------------------------------------------------
