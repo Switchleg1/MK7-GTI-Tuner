@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from direct.gui import DirectGuiGlobals as DGG
 from direct.gui.DirectGui import DirectButton, DirectFrame
+from direct.gui.OnscreenImage import OnscreenImage
 from panda3d.core import TextNode, TransparencyAttrib, Vec4
 
 from library.core import assets
 from library.core.constants import (
     BTN_DISABLED_FILL, BTN_DISABLED_TEXT, BTN_LINE, BUTTON_CLICK_BRIGHTEN, BUTTON_CLICK_HOLD,
-    GREEN_2, LINE, WHITE,
+    BUTTON_FLASH_SCALE, BUTTON_STYLES, GREEN_2, LINE, WHITE,
 )
 
 _UNSET = object()  # "argument not supplied" sentinel (so None can be a real value)
+_FLASH_SCALE = Vec4(BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, 1.0)
 
 
 def _vec(color) -> Vec4:
@@ -22,22 +24,25 @@ def _brighten(color: Vec4, factor: float = BUTTON_CLICK_BRIGHTEN) -> Vec4:
 
 
 class Button:
-    """One managed task button: a translucent rounded DirectButton (ui_box fill +
-    ui_ring border, the project's glass style) that flashes a "clicked" colour for a
-    short hold when pressed, then reverts.
+    """One managed button in two visual styles (``style=``):
 
-    Built once (by a ButtonController, on task create) and then tweaked over the task's
-    life via the getter/setter methods -- ``text()``, ``color()``, ``enabled()``,
-    ``is_visible()``, ``command()`` (each returns the current value when called with no
-    argument, sets it when given one). ``is_visible`` defaults True; a button set
-    not-visible is hidden on ``render`` (and can't be clicked). ``render(dt)`` enforces
-    visibility and advances the click flash. Never destroyed by a redraw, so a click
-    can't be dropped by the UI rebuilding mid-press."""
+    - **box** (default): a translucent rounded glass box (ui_box fill tinted by the
+      colour + ui_ring border, white text). Clicking flashes the *clicked colour*.
+    - **pill**: a textured pill (simon_button) with the colour as the *text* tint and an
+      optional left ``icon``. Clicking flashes by brightening the whole pill.
+
+    Built once (by a ButtonController) and then tweaked via getter/setter methods --
+    ``text()`` / ``color()`` / ``enabled()`` / ``is_visible()`` / ``command_fn()`` (no
+    arg = read, one arg = set). ``is_visible`` defaults True; a not-visible button is
+    stashed on ``render`` (off-screen and unclickable). ``render(dt)`` enforces
+    visibility and advances the click flash. Never destroyed by a redraw."""
 
     def __init__(self, parent, font, *, text, pos, size, command, enabled=True, is_visible=True,
-                 normal_color=None, clicked_color=None, click_hold=None, text_scale=0.044):
+                 normal_color=None, clicked_color=None, click_hold=None, text_scale=0.044,
+                 style="box", icon=None):
         self.font = font
         self.command = command
+        self.style = BUTTON_STYLES.get(style, BUTTON_STYLES["box"])
         self._enabled = enabled
         self._visible = is_visible
         self.click_hold = BUTTON_CLICK_HOLD if click_hold is None else click_hold
@@ -49,38 +54,61 @@ class Button:
 
         w, h = size
         fs = (-w / 2, w / 2, -h / 2, h / 2)
+        # Only nudge the text for pills / icons; box buttons keep DirectButton's default.
+        extra = {}
+        if icon or self.style["text_dy"]:
+            extra["text_pos"] = (0.06 if icon else 0.0, self.style["text_dy"])
         self.node = DirectButton(
             parent=parent, text=text, command=self._clicked, pos=pos, scale=1, text_scale=text_scale,
-            text_fg=self._text_color(), text_align=TextNode.ACenter, text_font=font, frameSize=fs,
-            frameColor=self._fill(), relief=DGG.FLAT, frameTexture=assets.image_path("ui_box"), pressEffect=0)
+            text_fg=self._text_color(), text_align=TextNode.ACenter, text_font=font,
+            frameSize=fs, frameColor=self._fill(), relief=DGG.FLAT,
+            frameTexture=assets.image_path(self.style["texture"]), pressEffect=0, **extra)
         self.node.setTransparency(TransparencyAttrib.MAlpha)
-        self.ring = DirectFrame(parent=self.node, frameSize=fs, frameColor=self._ring_color(),
-                                relief=DGG.FLAT, frameTexture=assets.image_path("ui_ring"))
-        self.ring.setTransparency(TransparencyAttrib.MAlpha)
+        self.ring = None
+        if self.style["ring"]:
+            self.ring = DirectFrame(parent=self.node, frameSize=fs, frameColor=self._ring_color(),
+                                    relief=DGG.FLAT, frameTexture=assets.image_path(self.style["ring"]))
+            self.ring.setTransparency(TransparencyAttrib.MAlpha)
+        self.icon = None
+        if icon:
+            self.icon = OnscreenImage(parent=self.node, image=assets.image_path(icon),
+                                      pos=(-w / 2 + 0.09, 0, 0), scale=0.058)
+            self.icon.setTransparency(TransparencyAttrib.MAlpha)
         if not self._visible:
             self.node.stash()
 
-    # -- derived colours ---------------------------------------------------
+    # -- derived colours (style-aware) -------------------------------------
     def _fill(self) -> Vec4:
-        return _vec(BTN_DISABLED_FILL) if not self._enabled else self.normal_color
+        if self.style["tint"] == "fill":  # box: the colour IS the fill
+            return _vec(BTN_DISABLED_FILL) if not self._enabled else self.normal_color
+        return _vec(WHITE)                # pill: the texture supplies the look
 
     def _text_color(self):
+        if self.style["tint"] == "text":  # pill: the colour tints the text
+            return self.normal_color if self._enabled else BTN_DISABLED_TEXT
         return WHITE if self._enabled else BTN_DISABLED_TEXT
 
     def _ring_color(self):
         return BTN_LINE if self._enabled else LINE
 
-    def _refresh_fill(self):
-        if self._flash <= 0.0:  # don't stomp an in-progress click flash
+    def _refresh(self):
+        """Re-apply text/ring (always) and fill (unless a fill-flash is in progress)."""
+        self.node["text_fg"] = self._text_color()
+        if self.ring is not None:
+            self.ring["frameColor"] = self._ring_color()
+        if not (self.style["flash"] == "fill" and self._flash > 0.0):
             self.node["frameColor"] = self._fill()
 
     # -- interaction -------------------------------------------------------
     def _clicked(self):
-        """DirectButton command: flash the clicked colour, then run the user command."""
+        """DirectButton command: flash, then run the user command."""
         if not self._enabled or not self._visible:
             return
         self._flash = self.click_hold
-        self.node["frameColor"] = self.clicked_color
+        if self.style["flash"] == "fill":
+            self.node["frameColor"] = self.clicked_color
+        else:  # scale: brighten the whole (textured) pill
+            self.node.setColorScale(_FLASH_SCALE)
         if self.command:
             self.command()
 
@@ -91,13 +119,16 @@ class Button:
             self.node.unstash()
         elif not self._visible and not stashed:
             self.node.stash()
-        # Click flash: revert to the normal/disabled fill once the hold elapses.
+        # Click flash: revert once the hold elapses.
         if self._flash > 0.0:
             self._flash -= dt
             if self._flash <= 0.0:
-                self.node["frameColor"] = self._fill()
+                if self.style["flash"] == "fill":
+                    self.node["frameColor"] = self._fill()
+                else:
+                    self.node.clearColorScale()
 
-    # -- getter / setter properties (set at any time after build) ----------
+    # -- getter / setter properties (set any time after build) -------------
     def text(self, value=_UNSET):
         if value is _UNSET:
             return self.node["text"]
@@ -109,7 +140,7 @@ class Button:
         self.normal_color = _vec(value)
         if self._auto_clicked:
             self.clicked_color = _brighten(self.normal_color)
-        self._refresh_fill()
+        self._refresh()
 
     def clicked_colour(self, value=_UNSET):
         if value is _UNSET:
@@ -121,9 +152,7 @@ class Button:
         if value is _UNSET:
             return self._enabled
         self._enabled = value
-        self.node["text_fg"] = self._text_color()
-        self.ring["frameColor"] = self._ring_color()
-        self._refresh_fill()
+        self._refresh()
 
     def is_visible(self, value=_UNSET):
         if value is _UNSET:
@@ -157,20 +186,27 @@ class Button:
         if size is not None and tuple(size) != tuple(self.size):
             self.size = size
             w, h = size
-            self.node["frameSize"] = self.ring["frameSize"] = (-w / 2, w / 2, -h / 2, h / 2)
+            fs = (-w / 2, w / 2, -h / 2, h / 2)
+            self.node["frameSize"] = fs
+            if self.ring is not None:
+                self.ring["frameSize"] = fs
+            if self.icon is not None:
+                self.icon.setPos(-w / 2 + 0.09, 0, 0)
         if command is not _UNSET:
             self.command = command
         if enabled is not None:
-            self.enabled(enabled)
+            self._enabled = enabled
         if is_visible is not None:
             self._visible = is_visible
         if normal_color is not _UNSET and normal_color is not None:
-            self.color(normal_color)
+            self.normal_color = _vec(normal_color)
+            if self._auto_clicked:
+                self.clicked_color = _brighten(self.normal_color)
         if clicked_color is not _UNSET:
             self.clicked_colour(clicked_color)
         if click_hold is not None:
             self.click_hold = click_hold
-        self._refresh_fill()
+        self._refresh()
 
     def destroy(self):
-        self.node.destroy()  # ring is a child, freed with it
+        self.node.destroy()  # ring + icon are children, freed with it

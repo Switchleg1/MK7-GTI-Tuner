@@ -22,14 +22,14 @@ class ButtonController:
 
     # -- build / change ----------------------------------------------------
     def add(self, key, text, pos, size, command, enabled=True, color=None, text_scale=0.044,
-            *, is_visible=True, clicked_color=None, click_hold=None) -> Button:
-        """Create (or replace) the button for ``key``. ``color`` is the normal/enabled
-        fill (None -> the default green)."""
+            *, is_visible=True, clicked_color=None, click_hold=None, style="box", icon=None) -> Button:
+        """Create (or replace) the button for ``key``. ``color`` tints the fill (box
+        style) or the text (pill style); ``style`` is ``"box"`` or ``"pill"``."""
         self.remove(key)
         self.buttons[key] = Button(
             self.parent, self.font, text=text, pos=pos, size=size, command=command, enabled=enabled,
             is_visible=is_visible, normal_color=color, clicked_color=clicked_color,
-            click_hold=click_hold, text_scale=text_scale)
+            click_hold=click_hold, text_scale=text_scale, style=style, icon=icon)
         return self.buttons[key]
 
     def get(self, key) -> Button | None:

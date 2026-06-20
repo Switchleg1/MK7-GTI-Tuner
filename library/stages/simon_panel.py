@@ -40,13 +40,12 @@ class SimonPanel(Hud):
         self.draw()
 
     def draw(self):
+        # Only the roast/tip popup lives here now; the "Ask Simon" trigger is a
+        # game-level chrome button (game.buttons) that calls self.ask().
         self.clear()
-        if not self.show:
-            return
-        right = self.bounds()[1]
-        self.pill("Ask Simon", (right - 0.34, 0, -0.85), self.ask, icon="simon")
         if not self.open or not self.current:
             return
+        right = self.bounds()[1]
         pw, ph = 1.32, 1.05
         cx, cz = right - 0.05 - pw / 2, 0.06
         left = cx - pw / 2 + 0.10

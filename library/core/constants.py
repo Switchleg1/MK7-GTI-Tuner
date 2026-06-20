@@ -30,11 +30,19 @@ BOX_LINE = rgba("#2f7d57", 0.55)     # subtle green ring around glass panels
 BTN_LINE = rgba("#357f59", 0.50)     # ring around an enabled button
 BTN_DISABLED_FILL = rgba("#0a0f13", 0.55)
 BTN_DISABLED_TEXT = rgba("#3a4750")
-# Managed task buttons (library/stages/button.py): on press a button flashes its
-# "clicked" colour for BUTTON_CLICK_HOLD seconds, then reverts. If no clicked colour
-# is given it auto-uses the normal colour brightened by BUTTON_CLICK_BRIGHTEN.
+# Managed buttons (library/stages/button.py): on press a button flashes for
+# BUTTON_CLICK_HOLD seconds then reverts. A "box" button (the default) flashes its
+# "clicked" colour (auto = normal brightened by BUTTON_CLICK_BRIGHTEN); a "pill" button
+# (textured) flashes by colour-scale brighten (BUTTON_FLASH_SCALE).
 BUTTON_CLICK_HOLD = 0.18
 BUTTON_CLICK_BRIGHTEN = 1.8
+BUTTON_FLASH_SCALE = 1.6
+# Visual styles: the frame texture, an optional ring texture, whether `color` tints the
+# FILL (box) or the TEXT (pill), a text vertical nudge, and the click-flash mode.
+BUTTON_STYLES = {
+    "box":  {"texture": "ui_box",       "ring": "ui_ring", "tint": "fill", "text_dy": 0.0,    "flash": "fill"},
+    "pill": {"texture": "simon_button", "ring": None,       "tint": "text", "text_dy": -0.016, "flash": "scale"},
+}
 
 # Dedicated cull bin for game-level overlays (Simon/Discord panels, the toast, and
 # the notifications), registered in app startup ABOVE Panda's default "fixed" bin so
@@ -130,7 +138,7 @@ REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"),
 
 # Dyno grade bands: (minimum score, grade letter, flavour note). Iterated high->low.
 GRADE_TABLE = [
-    (95, "F", "you know what this means")
+    (95, "F", "you know what this means"),
     (85, "S", "tuner of the year"),
     (72, "A", "fast, loud, barely legal"),
     (58, "B", "solid, more in it"),

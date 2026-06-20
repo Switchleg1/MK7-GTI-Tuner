@@ -30,6 +30,10 @@ class Game:
         # lets a task hide the pills (e.g. the race hides them while it's live).
         self.simon_panel = None
         self.discord_panel = None
+        # Game-level chrome buttons (Ask Simon / Ask Discord / Back), a ButtonController
+        # built by the app on first hub entry. The Ask buttons open the panels above;
+        # the Back button is pointed at the active task's on_back by TaskBase.
+        self.buttons = None
         self.advisors_visible = True
         self.new_game()
 
@@ -54,17 +58,20 @@ class Game:
 
     # -- advisor panels (Ask Simon / Ask Discord) --------------------------
     def set_advisors_visible(self, visible: bool):
-        """Show or hide the Ask-Simon + Ask-Discord pills (closing any open window when
+        """Show or hide the Ask-Simon + Ask-Discord buttons (closing any open panel when
         hiding). A task calls this to clear them off-screen -- e.g. the race hides them
-        while it's live and restores them when it concludes. No-op before the panels are
-        built (first hub entry)."""
+        while it's live and restores them when it concludes. No-op before the chrome
+        buttons / panels are built (first hub entry)."""
         self.advisors_visible = visible
-        for panel in (self.simon_panel, self.discord_panel):
-            if panel is None:
-                continue
-            if not visible:
-                panel.close()
-            panel.set_visible(visible)
+        if self.buttons is not None:
+            for key in ("ask_simon", "ask_discord"):
+                button = self.buttons.get(key)
+                if button is not None:
+                    button.is_visible(visible)
+        if not visible:
+            for panel in (self.simon_panel, self.discord_panel):
+                if panel is not None:
+                    panel.close()
 
     def log(self, message: str, kind: str = "dim"):
         self.logs.append((message, kind))

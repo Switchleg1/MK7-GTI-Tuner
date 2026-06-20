@@ -55,6 +55,9 @@ class TaskBase(Hud):
         audio = getattr(self.app, "audio", None)
         if audio:
             audio.silence()  # stop the engine note from droning into the next stage
+        back = self.game.buttons.get("back") if self.game.buttons is not None else None
+        if back is not None:
+            back.is_visible(False)  # hide the shared Back button leaving the task
         self.buttons.destroy()  # free this task's buttons + their layer
         self.scene.removeNode()
         self.destroy()
@@ -203,10 +206,18 @@ class TaskBase(Hud):
         left, right = self.bounds()
         self.draw_header(self.game)
         self.label(self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
-        if self.allow_back:
-            self.back_button(self.on_back)
+        self._sync_back()            # point the shared (game-level) Back button at this task
         self.build_ui(left, right)   # draws labels/frames + tweaks button props (not create)
         self.buttons.lift()          # keep buttons above the frames/labels just rebuilt
+
+    def _sync_back(self):
+        """The Back button is a game-level chrome button shared across tasks. Point it at
+        this task's on_back and show it only while Back is allowed (the race hides it
+        mid-run via allow_back)."""
+        back = self.game.buttons.get("back") if self.game.buttons is not None else None
+        if back is not None:
+            back.command_fn(self.on_back)
+            back.is_visible(self.allow_back)
 
     def panel_boxes(self, left, right):
         """The two panel-box extents (no drawing) -- so build_buttons can place buttons

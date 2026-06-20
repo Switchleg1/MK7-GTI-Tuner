@@ -88,10 +88,10 @@ class DiscordPanel(Hud):
 
     # -- draw --------------------------------------------------------------
     def draw(self):
+        # Only the chat window lives here now; the "Ask Discord" trigger is a
+        # game-level chrome button (game.buttons) that calls self.ask().
         self.clear()
         self.entry = None
-        right = self.bounds()[1]
-        self.pill("Ask Discord", (right - 0.34, 0, -0.71), self.ask, color=BLUE, width=0.62)
         if self.open:
             self._window()
 

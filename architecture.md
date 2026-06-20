@@ -30,17 +30,21 @@ game.render():
   per-frame updates   -> music.update(dt), toast.render(dt), notifications.render(dt)
   current stage       -> self.stage.render(dt)         (task tick/redraw or hub spin)
   advisor panels      -> game.simon_panel.render(dt), game.discord_panel.render(dt)
+  chrome buttons      -> game.buttons.render(dt)        (Ask Simon / Ask Discord / Back)
 ```
 
 So the **Ask-Simon / Ask-Discord panels are owned by the Game** (`game.simon_panel` /
 `game.discord_panel`), not by the task — they're built once on first hub entry (by the
 app, which has the Panda context), persist for the session, and get re-pointed at the new
 context on each `set_stage`. (The Discord *model* is `game.discord`; the panel is
-`game.discord_panel` — distinct.) Tasks no longer add their own per-frame task or their
-own panels, and because the panels live on the game, a task can hide them via
-**`game.set_advisors_visible(bool)`** (stash/unstash + close): the **race** hides both
-pills the moment it stages and restores them when it concludes (in lock-step with
-`allow_back`), so the cockpit isn't cluttered mid-run.
+`game.discord_panel` — distinct.) Each panel now owns **only its popup/window**; the
+**Ask Simon / Ask Discord / Back triggers are `Button`s in a game-level `ButtonController`,
+`game.buttons`** (also built on first hub entry, on its own OVERLAY_BIN layer). The Ask
+buttons call `panel.ask()`; the **Back** button is shared across tasks — `TaskBase` points
+it at the active task's `on_back` and shows it only in a task (hidden at the hub/menu).
+A task hides the Ask buttons via **`game.set_advisors_visible(bool)`** (toggles their
+`is_visible` + closes the panels): the **race** hides both the moment it stages and
+restores them when it concludes (in lock-step with `allow_back`, which also drives Back).
 
 All game-level overlays (the panels, the toast, the notifications) draw in a dedicated
 cull bin, **`OVERLAY_BIN`** (`"a2d-overlay"`), registered in `app._register_overlay_bin`
@@ -145,18 +149,21 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   (via `_glass`); the `slider` thumb is the round `knob` texture. `set_visible(bool)`
   stash/unstashes the whole tree (regions included); `destroy()` removes it. Base for
   every screen.
-- `button.py` — `Button`: one managed task button — a rounded glass `DirectButton`
-  (`ui_box` fill + `ui_ring` border) that **flashes a "clicked" colour** for
-  `BUTTON_CLICK_HOLD`s on press then reverts (auto-brightens the normal colour if no
-  clicked colour is given). Built once, then tweaked via getter/setter methods —
-  `text()` / `color()` / `enabled()` / `is_visible()` / `command_fn()` (no arg = read,
-  one arg = set). **`is_visible`** defaults True; `render(dt)` enforces it (a not-visible
-  button is *stashed* — off-screen and unclickable) and advances the flash. Never
-  destroyed by a redraw.
-- `button_controller.py` — `ButtonController`: owns one task's buttons (created on enter,
-  destroyed on exit). Buttons are **built once** via `add(key, …)` and then changed in
-  place — `get(key).text(…)` / `.is_visible(…)` / … or `edit(key, **props)` — rather than
-  recreated. `render(dt)` ticks every button's visibility + flash; `lift()` keeps the
+- `button.py` — `Button`: one managed button in two **styles** (`constants.BUTTON_STYLES`):
+  **box** (default) — a rounded glass `DirectButton` (`ui_box` fill tinted by the colour
+  + `ui_ring` border, white text) that flashes the *clicked colour* on press; and **pill**
+  — a textured `simon_button` pill with the colour as the *text* tint and an optional left
+  `icon`, that flashes by colour-scale brighten. Flash holds `BUTTON_CLICK_HOLD`s then
+  reverts. Built once, then tweaked via getter/setter methods — `text()` / `color()` /
+  `enabled()` / `is_visible()` / `command_fn()` (no arg = read, one arg = set).
+  **`is_visible`** defaults True; `render(dt)` enforces it (a not-visible button is
+  *stashed* — off-screen and unclickable) and advances the flash. Never destroyed by a
+  redraw. (Task buttons are `box`; the game-level Ask/Back chrome buttons are `pill`.)
+- `button_controller.py` — `ButtonController`: owns a set of buttons (per-task, or the
+  game-level chrome set). Buttons are **built once** via `add(key, …, style=…, icon=…)`
+  and then changed in place — `get(key).text(…)` / `.is_visible(…)` / … or
+  `edit(key, **props)` — rather than recreated. `render(dt)` ticks every button's
+  visibility + flash; `lift()` keeps the
   buttons drawn above the frames/labels a redraw just rebuilt.
 - `task_base.py` — `TaskBase(Hud)`: one full-screen task. Owns a 3D `scene` node;
   `enter()` sets the camera, builds the scene, **builds the buttons once
@@ -195,11 +202,13 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   `MENU_ITEMS` filtered by `resumable` (Resume/Save only mid-career; Load auto-disabled
   with no save). The app passes the actions (`new`/`load`/`save`/`resume`/`quit`); the
   options page hosts the music + FX volume sliders (apply live + persist to `options.cfg`).
-- `simon_panel.py` — `SimonPanel(Hud)`: the reusable Ask-Simon pill + roast/tip popup
-  (own node tree, toggles independently of the host screen), fed by `simos`.
-- `discord_panel.py` — `DiscordPanel(Hud)`: the **Ask-Discord chat window**. A pill
-  opens a Discord-style window (server rail, channel list, `#ecu-tuning` message area
-  with a `DirectEntry`, and the online/offline member list sampled from the roster).
+- `simon_panel.py` — `SimonPanel(Hud)`: the Ask-Simon roast/tip popup (own node tree,
+  toggles independently of the host screen), fed by `simos`. The trigger is the
+  game-level `ask_simon` button (`game.buttons`), which calls `SimonPanel.ask()`.
+- `discord_panel.py` — `DiscordPanel(Hud)`: the **Ask-Discord chat window** (server rail,
+  channel list, `#ecu-tuning` message area with a `DirectEntry`, online/offline member
+  list). Opened by the game-level `ask_discord` button (`game.buttons.ask_discord` →
+  `DiscordPanel.ask()`).
   Typing + Enter calls `game.ask_discord(text)` and appends the replies + the result
   line. Own node tree; companion to `SimonPanel`.
 - `notifications.py` — `Notifications`: a session-long top-screen overlay (achievement
@@ -242,9 +251,10 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
 - `game.py` — `Game`: root/session. Holds `bro: TunerBro`, `rivals: [RivalGreenName]`,
   `cars: CarLibrary`, `discord: Discord` (model), transient `logs`, a `car` property, and
   the orchestration that spans nodes (`buy_mod`, `register_pops`, `ask_discord`, log). It
-  also owns the **advisor panels** `simon_panel`/`discord_panel` (the app builds them on
-  first hub entry and assigns them here; not reset by `new_game`) plus
-  `set_advisors_visible(bool)` so a task can show/hide the Ask pills. `new_game()` resets
+  also owns the **advisor panels** `simon_panel`/`discord_panel` and the game-level
+  **chrome `ButtonController` `buttons`** (Ask Simon / Ask Discord / Back) — all built by
+  the app on first hub entry and assigned here, not reset by `new_game` — plus
+  `set_advisors_visible(bool)` so a task can show/hide the Ask buttons. `new_game()` resets
   a fresh career **in place** (so cached references survive); `to_dict`/`from_dict` cover
   the bro, car library (build + mods), discord presence, and the career
   counters/achievements (stamped with `SAVE_VERSION`), restoring in place. The **rival
