@@ -1,28 +1,35 @@
 from __future__ import annotations
 
 from direct.gui import DirectGuiGlobals as DGG
-from direct.gui.DirectGui import DirectButton, DirectFrame, DirectLabel, DirectSlider
+from direct.gui.DirectGui import DirectSlider
 from direct.gui.OnscreenImage import OnscreenImage
 from direct.showbase.DirectObject import DirectObject
 from panda3d.core import TextNode, TransparencyAttrib
 
 from library.core.assets import assets
 from library.core.constants import (
-    BOX_LINE, BTN_DISABLED_FILL, BTN_DISABLED_TEXT, BTN_LINE, DIM, GREEN, GREEN_2,
-    LINE, PANEL, PANEL_DARK, TEXT, VIOLET, WHITE,
+    BOX_LINE, DIM, GREEN, PANEL, PANEL_DARK, TEXT, VIOLET,
 )
+from library.core.ui.ui_object_controller import UIObjectController
 
 
 class Hud(DirectObject):
     """Base for any 2D screen: a tracked node tree under aspect2d plus draw helpers,
-    the shared header, and Simon-pill buttons. ``destroy()`` removes everything."""
+    the shared header, and Simon-pill buttons. ``destroy()`` removes everything.
+
+    The remaining convenience primitives delegate to managed UI objects, so legacy
+    ``self.label(...)`` / ``self.frame(...)`` calls still build ``Text`` / ``Frame`` /
+    ``Button`` objects instead of raw DirectGui nodes.
+    """
 
     def __init__(self, app, name: str):
         super().__init__()
         self.app = app
         self.font = getattr(app, "mono_font", None)
         self.root = app.aspect2d.attachNewNode(name)
+        self.hud_ui = UIObjectController(app, self.root.attachNewNode(f"{name}-hud-ui"))
         self.nodes: list = []
+        self._hud_id = 0
 
     def bounds(self):
         aspect = self.app.getAspectRatio()
@@ -41,46 +48,34 @@ class Hud(DirectObject):
             self.root.stash()
 
     def clear(self):
+        self.hud_ui.clear()
         for node in self.nodes:
             node.destroy()
         self.nodes.clear()
+        self._hud_id = 0
 
     def destroy(self):
         self.clear()
+        self.hud_ui.destroy()
         self.root.removeNode()
         self.ignoreAll()
 
     # -- primitives --------------------------------------------------------
-    def label(self, text, pos, scale=0.045, color=TEXT, align=TextNode.ALeft, wordwrap=None, parent=None):
-        node = DirectLabel(parent=parent or self.root, text=text, pos=pos, scale=scale, text_fg=color, text_align=align, text_wordwrap=wordwrap, text_font=self.font, frameColor=(0, 0, 0, 0), relief=None)
-        self.nodes.append(node)
-        return node
+    def _key(self, prefix: str) -> str:
+        self._hud_id += 1
+        return f"{prefix}-{self._hud_id}"
 
-    def _glass(self, parent, frame_size, color, texture="ui_box"):
-        """A translucent rounded rectangle (ui_box) or its outline (ui_ring),
-        tinted by ``color``. The texture supplies the rounded alpha shape."""
-        node = DirectFrame(parent=parent, frameSize=frame_size, frameColor=color, relief=DGG.FLAT, frameTexture=assets.image_path(texture))
-        node.setTransparency(TransparencyAttrib.MAlpha)
-        return node
+    def label(self, text, pos, scale=0.045, color=TEXT, align=TextNode.ALeft, wordwrap=None, parent=None):
+        if parent is not None:
+            return self.hud_ui.add_text(self._key("label"), text, pos, scale, color, align, wordwrap)
+        return self.hud_ui.add_text(self._key("label"), text, pos, scale, color, align, wordwrap)
 
     def frame(self, frame_size, pos=(0, 0, 0), color=PANEL, border=BOX_LINE):
-        node = self._glass(self.root, frame_size, color)
-        node.setPos(*pos)
-        self.nodes.append(node)
-        if border:
-            self._glass(node, frame_size, border, texture="ui_ring")  # child: freed with node
-        return node
+        return self.hud_ui.add_frame(self._key("frame"), frame_size=frame_size, pos=pos, color=color, border=border)
 
     def button(self, text, pos, size, command, enabled=True, color=None, text_scale=0.044):
-        width, height = size
-        fill = color or (GREEN_2 if enabled else BTN_DISABLED_FILL)
-        fg = WHITE if enabled else BTN_DISABLED_TEXT
-        fs = (-width / 2, width / 2, -height / 2, height / 2)
-        node = DirectButton(parent=self.root, text=text, command=command if (enabled and command) else None, pos=pos, scale=1, text_scale=text_scale, text_fg=fg, text_align=TextNode.ACenter, text_font=self.font, frameSize=fs, frameColor=fill, relief=DGG.FLAT, frameTexture=assets.image_path("ui_box"), pressEffect=0)
-        node.setTransparency(TransparencyAttrib.MAlpha)
-        self._glass(node, fs, BTN_LINE if enabled else LINE, texture="ui_ring")  # rounded border
-        self.nodes.append(node)
-        return node
+        return self.hud_ui.add_button(
+            self._key("button"), text, pos, size, command, enabled, color, text_scale)
 
     def image(self, key, pos, scale, parent=None):
         node = OnscreenImage(parent=parent or self.root, image=assets.image_path(key), pos=pos, scale=scale)
@@ -106,13 +101,9 @@ class Hud(DirectObject):
 
     # -- pill buttons (Simon style) ---------------------------------------
     def pill(self, text, pos, command, icon=None, width=0.60, height=0.155, color=VIOLET):
-        bx, _, bz = pos
-        node = DirectButton(parent=self.root, text=text, command=command, pos=pos, scale=1, text_scale=0.05, text_fg=color, text_align=TextNode.ACenter, text_pos=(0.07 if icon else 0.0, -0.016), text_font=self.font, frameSize=(-width / 2, width / 2, -height / 2, height / 2), frameTexture=assets.image_path("simon_button"), frameColor=(1, 1, 1, 1), relief=DGG.FLAT, pressEffect=0)
-        node.setTransparency(TransparencyAttrib.MAlpha)
-        self.nodes.append(node)
-        if icon:
-            self.image(icon, (bx - 0.19, 0, bz), 0.058)
-        return node
+        return self.hud_ui.add_button(
+            self._key("pill"), text, pos, (width, height), command, True, color, 0.05,
+            style="pill", icon=icon)
 
     def back_button(self, command):
         left, _ = self.bounds()

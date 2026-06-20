@@ -37,7 +37,13 @@ class BaseObject:
     def is_visible(self, value=_UNSET):
         if value is _UNSET:
             return self._visible
-        self._visible = value  # applied on the next render()
+        self._visible = value
+        if self.node is None:
+            return
+        if value and self.node.isStashed():
+            self.node.unstash()
+        elif not value and not self.node.isStashed():
+            self.node.stash()
 
     def enabled(self, value=_UNSET):
         if value is _UNSET:

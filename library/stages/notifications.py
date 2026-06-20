@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from direct.gui import DirectGuiGlobals as DGG
-from direct.gui.DirectGui import DirectFrame, DirectLabel
 from panda3d.core import TextNode
 
 from library.core.constants import AMBER, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, TEXT, WHITE
 from library.core.constants import GREEN as GREEN
+from library.core.ui.ui_object_controller import UIObjectController
 
 TOAST_LIFE = 4.5
 DAVE_LIFE = 4.6
@@ -47,28 +46,27 @@ class Notifications:
     def _add_toast(self, label):
         right = self.app.getAspectRatio() - 0.05
         w, h = 0.82, 0.13
-        frame = DirectFrame(parent=self.root, frameSize=(-w / 2, w / 2, -h / 2, h / 2),
-                            frameColor=PANEL_DARK, relief=DGG.FLAT, pos=(right + w, 0, 0.72))
-        frame.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"] + 1)
-        frame.setTransparency(1)
-        DirectFrame(parent=frame, frameSize=(-w / 2, -w / 2 + 0.02, -h / 2, h / 2), frameColor=GREEN, relief=DGG.FLAT)
-        DirectLabel(parent=frame, text="ACHIEVEMENT UNLOCKED", pos=(-w / 2 + 0.06, 0, 0.022), scale=0.025,
-                    text_fg=GREEN, text_align=TextNode.ALeft, text_font=self.font, frameColor=(0, 0, 0, 0), relief=None)
-        DirectLabel(parent=frame, text=label, pos=(-w / 2 + 0.06, 0, -0.035), scale=0.034,
-                    text_fg=WHITE, text_align=TextNode.ALeft, text_font=self.font, frameColor=(0, 0, 0, 0), relief=None)
-        self.toasts.append({"frame": frame, "life": TOAST_LIFE, "x": right + w, "anchor": right - w / 2})
+        layer = self.root.attachNewNode("achievement-toast")
+        layer.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"] + 1)
+        layer.setPos(right + w, 0, 0.72)
+        ui = UIObjectController(self.app, layer)
+        ui.add_frame("frame", frame_size=(-w / 2, w / 2, -h / 2, h / 2), color=PANEL_DARK, border=None, texture=None)
+        ui.add_frame("accent", frame_size=(-w / 2, -w / 2 + 0.02, -h / 2, h / 2), color=GREEN, border=None, texture=None)
+        ui.add_text("title", "ACHIEVEMENT UNLOCKED", (-w / 2 + 0.06, 0, 0.022), 0.025, GREEN, TextNode.ALeft)
+        ui.add_text("label", label, (-w / 2 + 0.06, 0, -0.035), 0.034, WHITE, TextNode.ALeft)
+        self.toasts.append({"ui": ui, "layer": layer, "life": TOAST_LIFE, "x": right + w, "anchor": right - w / 2})
 
     def _tick_toasts(self, dt):
         top, step = 0.72, 0.16
         for i, t in enumerate(list(self.toasts)):
             t["life"] -= dt
             t["x"] += (t["anchor"] - t["x"]) * min(1.0, dt * 10)
-            frame = t["frame"]
-            z = frame.getZ() + (top - i * step - frame.getZ()) * min(1.0, dt * 9)
-            frame.setPos(t["x"], 0, z)
-            frame.setColorScale(1, 1, 1, 1.0 if t["life"] > FADE else max(0.0, t["life"] / FADE))
+            layer = t["layer"]
+            z = layer.getZ() + (top - i * step - layer.getZ()) * min(1.0, dt * 9)
+            layer.setPos(t["x"], 0, z)
+            layer.setColorScale(1, 1, 1, 1.0 if t["life"] > FADE else max(0.0, t["life"] / FADE))
             if t["life"] <= 0:
-                frame.removeNode()
+                t["ui"].destroy()
                 self.toasts.remove(t)
 
     # -- Dyno Dave bubble --------------------------------------------------
@@ -76,27 +74,25 @@ class Notifications:
         if self.dave is None:
             left = -self.app.getAspectRatio() + 0.05
             w, h = 0.98, 0.17
-            frame = DirectFrame(parent=self.root, frameSize=(-w / 2, w / 2, -h / 2, h / 2),
-                                frameColor=PANEL_DARK, relief=DGG.FLAT, pos=(left + w / 2, 0, 0.70))
-            frame.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"] + 1)
-            frame.setTransparency(1)
-            DirectFrame(parent=frame, frameSize=(-w / 2, w / 2, h / 2 - 0.006, h / 2), frameColor=AMBER, relief=DGG.FLAT)
-            DirectLabel(parent=frame, text="DYNO DAVE", pos=(-w / 2 + 0.05, 0, 0.04), scale=0.025,
-                        text_fg=AMBER, text_align=TextNode.ALeft, text_font=self.font, frameColor=(0, 0, 0, 0), relief=None)
-            label = DirectLabel(parent=frame, text=line, pos=(-w / 2 + 0.05, 0, -0.025), scale=0.030,
-                                text_fg=TEXT, text_align=TextNode.ALeft, text_wordwrap=29, text_font=self.font,
-                                frameColor=(0, 0, 0, 0), relief=None)
-            self.dave = {"frame": frame, "label": label, "life": DAVE_LIFE}
+            layer = self.root.attachNewNode("dave-toast")
+            layer.setBin(OVERLAY_BIN, OVERLAY_SORT["notify"] + 1)
+            layer.setPos(left + w / 2, 0, 0.70)
+            ui = UIObjectController(self.app, layer)
+            ui.add_frame("frame", frame_size=(-w / 2, w / 2, -h / 2, h / 2), color=PANEL_DARK, border=None, texture=None)
+            ui.add_frame("accent", frame_size=(-w / 2, w / 2, h / 2 - 0.006, h / 2), color=AMBER, border=None, texture=None)
+            ui.add_text("title", "DYNO DAVE", (-w / 2 + 0.05, 0, 0.04), 0.025, AMBER, TextNode.ALeft)
+            ui.add_text("line", line, (-w / 2 + 0.05, 0, -0.025), 0.030, TEXT, TextNode.ALeft, wordwrap=29)
+            self.dave = {"ui": ui, "layer": layer, "life": DAVE_LIFE}
         else:
-            self.dave["label"]["text"] = line
+            self.dave["ui"].get("line").text(line)
             self.dave["life"] = DAVE_LIFE
-            self.dave["frame"].setColorScale(1, 1, 1, 1)
+            self.dave["layer"].setColorScale(1, 1, 1, 1)
 
     def _tick_dave(self, dt):
         if not self.dave:
             return
         self.dave["life"] -= dt
-        self.dave["frame"].setColorScale(1, 1, 1, 1.0 if self.dave["life"] > FADE else max(0.0, self.dave["life"] / FADE))
+        self.dave["layer"].setColorScale(1, 1, 1, 1.0 if self.dave["life"] > FADE else max(0.0, self.dave["life"] / FADE))
         if self.dave["life"] <= 0:
-            self.dave["frame"].removeNode()
+            self.dave["ui"].destroy()
             self.dave = None

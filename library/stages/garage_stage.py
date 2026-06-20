@@ -55,8 +55,8 @@ class GarageStage(Hud):
         self.draw_header(self.game)
         if self.on_menu:
             self.ui.add_button("menu", "MENU", (left + 0.21, 0, 0.66), (0.34, 0.09), self.on_menu, True, PANEL, 0.04)
-        self.label("GARAGE", (0, 0, 0.66), 0.06, GREEN, align=TextNode.ACenter)
-        self.label("Pick a task. Ask Simon if you're stuck.", (0, 0, 0.58), 0.034, DIM, align=TextNode.ACenter)
+        self.ui.add_text("title", "GARAGE", (0, 0, 0.66), 0.06, GREEN, align=TextNode.ACenter)
+        self.ui.add_text("subtitle", "Pick a task. Ask Simon if you're stuck.", (0, 0, 0.58), 0.034, DIM, align=TextNode.ACenter)
         if self.on_summon and self.game.wizard_available():
             self.ui.add_button("wizard", "> A MYSTERIOUS DM - ANSWER IT <", (0, 0, 0.46), (1.4, 0.10), self.on_summon, True, VIOLET, 0.036)
         gap = 0.04
@@ -71,4 +71,5 @@ class GarageStage(Hud):
         # The "garage" style draws the green top accent strip itself.
         self.ui.add_button(f"task-{key}", title, (x, 0, -0.60), (width, 0.20),
                            lambda k=key: self.on_pick(k), True, PANEL, 0.05, style="garage")
-        self.label(blurb, (x, 0, -0.74), 0.026, DIM, align=TextNode.ACenter, wordwrap=int(width / 0.03))
+        self.ui.add_text(f"task-{key}-blurb", blurb, (x, 0, -0.74), 0.026, DIM,
+                         align=TextNode.ACenter, wordwrap=int(width / 0.03))

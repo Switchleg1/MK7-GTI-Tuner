@@ -147,16 +147,16 @@ class RaceTask(TaskBase):
             return
         # Tach needle position (a frame); the digits are managed text.
         frac = clamp((rpm - 850) / (7300 - 850), 0, 1)
-        d["needle"].setX(d["tach_x0"] + frac * (d["tach_x1"] - d["tach_x0"]))
+        d["needle"].node.setX(d["tach_x0"] + frac * (d["tach_x1"] - d["tach_x0"]))
         self.ui.get("rpm").text(f"{int(rpm)}")
         self.ui.get("gear").text("N" if rpm <= 900 and gear == 1 else str(gear))
         self.ui.get("mph").text(f"{int(mph)}")
         # Shift light: brightens (and the bezel goes red) past the redline.
         if rpm >= SHIFT_RPM:
-            d["shift_bg"]["frameColor"] = (1.0, 0.20, 0.20, 0.90)
+            d["shift_bg"].color((1.0, 0.20, 0.20, 0.90))
             self.ui.get("shift").color(WHITE)
         else:
-            d["shift_bg"]["frameColor"] = PANEL_DARK
+            d["shift_bg"].color(PANEL_DARK)
             self.ui.get("shift").color(DIM)
 
     def bind_keys(self):
@@ -275,7 +275,7 @@ class RaceTask(TaskBase):
             tx = d["tach_x0"] + (r - 850) / (7300 - 850) * span
             self.frame((tx - 0.003, tx + 0.003, z1, z1 + 0.025), color=WHITE, border=None)
         d["needle"] = self.frame((-0.006, 0.006, -0.058, 0.058), color=WHITE, border=None)
-        d["needle"].setPos(d["tach_x0"], 0, (z0 + z1) / 2)
+        d["needle"].pos((d["tach_x0"], 0, (z0 + z1) / 2))
         gx = d["tach_x0"] - 0.13
         self.frame((gx - 0.10, gx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
         mx = d["tach_x1"] + 0.13

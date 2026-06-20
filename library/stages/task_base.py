@@ -208,7 +208,7 @@ class TaskBase(Hud):
         left, right = self.bounds()
         self.build_ui(left, right)   # draws frames/images + tweaks UI-object props (not create)
         self.draw_header(self.game)
-        self.label(self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
+        self.ui.add_text("task-title", self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
         self._sync_back()            # point the shared (game-level) Back button at this task
         self.ui.lift()               # keep the text/buttons above the frames just rebuilt
 

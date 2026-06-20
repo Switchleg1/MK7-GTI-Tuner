@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from direct.gui import DirectGuiGlobals as DGG
-from direct.gui.DirectGui import DirectButton, DirectLabel
-from direct.gui.OnscreenImage import OnscreenImage
 from direct.interval.IntervalGlobal import Func, LerpColorScaleInterval, LerpFunc, LerpPosInterval, Parallel, Sequence, Wait
 from direct.showbase.DirectObject import DirectObject
-from panda3d.core import TextNode, TransparencyAttrib
 
 import library.core.assets as assets
+from library.core.ui.ui_object_controller import UIObjectController
 from library.stages.character import Character
 from library.core.constants import (
     BLUE,
@@ -50,7 +47,8 @@ class UnlockStage(DirectObject):
         self.base = base
         self.on_complete = on_complete
         self.root = base.render.attachNewNode("unlock-scene")
-        self.ui = base.aspect2d.attachNewNode("unlock-ui")
+        self.ui_root = base.aspect2d.attachNewNode("unlock-ui")
+        self.ui = UIObjectController(base, self.ui_root)
         self.sequence = None
         self._pulse_iv = None
         self._pulse_np = None
@@ -90,12 +88,13 @@ class UnlockStage(DirectObject):
             self.base.camLens.setFov(UNLOCK_FOV)
 
     def _build_ui(self):
-        logo = OnscreenImage(parent=self.ui, image=assets.image_path("logo"), pos=(-1.18, 0, 0.86), scale=(0.30, 1, 0.082))
-        logo.setTransparency(TransparencyAttrib.MAlpha)
-        self.title = DirectLabel(parent=self.ui, text="ECU UNLOCK", pos=(-1.48, 0, 0.74), scale=0.05, text_fg=GREEN, text_align=TextNode.ALeft, frameColor=(0, 0, 0, 0), relief=None)
-        self.prompt = DirectLabel(parent=self.ui, text="", pos=(-0.5, 0, -0.82), scale=0.062, text_fg=WHITE, text_align=TextNode.ACenter, frameColor=(0, 0, 0, 0), relief=None)
-        self.substep = DirectLabel(parent=self.ui, text="", pos=(-0.5, 0, -0.90), scale=0.036, text_fg=DIM, text_align=TextNode.ACenter, frameColor=(0, 0, 0, 0), relief=None)
-        self.link_bar = ProgressBar(self.ui, (-0.5, 0, -0.97), 0.9, 0.03, (0.05, 0.08, 0.10, 1), GREEN)
+        from panda3d.core import TextNode
+
+        self.ui.add_image("logo", "logo", (-1.18, 0, 0.86), (0.30, 1, 0.082))
+        self.title = self.ui.add_text("title", "ECU UNLOCK", (-1.48, 0, 0.74), 0.05, GREEN, TextNode.ALeft)
+        self.prompt = self.ui.add_text("prompt", "", (-0.5, 0, -0.82), 0.062, WHITE, TextNode.ACenter)
+        self.substep = self.ui.add_text("substep", "", (-0.5, 0, -0.90), 0.036, DIM, TextNode.ACenter)
+        self.link_bar = ProgressBar(self.ui_root, (-0.5, 0, -0.97), 0.9, 0.03, (0.05, 0.08, 0.10, 1), GREEN)
         self.link_bar.track.hide()
 
     # -- phase machine -----------------------------------------------------
@@ -103,8 +102,8 @@ class UnlockStage(DirectObject):
         self.phase = phase
         self._stop_pulse()
         self.picker.clear()
-        self.prompt["text"] = UNLOCK_PROMPTS.get(phase, "")
-        self.substep["text"] = ""
+        self.prompt.text(UNLOCK_PROMPTS.get(phase, ""))
+        self.substep.text("")
         if phase == "plug":
             self.picker.register(self.port, "port", self._on_plug)
             self._pulse(self.port)
@@ -119,7 +118,7 @@ class UnlockStage(DirectObject):
 
     def _on_plug(self):
         self.picker.clear()
-        self.prompt["text"] = UNLOCK_PROMPTS["plugging"]
+        self.prompt.text(UNLOCK_PROMPTS["plugging"])
         self._stop_pulse()
         self.link_bar.track.show()
         seq = Sequence(
@@ -135,13 +134,13 @@ class UnlockStage(DirectObject):
         self._play(seq)
 
     def _set_substep(self, label: str, fraction: float):
-        self.substep["text"] = label
+        self.substep.text(label)
         self.link_bar.set(fraction)
 
     def _on_phone(self):
         self.picker.clear()
         self._stop_pulse()
-        self.prompt["text"] = UNLOCK_PROMPTS["raising"]
+        self.prompt.text(UNLOCK_PROMPTS["raising"])
         seq = Sequence(
             self.character.pose_interval("hold_phone", RAISE_PHONE_SECONDS),
             Func(self.phone_screen.show),
@@ -150,7 +149,7 @@ class UnlockStage(DirectObject):
         self._play(seq)
 
     def _on_flash(self):
-        self.prompt["text"] = UNLOCK_PROMPTS["flashing"]
+        self.prompt.text(UNLOCK_PROMPTS["flashing"])
         self.phone_screen.begin_progress()
         seq = Sequence()
         previous = 0.0
@@ -172,21 +171,10 @@ class UnlockStage(DirectObject):
 
     # -- continue ----------------------------------------------------------
     def _show_continue(self):
-        self.prompt["text"] = UNLOCK_PROMPTS["done"]
-        self.continue_button = DirectButton(
-            parent=self.ui,
-            text="Continue  >",
-            pos=(-0.5, 0, -0.92),
-            scale=1,
-            text_scale=0.05,
-            text_fg=WHITE,
-            text_align=TextNode.ACenter,
-            frameSize=(-0.30, 0.30, -0.07, 0.07),
-            frameColor=GREEN_2,
-            relief=DGG.FLAT,
-            pressEffect=0,
-            command=self._finish,
-        )
+        self.prompt.text(UNLOCK_PROMPTS["done"])
+        self.continue_button = self.ui.add_button(
+            "continue", "Continue  >", (-0.5, 0, -0.92), (0.60, 0.14),
+            self._finish, True, GREEN_2, 0.05)
 
     # -- helpers -----------------------------------------------------------
     def _play(self, interval):
@@ -221,8 +209,6 @@ class UnlockStage(DirectObject):
         self.picker.destroy()
         self.phone_screen.destroy()
         self.link_bar.destroy()
-        if self.continue_button is not None:
-            self.continue_button.destroy()
-        self.ui.removeNode()
+        self.ui.destroy()
         self.root.removeNode()
         self.ignoreAll()
