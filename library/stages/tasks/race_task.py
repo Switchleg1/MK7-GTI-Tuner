@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import random
 import time
 
-from panda3d.core import TextNode, Vec4
+from panda3d.core import CardMaker, MovieTexture, TextNode, Vec4
 
 import library.core.assets as assets
 from library.core.constants import (
     AMBER, AUDIO, BLUE, BOX_LINE, CHASE_CAM_LOOK, CHASE_CAM_POS, CHASE_FOV, DIM, ED_HEAL_ON_WIN,
     ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY, ED_TAUNT_THRESHOLD, FINAL_DRIVE, GEAR_RATIOS,
-    GREEN, GREEN_2, LINE, PANEL, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
+    GREEN, GREEN_2, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, RED, TEXT, TIRE_CIRC, TRACK_M, WHITE,
 )
 from library.core.utils import clamp
 from library.game.geometry import make_box
@@ -25,6 +26,8 @@ MARKER_RECYCLE_Y = 28.0
 MARKER_PAST_Y = -4.0
 DASH_SPACING_M = 7.0            # one centerline dash every ~7 metres
 SCROLL_SCALE = 0.22             # scene units per metre of player travel
+RESULT_VIDEO_FALLBACK_SECONDS = 5.0
+RESULT_VIDEO_AUDIO_DELAY_SECONDS = 0.12
 
 
 class RaceTask(TaskBase):
@@ -64,6 +67,12 @@ class RaceTask(TaskBase):
         # Cached dash widgets, built once in build_ui and updated per-frame.
         self.dash = {}
         self.race = None
+        self.result_video = None
+        self.music_paused_for_video = False
+
+    def exit(self):
+        self._clear_result_video(restore_controls=False)
+        super().exit()
 
     def _build_track(self):
         """Two rows of lane dashes + side cones laid out along +Y. Each is a
@@ -95,6 +104,10 @@ class RaceTask(TaskBase):
 
     # -- per-frame ---------------------------------------------------------
     def tick(self, dt):
+        self._update_result_video(dt)
+        if self.result_video is not None:
+            self.app.audio.silence()
+            return
         if self.race and self.race["active"]:
             self._step_race(dt)
             player = self.race["p"]
@@ -246,7 +259,7 @@ class RaceTask(TaskBase):
             button.enabled(index <= game.bro.unlocked_rival)
             button.color(RED if index == game.bro.selected_rival else GREEN_2)
         launching = (not staged) or not self.race["p"]["launched"]
-        self.ui.get("stage").enabled(game.car.flashed and not staged)
+        self.ui.get("stage").enabled(game.car.flashed and not staged and self.result_video is None)
         launch = self.ui.get("launch")
         launch.text(("Launch" if launching else "Shift") + " (SPACE)")
         launch.enabled(staged)
@@ -331,7 +344,7 @@ class RaceTask(TaskBase):
         return bool(self.race and self.race["active"])
 
     def _start_race(self) -> str | None:
-        if not self.game.car.flashed or self._race_active():
+        if self.result_video is not None or not self.game.car.flashed or self._race_active():
             return None
         if self.game.car.car_perf()["blown"]:
             self.game.log("Your tune is a grenade. Fix it on dyno first.", "err")
@@ -388,6 +401,7 @@ class RaceTask(TaskBase):
     def _resolve_race(self, player, rival, foe):
         game = self.game
         won = player["et"] < rival["et"]
+        video_playing = False
         if won:
             game.bro.earn(foe.purse)
             game.bro.add_cred(round(foe.purse / 5))
@@ -399,12 +413,167 @@ class RaceTask(TaskBase):
                 game.unlock("king", "King of the Streets")
             game.dave("win")
             game.soothe_bro(ED_HEAL_ON_WIN)  # a win settles the nerves
+            video_playing = self._play_result_video(foe.video_win)
         else:
             game.dave("lose")
             game.hurt_bro(ED_LOSS)
+            video_playing = self._play_result_video(foe.video_loss)
         game.log(("WIN" if won else "LOSS") + f" {player['et']:.2f}s @ {round(player['trap'])} mph", "ok" if won else "warn")
         game.maybe_green()
         self.race["active"] = False
-        self.allow_back = True
-        game.set_advisors_visible(True)  # race over -- bring the advisor pills back
+        self.allow_back = not video_playing
+        game.set_advisors_visible(not video_playing)  # race over -- bring the advisor pills back unless a clip owns the screen
         self.dirty = True
+
+    def _play_result_video(self, clips: list[str]) -> bool:
+        if not clips:
+            return False
+        clip = random.choice(clips)
+        path = assets.video_path(clip)
+        texture_name = "race-result-" + clip.replace("/", "-").replace("\\", "-")
+        tex = MovieTexture(texture_name)
+        try:
+            loaded = tex.read(path)
+        except Exception as exc:  # noqa: BLE001
+            self.game.log(f"could not play race video {clip}: {exc}", "warn")
+            return False
+        if not loaded:
+            self.game.log(f"could not play race video {clip}", "warn")
+            return False
+        audio = self._load_result_video_audio(path, clip)
+        synchronized = self._sync_video_to_audio(tex, audio)
+
+        self._clear_result_video(restore_controls=False)
+        card = CardMaker("race-result-video")
+        card.setFrameFullscreenQuad()
+        node = self.app.render2d.attachNewNode(card.generate())
+        node.setTexture(tex)
+        node.setBin(OVERLAY_BIN, OVERLAY_SORT["toast"] - 1)
+        audio_delay = RESULT_VIDEO_AUDIO_DELAY_SECONDS if audio is not None else 0.0
+        if not synchronized:
+            tex.play()
+        self.result_video = {
+            "node": node,
+            "texture": tex,
+            "audio": audio,
+            "audio_delay": audio_delay,
+            "audio_started": audio is None,
+            "synchronized": synchronized,
+            "texture_started": not synchronized,
+            "life": self._result_video_duration(tex, audio) + audio_delay,
+        }
+        self._pause_music_for_video()
+        self.allow_back = False
+        self._sync_back()
+        self.game.set_advisors_visible(False)
+        return True
+
+    def _update_result_video(self, dt):
+        if self.result_video is None:
+            return
+        if not self.result_video["audio_started"]:
+            self.result_video["audio_delay"] -= dt
+            if self.result_video["audio_delay"] <= 0:
+                self._start_result_video_audio()
+        self.result_video["life"] -= dt
+        if self.result_video["life"] <= 0:
+            self._clear_result_video(restore_controls=True)
+            self.dirty = True
+
+    def _start_result_video_audio(self):
+        if self.result_video is None:
+            return
+        if not self.result_video["texture_started"]:
+            self.result_video["texture"].play()
+            self.result_video["texture_started"] = True
+        audio = self.result_video["audio"]
+        if audio is not None:
+            audio.play()
+        self.result_video["audio_started"] = True
+
+    def _clear_result_video(self, restore_controls: bool):
+        if self.result_video is None:
+            return
+        texture = self.result_video["texture"]
+        if hasattr(texture, "stop"):
+            texture.stop()
+        audio = self.result_video.get("audio")
+        if audio is not None:
+            audio.stop()
+        self.result_video["node"].removeNode()
+        self.result_video = None
+        self._resume_music_after_video()
+        if restore_controls:
+            self.allow_back = True
+            self._sync_back()
+            self.game.set_advisors_visible(True)
+
+    def _load_result_video_audio(self, path: str, clip: str):
+        try:
+            audio = self.app.loader.loadSfx(path)
+        except Exception as exc:  # noqa: BLE001
+            self.game.log(f"could not load race video audio {clip}: {exc}", "warn")
+            return None
+        if audio is None:
+            self.game.log(f"could not load race video audio {clip}", "warn")
+            return None
+        try:
+            length = float(audio.length())
+        except Exception:  # noqa: BLE001
+            length = 0.0
+        if length <= 0:
+            self.game.log(f"race video audio has no playable length {clip}", "warn")
+            return None
+        audio.setLoop(False)
+        audio.setVolume(1.0)
+        return audio
+
+    def _sync_video_to_audio(self, texture, audio) -> bool:
+        if audio is None:
+            return False
+        for method_name in ("synchronizeTo", "synchronize_to"):
+            sync = getattr(texture, method_name, None)
+            if not callable(sync):
+                continue
+            try:
+                sync(audio)
+            except Exception as exc:  # noqa: BLE001
+                self.game.log(f"could not sync race video audio: {exc}", "warn")
+                return False
+            return True
+        return False
+
+    def _pause_music_for_video(self):
+        music = getattr(self.app, "music", None)
+        if music is None:
+            return
+        music.pause()
+        self.music_paused_for_video = True
+
+    def _resume_music_after_video(self):
+        if not self.music_paused_for_video:
+            return
+        music = getattr(self.app, "music", None)
+        if music is not None:
+            music.resume()
+        self.music_paused_for_video = False
+
+    @staticmethod
+    def _result_video_duration(texture, audio) -> float:
+        if audio is not None:
+            try:
+                value = float(audio.length())
+            except Exception:  # noqa: BLE001
+                value = 0.0
+            if value > 0:
+                return value
+        for name in ("getVideoLength", "getDuration", "length"):
+            method = getattr(texture, name, None)
+            if callable(method):
+                try:
+                    value = float(method())
+                except Exception:  # noqa: BLE001
+                    continue
+                if value > 0:
+                    return value
+        return RESULT_VIDEO_FALLBACK_SECONDS

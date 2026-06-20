@@ -3,7 +3,7 @@ from __future__ import annotations
 from panda3d.core import ClockObject, TextNode
 
 import library.core.assets as assets
-from library.core.constants import DIM, GREEN, MODES, PANEL, TEXT, VIOLET
+from library.core.constants import DIM, GREEN, MODES, PANEL, RED, TEXT, VIOLET
 from library.stages.hud import Hud
 
 
@@ -69,8 +69,9 @@ class GarageStage(Hud):
         self.ui.add_text("header-subtitle", "EA888  .  SIMOS18.1  .  POPS & BANGS  .  CAREER",
                          (left + 0.05, 0, 0.835), 0.026, DIM)
         name = str(self.game.car.active_tune().get("name", "Stock"))[:16]
+        cash_color = RED if self.game.bro.is_broke() else GREEN
         self.ui.add_text("header-cash", f"${round(self.game.bro.cash)}   .   ECU {self.game.car.ecu_status()}",
-                         (right - 0.04, 0, 0.888), 0.033, GREEN, align=TextNode.ARight)
+                         (right - 0.04, 0, 0.888), 0.033, cash_color, align=TextNode.ARight)
         self.ui.add_text("header-map", f"MAP {self.game.car.active_slot + 1} {name}   .   REP {self.game.bro.rep()}",
                          (right - 0.04, 0, 0.832), 0.027, TEXT, align=TextNode.ARight)
 

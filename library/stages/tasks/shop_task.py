@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import random
+
 from panda3d.core import TextNode
 
-from library.core.constants import BLUE, DIM, GREEN, GREEN_2, GREEN_NAME_CRED, LINE, MODS, TEXT
+from library.core.constants import (
+    BLUE, DIM, ED_BAD_REVIEW, GREEN, GREEN_2, GREEN_NAME_CRED, LINE, MODS, PRO_MAPS, RED,
+    SALE_BAD, TEXT, TUNE_SALE,
+)
+from library.core.utils import pick
 from library.stages.task_base import TaskBase
 
 
@@ -23,13 +29,13 @@ class ShopTask(TaskBase):
         for index, (mod_id, name, cost, _desc) in enumerate(MODS):
             row, col = divmod(index, 2)
             self.ui.add_button(f"mod-{mod_id}", name, (left + 0.28 + col * 0.82, 0, 0.25 - row * 0.12),
-                               (0.72, 0.08), self.bind(game.buy_mod, mod_id))
+                               (0.72, 0.08), self.bind(self._buy_mod, mod_id))
         # Pro storefront: built now, shown only once the bro goes verified green name.
         self.ui.add_button("sell", "Sell a tune  (+$)", (left + 0.32, 0, -0.45), (0.54, 0.10),
-                           self.bind(game.sell_tune), True, GREEN_2, is_visible=False)
+                           self.bind(self._sell_tune), True, GREEN_2, is_visible=False)
         for i, pro in enumerate(game.pros):
             self.ui.add_button(f"pro-{pro.handle}", f"Ask {pro.name}", (left + 0.92 + i * 0.42, 0, -0.45),
-                               (0.38, 0.10), self.bind(game.ask_pro, pro.handle), is_visible=False)
+                               (0.38, 0.10), self.bind(self._ask_pro, pro.handle), is_visible=False)
         self.ui.add_text("cash", "", (left + 0.18, 0, 0.40), 0.044, BLUE)
         self.ui.add_text("lock1", "PRO STOREFRONT - locked", (left + 0.06, 0, -0.34), 0.036, DIM, is_visible=False)
         self.ui.add_text("lock2", "", (left + 0.06, 0, -0.41), 0.030, DIM, wordwrap=44, is_visible=False)
@@ -42,7 +48,9 @@ class ShopTask(TaskBase):
     def update_ui(self, left, right):
         game = self.game
         bro = game.bro
-        self.ui.get("cash").text(f"SHOP  -  CASH ${round(bro.cash)}")
+        cash = self.ui.get("cash")
+        cash.text(f"SHOP  -  CASH ${round(bro.cash)}")
+        cash.color(RED if bro.is_broke() else BLUE)
         for mod_id, name, cost, _desc in MODS:
             owned = game.car.mods[mod_id]
             button = self.ui.get(f"mod-{mod_id}")
@@ -69,3 +77,54 @@ class ShopTask(TaskBase):
         pro_keys = [p.grant_map for p in game.pros]
         have_n = sum(1 for k in pro_keys if k in bro.unlocked_maps)
         self.ui.get("green3").text(f"Pro map stages unlocked: {have_n}/{len(pro_keys)}  -  sell tunes to earn the rest.")
+
+    def _buy_mod(self, mod_id: str):
+        game = self.game
+        cost = next(item[2] for item in MODS if item[0] == mod_id)
+        if game.car.mods[mod_id] or not game.bro.spend(cost):
+            return
+        self._log_result(game.car.set_mod(mod_id))
+        if all(game.car.mods.values()):
+            game.unlock("fully_built", "Fully Built (Wallet Empty)")
+        game.dave("shop")
+
+    def _sell_tune(self):
+        """Green-name income: flog a tune to a random user."""
+        game = self.game
+        if not game.bro.green_name:
+            return
+        if random.random() < TUNE_SALE["bad_chance"]:
+            game.bro.add_cred(-4)
+            game.hurt_bro(ED_BAD_REVIEW)
+            game.log(pick(SALE_BAD), "warn")
+            return
+        whp = game.car.compute()["whp"]
+        pay = int(TUNE_SALE["base"] + max(0.0, whp - 210) * TUNE_SALE["per_whp"])
+        game.bro.earn(pay)
+        game.bro.add_cred(TUNE_SALE["cred"])
+        game.bro.tunes_sold += 1
+        game.unlock("first_sale", "Side Hustle")
+        if game.bro.tunes_sold >= 10:
+            game.unlock("tune_mill", "Tune Mill")
+        game.log(f"sold a tune for ${pay}  ({game.bro.tunes_sold} sold)", "ok")
+        game.dave("sell")
+        game.maybe_green()
+
+    def _ask_pro(self, handle: str):
+        """DM a pro for a pro-only map stage from the shop storefront."""
+        game = self.game
+        if not game.bro.green_name:
+            return
+        pro = next((p for p in game.pros if p.handle == handle), None)
+        if pro is None:
+            return
+        if pro.grant_map in game.bro.unlocked_maps:
+            game.log(f"{pro.name}: you already have {PRO_MAPS[pro.grant_map]['name']}.", "info")
+        elif game.bro.tunes_sold >= pro.min_tunes:
+            game.bro.unlock_map(pro.grant_map)
+            game.unlock("pro_network", "Pro Network")
+            game.log(f"{pro.name} hooked you up: {PRO_MAPS[pro.grant_map]['name']} unlocked.", "ok")
+            game.dave("pro")
+        else:
+            need = pro.min_tunes - game.bro.tunes_sold
+            game.log(f"{pro.name}: {pro.chatter()} (sell {need} more tune{'s' if need != 1 else ''} first)", "warn")

@@ -8,6 +8,7 @@ from panda3d.core import Filename, NodePath, TexturePool
 
 from library.core.constants import (
     AUDIO, AUDIO_DIR, IMAGE_FILES, IMAGES_DIR, MODELS_DIR, MUSIC_DIR, MUSIC_EXTS, SOUND_FILES,
+    VIDEOS_DIR,
 )
 
 from library.core.assets.model_types import ModelType
@@ -154,6 +155,11 @@ def _sound_preload_count(key: str) -> int:
 def sound_path(key: str) -> str:
     """Panda-style path string for a generated .wav in constants.SOUND_FILES."""
     return _panda_path(os.path.join(AUDIO_DIR, SOUND_FILES[key]))
+
+
+def video_path(rel: str) -> str:
+    """Panda-style path string for a video under data/videos/."""
+    return _panda_path(os.path.join(VIDEOS_DIR, rel))
 
 
 def music_paths(key: str) -> list[str]:

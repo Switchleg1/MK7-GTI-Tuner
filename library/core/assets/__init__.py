@@ -7,6 +7,7 @@ from library.core.assets.assets import (
     music_paths,
     preload_assets,
     sound_path,
+    video_path,
 )
 from library.core.assets.model_types import ModelType
 
@@ -18,6 +19,7 @@ __all__ = [
     "data_root",
     "image_path",
     "sound_path",
+    "video_path",
     "music_paths",
     "ModelType",
 ]

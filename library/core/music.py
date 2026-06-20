@@ -24,11 +24,15 @@ class MusicPlayer:
         self.song = ""
         self.token = 0
         self.volume = MUSIC_VOLUME
+        self.paused = False
+        self.pause_time = 0.0
 
     def set_track(self, key: str):
         if key == self.key:
             return  # same context -> let the current song keep playing
         self.key = key
+        self.paused = False
+        self.pause_time = 0.0
         self._play_random()
 
     def set_volume(self, volume: float):
@@ -40,6 +44,35 @@ class MusicPlayer:
 
     def update(self, dt):
         """Render-loop hook. Music advances on the finished event, not per frame."""
+
+    def pause(self):
+        """Pause the current song without changing the active stage music key."""
+        if self.current is None or self.paused:
+            return
+        try:
+            self.pause_time = self.current.getTime()
+        except Exception:  # noqa: BLE001
+            self.pause_time = 0.0
+        self.app.ignore(f"music-finished-{self.token}")
+        self.current.stop()
+        self.paused = True
+
+    def resume(self):
+        """Resume a song paused by ``pause``. No-op if music was already silent."""
+        if not self.paused:
+            return
+        self.paused = False
+        if self.current is None:
+            return
+        event = f"music-finished-{self.token}"
+        self.current.setFinishedEvent(event)
+        self.app.acceptOnce(event, self._play_random)
+        try:
+            self.current.setTime(self.pause_time)
+        except Exception:  # noqa: BLE001
+            pass
+        self.current.play()
+        self.pause_time = 0.0
 
     # -- internals ---------------------------------------------------------
     def _play_random(self):
@@ -69,6 +102,8 @@ class MusicPlayer:
             self.app.ignore(f"music-finished-{self.token}")  # don't chain on manual stop
             self.current.stop()
             self.current = None
+        self.paused = False
+        self.pause_time = 0.0
 
     @staticmethod
     def _title(path):

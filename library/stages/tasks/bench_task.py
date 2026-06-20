@@ -11,13 +11,12 @@ class BenchTask(TaskBase):
     key = "bench"
 
     def build_ui(self):
-        game = self.game
         lbox, rbox = self.panel_boxes(*self.bounds())
         for index, box in enumerate((lbox, rbox)):
             self.ui.add_frame(f"panel-{index}", frame_size=box, border=None)
-        self.ui.add_button("switch", "", (lbox[0] + 0.32, 0, 0.02), (0.48, 0.10), self.bind(game.toggle_switch))
+        self.ui.add_button("switch", "", (lbox[0] + 0.32, 0, 0.02), (0.48, 0.10), self.bind(self._toggle_switch))
         self.ui.add_button("flash", "FLASH ECU", ((lbox[0] + lbox[1]) / 2, 0, -0.24),
-                           (lbox[1] - lbox[0] - 0.12, 0.12), self.bind(game.flash_ecu), True, GREEN_2)
+                           (lbox[1] - lbox[0] - 0.12, 0.12), self.bind(self._flash_ecu), True, GREEN_2)
         self.ui.add_text("title_l", "SIMOSTOOLS - RE-FLASH", (lbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
         self.ui.add_text("info", "ECU is unlocked. Build a map in TUNE, then write it to the car here.",
                          (lbox[0] + 0.05, 0, 0.29), 0.034, TEXT, wordwrap=24)
@@ -42,3 +41,14 @@ class BenchTask(TaskBase):
                 line.is_visible(True)
             else:
                 line.is_visible(False)
+
+    def _toggle_switch(self):
+        self._log_result(self.game.car.toggle_switch())
+
+    def _flash_ecu(self):
+        game = self.game
+        self._log_result(game.car.flash_ecu())
+        game.unlock("first_flash", "Boot Patched, Baby")
+        if game.car.tune["fuel"] == "E30" and game.car.tune["boost"] >= 24:
+            game.unlock("e30_lifestyle", "It's Not Stage 2, It's a Lifestyle")
+        game.dave("flash")

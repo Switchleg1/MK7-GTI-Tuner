@@ -14,6 +14,7 @@ from library.core.constants import (
     DYNO_TRACE,
     DYNO_ZONE_GREEN,
     DYNO_ZONE_RED,
+    ED_BLOWN,
     GREEN,
     GREEN_2,
     LINE,
@@ -74,7 +75,7 @@ class DynoTask(TaskBase):
         if finished:
             self.pull_t = 1.0
             self.running = False
-            self.game.finish_dyno(self.result)  # record + grade-based toast/Dave quip
+            self._finish_dyno(self.result)
             self.dirty = True
         self._sample()
         self.spin -= dt * 1700
@@ -116,6 +117,22 @@ class DynoTask(TaskBase):
                 return prev["pw"] + (point["pw"] - prev["pw"]) * frac
             prev = point
         return self.points[-1]["pw"]
+
+    def _finish_dyno(self, result: dict):
+        """Record the pull, log the grade, and fire grade-based achievements/quips."""
+        game = self.game
+        self._log_result(game.car.record_dyno(result))
+        if result["blown"]:
+            game.unlock("money_shift", "Money Shift")
+            game.hurt_bro(ED_BLOWN)
+            game.dave("blown")
+        elif game.car.grade.startswith("Grade S"):
+            game.unlock("tuner_of_year", "Tuner of the Year")
+            game.dave("sgrade")
+        else:
+            game.dave("dyno")
+        if result["pop"] > 90:
+            game.unlock("cat_delete", "Cat Delete Speedrun")
 
     # -- UI ----------------------------------------------------------------
     def _gauge_layout(self):

@@ -13,6 +13,7 @@ from library.core.constants import (
     GARAGE_CAMERA,
     GREEN,
     PANEL,
+    RED,
     TASK_CAMERAS,
     TEXT,
     UI_REFRESH_SECONDS,
@@ -173,6 +174,10 @@ class TaskBase(Hud):
             self.dirty = True
         return run
 
+    def _log_result(self, result):
+        if result:
+            self.game.log(*result)
+
     # -- exhaust flames (shared by STREET pops + RACE shifts) -------------
     def spawn_flames(self, anchor, count=5):
         base = anchor.getPos(self.app.render)
@@ -233,7 +238,9 @@ class TaskBase(Hud):
         self.ui.get("header-subtitle").pos((left + 0.05, 0, 0.835))
         name = str(self.game.car.active_tune().get("name", "Stock"))[:16]
         self.ui.get("header-cash").pos((right - 0.04, 0, 0.888))
-        self.ui.get("header-cash").text(f"${round(self.game.bro.cash)}   .   ECU {self.game.car.ecu_status()}")
+        cash = self.ui.get("header-cash")
+        cash.text(f"${round(self.game.bro.cash)}   .   ECU {self.game.car.ecu_status()}")
+        cash.color(RED if self.game.bro.is_broke() else GREEN)
         self.ui.get("header-map").pos((right - 0.04, 0, 0.832))
         self.ui.get("header-map").text(
             f"MAP {self.game.car.active_slot + 1} {name}   .   REP {self.game.bro.rep()}")

@@ -3,9 +3,9 @@ from __future__ import annotations
 import random
 
 from library.core.constants import (
-    DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_BAD_REVIEW, ED_BLOWN, ED_DISCORD_BAD,
-    ED_DISCORD_GOOD_HEAL, ED_TAUNT_THRESHOLD, ED_TAUNTS, GOD_PAYOUT, GREEN_NAME_CRED,
-    MAX_LOG_LINES, MODS, PRO_MAPS, SALE_BAD, SAVE_VERSION, TUNE_SALE, WIZARD_CRED,
+    DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_DISCORD_BAD, ED_DISCORD_GOOD_HEAL,
+    ED_TAUNT_THRESHOLD, ED_TAUNTS, GOD_PAYOUT, GREEN_NAME_CRED, MAX_LOG_LINES,
+    SAVE_VERSION, WIZARD_CRED,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -18,9 +18,9 @@ from library.game.tuner_bro import TunerBro
 
 class Game:
     """Root of the save-ready model tree: a TunerBro, and a CarLibrary, plus transient 
-    session state (logs, the active race). Cross-node
-    actions (buying, pops, racing) are orchestrated here; per-node logic lives on the
-    nodes. Display reads go straight to ``game.bro`` / ``game.car``."""
+    session state (logs, advisors, unlock queues). Task-specific actions live in their
+    tasks; shared career state and cross-stage helpers stay here. Display reads go
+    straight to ``game.bro`` / ``game.car``."""
     
     # How each Discord outcome effect lands on the bro/car -- table-dispatched
     # instead of an if/elif staircase. An unknown/"none" effect falls through to
@@ -86,10 +86,6 @@ class Game:
         self.logs.append((message, kind))
         self.logs = self.logs[-MAX_LOG_LINES:]
 
-    def _log_result(self, result):
-        if result:
-            self.log(*result)
-
     # -- achievements + Dave (drained by the Notifications overlay) ---------
     def check_unlock(self, stat, table):
         for key, value in table.items():
@@ -117,56 +113,6 @@ class Game:
     def soothe_bro(self, amount: float):
         """Heal emotional damage (a win, a good outcome)."""
         self.bro.add_damage(-amount)
-
-    def finish_dyno(self, result: dict):
-        """Record the pull, log the grade, and fire grade-based achievements/quips."""
-        self._log_result(self.car.record_dyno(result))
-        if result["blown"]:
-            self.unlock("money_shift", "Money Shift")
-            self.hurt_bro(ED_BLOWN)
-            self.dave("blown")
-        elif self.car.grade.startswith("Grade S"):
-            self.unlock("tuner_of_year", "Tuner of the Year")
-            self.dave("sgrade")
-        else:
-            self.dave("dyno")
-        if result["pop"] > 90:
-            self.unlock("cat_delete", "Cat Delete Speedrun")
-
-    # -- car action facades (Car does the work, Game logs it) --------------
-    def toggle_switch(self):
-        self._log_result(self.car.toggle_switch())
-
-    def flash_ecu(self):
-        self._log_result(self.car.flash_ecu())
-        self.unlock("first_flash", "Boot Patched, Baby")
-        if self.car.tune["fuel"] == "E30" and self.car.tune["boost"] >= 24:
-            self.unlock("e30_lifestyle", "It's Not Stage 2, It's a Lifestyle")
-        self.dave("flash")
-
-    def apply_preset(self, key: str):
-        self._log_result(self.car.apply_preset(key))
-
-    def assign_slot(self):
-        self._log_result(self.car.assign_slot())
-
-    def select_slot(self, index: int):
-        self.car.select_slot(index)
-        if 0 <= index < len(self.car.slots) and self.car.slots[index]:
-            self.bro.map_switches += 1
-            if self.bro.map_switches >= 10:
-                self.unlock("stalk_wizard", "Stalk Wizard")
-            if random.random() < 0.4:
-                self.dave("mapswitch")
-
-    def buy_mod(self, mod_id: str):
-        cost = next(item[2] for item in MODS if item[0] == mod_id)
-        if self.car.mods[mod_id] or not self.bro.spend(cost):
-            return
-        self._log_result(self.car.set_mod(mod_id))
-        if all(self.car.mods.values()):
-            self.unlock("fully_built", "Fully Built (Wallet Empty)")
-        self.dave("shop")
 
     # -- discord -----------------------------------------------------------
     def ask_discord(self, text: str) -> dict:
@@ -233,47 +179,6 @@ class Game:
         self.unlock("god_status", "Passed the Trial")
         self.dave("god")
         self.log(f"TRIAL PASSED. god status granted. +${GOD_PAYOUT:,}.", "ok")
-
-    def sell_tune(self):
-        """Green-name income: flog a tune to a random user. Usually pays; sometimes
-        they brick it and leave a bad review (a cred hit)."""
-        if not self.bro.green_name:
-            return
-        if random.random() < TUNE_SALE["bad_chance"]:
-            self.bro.add_cred(-4)
-            self.hurt_bro(ED_BAD_REVIEW)
-            self.log(pick(SALE_BAD), "warn")
-            return
-        whp = self.car.compute()["whp"]
-        pay = int(TUNE_SALE["base"] + max(0.0, whp - 210) * TUNE_SALE["per_whp"])
-        self.bro.earn(pay)
-        self.bro.add_cred(TUNE_SALE["cred"])
-        self.bro.tunes_sold += 1
-        self.unlock("first_sale", "Side Hustle")
-        if self.bro.tunes_sold >= 10:
-            self.unlock("tune_mill", "Tune Mill")
-        self.log(f"sold a tune for ${pay}  ({self.bro.tunes_sold} sold)", "ok")
-        self.dave("sell")
-        self.maybe_green()
-
-    def ask_pro(self, handle: str):
-        """DM a pro for a pro-only map stage. They hand it over once you've sold
-        enough tunes to be taken seriously; otherwise they tell you to earn it."""
-        if not self.bro.green_name:
-            return
-        pro = next((p for p in self.pros if p.handle == handle), None)
-        if pro is None:
-            return
-        if pro.grant_map in self.bro.unlocked_maps:
-            self.log(f"{pro.name}: you already have {PRO_MAPS[pro.grant_map]['name']}.", "info")
-        elif self.bro.tunes_sold >= pro.min_tunes:
-            self.bro.unlock_map(pro.grant_map)
-            self.unlock("pro_network", "Pro Network")
-            self.log(f"{pro.name} hooked you up: {PRO_MAPS[pro.grant_map]['name']} unlocked.", "ok")
-            self.dave("pro")
-        else:
-            need = pro.min_tunes - self.bro.tunes_sold
-            self.log(f"{pro.name}: {pro.chatter()} (sell {need} more tune{'s' if need != 1 else ''} first)", "warn")
 
     # -- save --------------------------------------------------------------
     def to_dict(self) -> dict:
