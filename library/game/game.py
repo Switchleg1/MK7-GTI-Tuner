@@ -291,7 +291,6 @@ class Game:
             "version": SAVE_VERSION,
             "bro": self.bro.to_dict(),
             "cars": self.cars.to_dict(),
-            "rivals": [rival.to_dict() for rival in self.rivals],
             "discord": self.discord.to_dict(),
             "achievements": sorted(self.achievements),
             "total_pops": self.total_pops,
@@ -302,8 +301,6 @@ class Game:
     def from_dict(self, data: dict):
         self.bro.from_dict(data.get("bro", {}))
         self.cars.from_dict(data.get("cars", {}))
-        for rival, saved in zip(self.rivals, data.get("rivals", [])):
-            rival.from_dict(saved)
         self.discord.from_dict(data.get("discord", {}))
         self.achievements = set(data.get("achievements", []))
         self.total_pops = data.get("total_pops", 0)
