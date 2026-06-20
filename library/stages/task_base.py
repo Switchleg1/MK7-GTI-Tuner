@@ -7,7 +7,18 @@ from direct.gui.OnscreenImage import OnscreenImage
 from panda3d.core import MouseButton, Point3, TextNode, TransparencyAttrib, Vec3, Vec4
 
 from library.core.assets import assets
-from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS, WHEEL_PREFIX, WHEEL_STATIC
+from library.core.constants import (
+    BLUE,
+    DIM,
+    GARAGE_CAMERA,
+    GREEN,
+    PANEL,
+    TASK_CAMERAS,
+    TEXT,
+    UI_REFRESH_SECONDS,
+    WHEEL_PREFIX,
+    WHEEL_STATIC,
+)
 from library.game.geometry import make_box
 from library.stages.hud import Hud
 from library.core.ui.ui_object_controller import UIObjectController
@@ -36,18 +47,18 @@ class TaskBase(Hud):
         self.flames = []
         self.reactions = []
         self.allow_back = True
-        # Each task owns a UIObjectController. Its text + buttons are BUILT ONCE in
+        # Each task owns a UIObjectController. Its UI objects are BUILT ONCE in
         # build_objects() (on enter) and only tweaked afterwards (text/color/enabled/
-        # is_visible) -- they persist across redraws (no destroy/recreate per render),
-        # so clicks aren't dropped and labels don't churn. They live on their own layer,
-        # lifted above the redrawn frames/images each pass, and are freed on exit.
+        # is_visible/frame_size) -- they persist across redraws (no destroy/recreate
+        # per render), so clicks aren't dropped and labels don't churn.
         self.ui = UIObjectController(app, self.root.attachNewNode("task-ui"))
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
         self.set_camera()
         self.build_scene()
-        self.build_objects()  # create this task's text + buttons once
+        self._build_header_objects()
+        self.build_objects()  # create this task's UI objects once
         self.redraw()
         self.bind_keys()
 
@@ -75,10 +86,10 @@ class TaskBase(Hud):
 
     def build_objects(self):
         """Create this task's persistent UI objects ONCE (on enter) via
-        ``self.ui.add_text(key, ...)`` / ``self.ui.add_button(key, ...)``. After this,
-        only change their properties (``text``/``color``/``enabled``/``is_visible``) --
-        typically from ``build_ui``, which runs each redraw and also draws the transient
-        frames/images that aren't managed objects."""
+        ``self.ui.add_text(key, ...)`` / ``self.ui.add_button(key, ...)`` /
+        ``self.ui.add_frame(key, ...)`` / ``self.ui.add_image(key, ...)``. After this,
+        only change their properties (``text``/``color``/``enabled``/``is_visible`` /
+        ``frame_size``), typically from ``build_ui`` or ``tick``."""
 
     def build_ui(self, left, right):
         pass
@@ -161,7 +172,7 @@ class TaskBase(Hud):
         return False
 
     def bind(self, fn, *args):
-        """Wrap a model action so the UI redraws after it runs."""
+        """Wrap a model action so the persistent UI resyncs after it runs."""
         def run():
             fn(*args)
             self.dirty = True
@@ -204,17 +215,34 @@ class TaskBase(Hud):
                 self.reactions.remove(r)
 
     def redraw(self):
-        self.clear()                 # rebuild the transient header/frames/images
         left, right = self.bounds()
-        self.build_ui(left, right)   # draws frames/images + tweaks UI-object props (not create)
-        self.draw_header(self.game)
-        title = self.ui.get("task-title")
-        if title is None:
-            self.ui.add_text("task-title", self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
-        else:
-            title.text(self.title)
+        self.build_ui(left, right)   # sync persistent UI-object props (not create)
+        self._sync_header(left, right)
         self._sync_back()            # point the shared (game-level) Back button at this task
-        self.ui.lift()               # keep the text/buttons above the frames just rebuilt
+        self.ui.lift()
+
+    def _build_header_objects(self):
+        left, right = self.bounds()
+        self.ui.add_frame("header-frame", frame_size=(left, right, -0.085, 0.085),
+                          pos=(0, 0, 0.86), color=PANEL, border=None)
+        self.ui.add_text("header-title", "MK7 GTI TUNER", (left + 0.05, 0, 0.89), 0.05, GREEN)
+        self.ui.add_text("header-subtitle", "EA888  .  SIMOS18.1  .  POPS & BANGS  .  CAREER",
+                         (left + 0.05, 0, 0.835), 0.026, DIM)
+        self.ui.add_text("header-cash", "", (right - 0.04, 0, 0.888), 0.033, GREEN, align=TextNode.ARight)
+        self.ui.add_text("header-map", "", (right - 0.04, 0, 0.832), 0.027, TEXT, align=TextNode.ARight)
+        self.ui.add_text("task-title", self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
+
+    def _sync_header(self, left, right):
+        self.ui.get("header-frame").frame_size((left, right, -0.085, 0.085))
+        self.ui.get("header-title").pos((left + 0.05, 0, 0.89))
+        self.ui.get("header-subtitle").pos((left + 0.05, 0, 0.835))
+        name = str(self.game.car.active_tune().get("name", "Stock"))[:16]
+        self.ui.get("header-cash").pos((right - 0.04, 0, 0.888))
+        self.ui.get("header-cash").text(f"${round(self.game.bro.cash)}   .   ECU {self.game.car.ecu_status()}")
+        self.ui.get("header-map").pos((right - 0.04, 0, 0.832))
+        self.ui.get("header-map").text(
+            f"MAP {self.game.car.active_slot + 1} {name}   .   REP {self.game.bro.rep()}")
+        self.ui.get("task-title").text(self.title)
 
     def _sync_back(self):
         """The Back button is a game-level chrome button shared across tasks. Point it at
@@ -226,17 +254,11 @@ class TaskBase(Hud):
             back.is_visible(self.allow_back)
 
     def panel_boxes(self, left, right):
-        """The two panel-box extents (no drawing) -- so build_objects can place objects
-        relative to them without depending on the (redrawn) frames."""
+        """The two panel-box extents (no drawing) so build_objects can place matching
+        persistent frames and controls from the same coordinates."""
         gap = 0.04
         mid = (left + right) / 2
         return ((left, mid - gap / 2, -0.62, 0.48), (mid + gap / 2, right, -0.62, 0.48))
-
-    def panel_pair(self, left, right):
-        boxes = self.panel_boxes(left, right)
-        for box in boxes:
-            self.frame(box, (0, 0, 0), border=None)
-        return boxes
 
     def kind_color(self, kind):
         from library.core.constants import AMBER, BLUE as _B, DIM, GREEN, RED, VIOLET
@@ -246,10 +268,8 @@ class TaskBase(Hud):
         """Called every frame by the app's render loop: advance flames/reactions,
         run the subclass ``tick``, and redraw when dirty (or on the live timer).
 
-        The redraw rebuilds the transient frames/images (not the managed text/buttons),
-        so doing it while the mouse is held could still drop a click on a recreated
-        widget (the Back pill / maps sliders aren't managed objects); we defer it until
-        release -- the sim (tick) keeps running; only the rebuild waits."""
+        The redraw now only syncs persistent UI-object values, but we still defer dirty
+        updates while the mouse is held so command callbacks cannot race a click."""
         self.update_flames(dt)
         self.update_reactions(dt)
         self.tick(dt)

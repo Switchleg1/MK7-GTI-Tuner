@@ -16,6 +16,10 @@ class ShopTask(TaskBase):
     def build_objects(self):
         game = self.game
         left, right = self.bounds()
+        self.ui.add_frame("panel", frame_size=(left, right, -0.62, 0.48), border=None)
+        self.ui.add_image("emoji-cash", "emoji_cash", (left + 0.10, 0, 0.405), 0.045)
+        self.ui.add_frame("green-divider", frame_size=(left + 0.04, right - 0.04, -0.275, -0.272),
+                          color=LINE, border=None)
         for index, (mod_id, name, cost, _desc) in enumerate(MODS):
             row, col = divmod(index, 2)
             self.ui.add_button(f"mod-{mod_id}", name, (left + 0.28 + col * 0.82, 0, 0.25 - row * 0.12),
@@ -38,8 +42,6 @@ class ShopTask(TaskBase):
     def build_ui(self, left, right):
         game = self.game
         bro = game.bro
-        self.frame((left, right, -0.62, 0.48), border=None)
-        self.image("emoji_cash", (left + 0.10, 0, 0.405), 0.045)
         self.ui.get("cash").text(f"SHOP  -  CASH ${round(bro.cash)}")
         for mod_id, name, cost, _desc in MODS:
             owned = game.car.mods[mod_id]
@@ -50,7 +52,6 @@ class ShopTask(TaskBase):
 
     def _green_section(self, left, right):
         game, bro = self.game, self.game.bro
-        self.frame((left + 0.04, right - 0.04, -0.275, -0.272), (0, 0, 0), LINE, None)  # divider
         green = bro.green_name
         self.ui.get("sell").is_visible(green)
         for pro in game.pros:

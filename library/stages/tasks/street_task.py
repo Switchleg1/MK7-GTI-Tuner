@@ -18,7 +18,7 @@ class StreetTask(TaskBase):
 
     title = "SKREETS"
     key = "street"
-    live = True
+    live = False
     music_key = "skreetz"  # data/music/skreetz/
 
     def build_scene(self):
@@ -59,8 +59,9 @@ class StreetTask(TaskBase):
                 self.app.audio.overrun(self.game.car.active_pop(), 0.9)
                 self.spawn_flames(self.car, self._pops())  # cred + Karen + flames
                 self._spawn_reactions()  # floating crowd / Karen emoji popups
-                self.dirty = True  # refresh the cred / Karen readout now
+                self.dirty = True  # sync the header if a bust changed cash/rep
             self._peak_rpm = 0.0
+        self._update_readouts()
 
     def hold_throttle(self):
         """Space pressed: peg the throttle open and arm the lift-off crackle."""
@@ -90,7 +91,8 @@ class StreetTask(TaskBase):
         self.app.audio.bov()
         self.app.audio.overrun(self.game.car.active_pop(), 1.0)
         self._spawn_reactions()
-        self.dirty = True
+        self._update_readouts()
+        self.dirty = True  # sync the header if a bust changed cash/rep
 
     # -- Karen / cops (street-only mechanics) ------------------------------
     def _cool_karen(self, dt):
@@ -141,27 +143,33 @@ class StreetTask(TaskBase):
     def build_objects(self):
         left, _ = self.bounds()
         flashed = self.game.car.flashed
+        bar_x, bar_w = left + 0.06, 0.62
         self.ui.add_button("throttle", "Throttle", (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, flashed, GREEN_2)
         self.ui.add_button("pops", "Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, flashed)
         self.ui.add_text("rpm", "", (left + 0.06, 0, 0.34), 0.055, TEXT)
+        self.ui.add_image("emoji-cred", "emoji_cred", (left + 0.10, 0, 0.20), 0.05)
         self.ui.add_text("cred", "", (left + 0.20, 0, 0.185), 0.046, GREEN)
+        self.ui.add_image("emoji-karen", "emoji_karen", (left + 0.10, 0, 0.04), 0.05)
         self.ui.add_text("karen", "", (left + 0.20, 0, 0.025), 0.046, AMBER)
+        self.ui.add_frame("karen-track", frame_size=(bar_x, bar_x + bar_w, -0.075, -0.05), color=PANEL, border=None)
+        self.ui.add_frame("karen-fill", frame_size=(bar_x, bar_x + 0.001, -0.075, -0.05), color=RED, border=None)
         self.ui.add_text("hint", "Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.",
                          (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)
 
     def build_ui(self, left, right):
+        self._update_readouts()
+
+    def _update_readouts(self):
         bro = self.game.bro
         self.ui.get("rpm").text(f"{round(self.rpm)} RPM")
-        self.image("emoji_cred", (left + 0.10, 0, 0.20), 0.05)
         self.ui.get("cred").text(f"Cred {round(bro.cred)}")
-        self.image("emoji_karen", (left + 0.10, 0, 0.04), 0.05)
         karen = self.ui.get("karen")
         karen.text(f"Karen {round(bro.karen)}%")
         karen.color(RED if bro.karen >= 80 else AMBER)
-        bar_x, bar_w = left + 0.06, 0.62
-        self.frame((bar_x, bar_x + bar_w, -0.075, -0.05), color=PANEL, border=None)
+        bar_x = self.bounds()[0] + 0.06
+        bar_w = 0.62
         fill = bar_w * clamp(bro.karen / 100, 0, 1)
-        self.frame((bar_x, bar_x + max(0.001, fill), -0.075, -0.05), color=RED, border=None)
+        self.ui.get("karen-fill").frame_size((bar_x, bar_x + max(0.001, fill), -0.075, -0.05))
         throttle = self.ui.get("throttle")
         throttle.text("Throttle [HELD]" if self._held else "Throttle")
         throttle.color(GREEN if self._held else GREEN_2)

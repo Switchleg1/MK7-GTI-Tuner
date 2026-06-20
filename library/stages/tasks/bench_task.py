@@ -13,6 +13,8 @@ class BenchTask(TaskBase):
     def build_objects(self):
         game = self.game
         lbox, rbox = self.panel_boxes(*self.bounds())
+        for index, box in enumerate((lbox, rbox)):
+            self.ui.add_frame(f"panel-{index}", frame_size=box, border=None)
         self.ui.add_button("switch", "", (lbox[0] + 0.32, 0, 0.02), (0.48, 0.10), self.bind(game.toggle_switch))
         self.ui.add_button("flash", "FLASH ECU", ((lbox[0] + lbox[1]) / 2, 0, -0.24),
                            (lbox[1] - lbox[0] - 0.12, 0.12), self.bind(game.flash_ecu), True, GREEN_2)
@@ -27,7 +29,6 @@ class BenchTask(TaskBase):
 
     def build_ui(self, left, right):
         game = self.game
-        self.panel_pair(left, right)  # the two panel frames (transient)
         self.ui.get("loaded").text(f"Loaded tune: {game.car.tune.get('name', 'Your Tune')}")
         self.ui.get("switch").text(f"switch patch: {'ON' if game.car.switch_patch else 'OFF'}")
         self.ui.get("dirty").is_visible(game.car.dirty)

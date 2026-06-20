@@ -26,6 +26,9 @@ class MapsTask(TaskBase):
         car = self.game.car
         lbox, rbox = self.panel_boxes(*self.bounds())
         boxes = (lbox, rbox)
+        for index, box in enumerate(boxes):
+            self.ui.add_frame(f"panel-{index}", frame_size=box, border=None)
+        self.ui.add_image("emoji-pops", "emoji_pops", (rbox[0] + 0.10, 0, 0.305), 0.045)
         for i, fuel in enumerate(FUELS):
             self.ui.add_button(f"fuel-{fuel}", fuel, (lbox[0] + 0.42 + i * 0.20, 0, self.FUEL_Z), (0.18, 0.075),
                                (lambda f=fuel: self._set_fuel(f)), True, GREEN_2, 0.036)
@@ -50,22 +53,21 @@ class MapsTask(TaskBase):
         self.ui.add_text("burble", "", (rbox[0] + 0.19, 0, 0.30), 0.046, AMBER)
         self.ui.add_text("t-slots", "SWITCH SLOTS", (rbox[0] + 0.05, 0, -0.18), 0.032, DIM)
         for attr, box_i, z in SLIDER_ROWS:
+            vrange = next(s[2] for s in SLIDERS if s[0] == attr)
+            value = car.tune[SLIDER_KEY[attr]]
+            slider = self.ui.add_slider(attr, (boxes[box_i][0] + 0.64, 0, z), vrange, value, width=0.5)
+            slider.command_fn(self._on_slide)  # wired after build so init doesn't fire it
+            setattr(self, attr, slider)
             self.ui.add_text(f"val-{attr}", "", (boxes[box_i][0] + 0.06, 0, z + 0.035), 0.030, TEXT)
 
     def build_ui(self, left, right):
         self._ready = False
         car = self.game.car
-        lbox, rbox = self.panel_pair(left, right)
-        boxes = (lbox, rbox)
-        self.image("emoji_pops", (rbox[0] + 0.10, 0, 0.305), 0.045)
-        # Sliders are transient (rebuilt each redraw); their value labels are managed.
+        # Sliders are persistent; redraws only sync their values and labels.
         for attr, box_i, z in SLIDER_ROWS:
-            vrange = next(s[2] for s in SLIDERS if s[0] == attr)
             fmt = next(s[3] for s in SLIDERS if s[0] == attr)
             value = car.tune[SLIDER_KEY[attr]]
-            node = self.slider((boxes[box_i][0] + 0.64, 0, z), vrange, value, width=0.5)
-            setattr(self, attr, node)
-            node["command"] = self._on_slide  # wired after build so init doesn't fire it
+            getattr(self, attr).value(value)
             self.ui.get(f"val-{attr}").text(fmt(value))
         self.ui.get("burble").text(f"Burble index: {round(pop_score(car.tune))}")
         self.ui.get("dirty").text("Flash required for changed tune." if car.dirty else "")
@@ -93,12 +95,12 @@ class MapsTask(TaskBase):
         if not getattr(self, "_ready", False):
             return
         tune = self.game.car.tune
-        tune["boost"] = round(self.sl_boost["value"] * 2) / 2
-        tune["timing"] = round(self.sl_timing["value"] * 2) / 2
-        tune["lambda"] = round(self.sl_lambda["value"] / 0.005) * 0.005
-        tune["of"] = float(round(self.sl_of["value"]))
-        tune["or"] = float(round(self.sl_or["value"]))
-        tune["th"] = float(round(self.sl_th["value"]))
+        tune["boost"] = round(self.sl_boost.value() * 2) / 2
+        tune["timing"] = round(self.sl_timing.value() * 2) / 2
+        tune["lambda"] = round(self.sl_lambda.value() / 0.005) * 0.005
+        tune["of"] = float(round(self.sl_of.value()))
+        tune["or"] = float(round(self.sl_or.value()))
+        tune["th"] = float(round(self.sl_th.value()))
         self.game.car.dirty = self.game.car.flashed
         self._refresh_readouts()
 
@@ -112,4 +114,4 @@ class MapsTask(TaskBase):
     def _set_fuel(self, fuel):
         self.game.car.tune["fuel"] = fuel
         self.game.car.dirty = self.game.car.flashed
-        self.dirty = True  # discrete click -> full redraw updates the slot/readout state
+        self.dirty = True  # discrete click -> resync the readouts and slot state

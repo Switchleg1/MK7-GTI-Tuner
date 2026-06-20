@@ -33,7 +33,7 @@ class DynoTask(TaskBase):
 
     title = "DYNO"
     key = "dyno"
-    live = True
+    live = False
 
     def build_scene(self):
         self.car_np = self.add_garage_scene()
@@ -84,6 +84,8 @@ class DynoTask(TaskBase):
         if finished:  # lift off at redline -> overrun crackle
             self.app.audio.bov()
             self.app.audio.overrun(self.game.car.active_pop(), 1.1)
+        self._update_gauges()
+        self._controls()
         self._draw_graph()
 
     def _sample(self):
@@ -136,10 +138,14 @@ class DynoTask(TaskBase):
         mid = (left + right) / 2
         self.ui.add_button("run", "Run Dyno Pull", ((mid + right) / 2, 0, -0.30), (0.46, 0.12),
                            self.start_pull, self.game.car.flashed and not self.running, GREEN_2)
-        # Gauge labels (title/unit/scale static; value/min:max edited each redraw).
+        # Gauge frames and labels are persistent; values/fill sizes are edited live.
         for index, (x, z, w, h, gauge) in enumerate(self._gauge_layout()):
             label, _key, lo, hi, _danger, unit, _dec = gauge
             cx = x + w / 2
+            xr, zt = x + w, z + h
+            self.ui.add_frame(f"g{index}-tile", frame_size=(x, xr, z, zt), color=DYNO_TILE, border=LINE)
+            self.ui.add_frame(f"g{index}-green", frame_size=(x, xr, z, z), color=DYNO_ZONE_GREEN, border=None)
+            self.ui.add_frame(f"g{index}-red", frame_size=(x, xr, z, z), color=DYNO_ZONE_RED, border=None, is_visible=False)
             self.ui.add_text(f"g{index}-title", label, (cx, 0, z + h - 0.045), 0.024, TEXT, CENTER)
             for i in range(3):
                 self.ui.add_text(f"g{index}-s{i}", f"{lo + (hi - lo) * i / 2:.0f}", (x + 0.02, 0, z + h * i / 2 - 0.008), 0.020, DIM)
@@ -153,26 +159,31 @@ class DynoTask(TaskBase):
         self.ui.add_text("graph-t", f"T[{round(DYNO_RPM_RANGE[1])}]", (right - 0.03, 0, 0.40), 0.022, DIM, TextNode.ARight)
         self.ui.add_text("status", "", ((mid + right) / 2, 0, -0.42), 0.034, DIM, CENTER)
         self.ui.add_text("grade", "", ((mid + right) / 2, 0, -0.54), 0.034, DIM, CENTER, wordwrap=30)
+        self._build_graph_objects(mid + 0.04, right, -0.16, 0.50)
 
     def build_ui(self, left, right):
-        mid = (left + right) / 2
-        for index, (x, z, w, h, gauge) in enumerate(self._gauge_layout()):
-            self._gauge(index, x, z, w, h, gauge)
-        self._graph_panel(mid + 0.04, right, -0.16, 0.50)
-        self._controls(mid, right)
+        self._update_gauges()
+        self._controls()
         self._draw_graph()
 
-    def _gauge(self, index, x, z, w, h, gauge):
+    def _update_gauges(self):
+        for index, (x, z, w, h, gauge) in enumerate(self._gauge_layout()):
+            self._update_gauge(index, x, z, w, h, gauge)
+
+    def _update_gauge(self, index, x, z, w, h, gauge):
         _label, key, lo, hi, danger, _unit, decimals = gauge
-        xr, zt = x + w, z + h
-        self.frame((x, xr, z, zt), color=DYNO_TILE, border=LINE)
+        xr = x + w
         value = self.values.get(key, 0.0)
         vf = clamp((value - lo) / (hi - lo), 0, 1)
         df = clamp((danger - lo) / (hi - lo), 0, 1)
         green_top = z + h * min(vf, df)
-        self.frame((x, xr, z, green_top), color=DYNO_ZONE_GREEN, border=None)
+        self.ui.get(f"g{index}-green").frame_size((x, xr, z, green_top))
+        red = self.ui.get(f"g{index}-red")
         if vf > df:
-            self.frame((x, xr, z + h * df, z + h * vf), color=DYNO_ZONE_RED, border=None)
+            red.frame_size((x, xr, z + h * df, z + h * vf))
+            red.is_visible(True)
+        else:
+            red.is_visible(False)
         self.ui.get(f"g{index}-val").text(self._fmt(value, decimals))
         self.ui.get(f"g{index}-mm").text(
             f"{self._fmt(self.vmin.get(key, value), decimals)} : {self._fmt(self.vmax.get(key, value), decimals)}")
@@ -181,22 +192,28 @@ class DynoTask(TaskBase):
     def _fmt(value, decimals):
         return f"{value:.{decimals}f}"
 
-    def _graph_panel(self, x0, x1, z0, z1):
-        self.frame((x0, x1, z0, z1), color=DYNO_TILE, border=LINE)
-        peak = round(max((p["pw"] for p in self.points), default=0))
-        self.ui.get("graph-z").text(f"Z[{peak}]")
+    def _build_graph_objects(self, x0, x1, z0, z1):
+        self.ui.add_frame("graph-panel", frame_size=(x0, x1, z0, z1), color=DYNO_TILE, border=LINE)
         gx0, gx1, gz0, gz1 = x0 + 0.06, x1 - 0.05, z0 + 0.06, z1 - 0.16
         for i in range(5):
             gx = gx0 + (gx1 - gx0) * i / 4
-            self.frame((gx, gx + 0.003, gz0, gz1), color=DYNO_GRID, border=None)
+            self.ui.add_frame(f"graph-grid-x-{i}", frame_size=(gx, gx + 0.003, gz0, gz1),
+                              color=DYNO_GRID, border=None)
             gz = gz0 + (gz1 - gz0) * i / 4
-            self.frame((gx0, gx1, gz, gz + 0.003), color=DYNO_GRID, border=None)
+            self.ui.add_frame(f"graph-grid-z-{i}", frame_size=(gx0, gx1, gz, gz + 0.003),
+                              color=DYNO_GRID, border=None)
         self._graph_box = (gx0, gx1, gz0, gz1)
+        self._update_graph_scale()
+
+    def _update_graph_scale(self):
+        peak = round(max((p["pw"] for p in self.points), default=0))
+        self.ui.get("graph-z").text(f"Z[{peak}]")
 
     def _draw_graph(self):
         if self.graph is not None:
             self.graph.removeNode()
             self.graph = None
+        self._update_graph_scale()
         box = getattr(self, "_graph_box", None)
         if not box or not self.points:
             return
@@ -218,7 +235,7 @@ class DynoTask(TaskBase):
         if started:
             self.graph = self.root.attachNewNode(segs.create())
 
-    def _controls(self, mid, right):
+    def _controls(self):
         game = self.game
         self.ui.get("run").enabled(game.car.flashed and not self.running)
         if self.running:
