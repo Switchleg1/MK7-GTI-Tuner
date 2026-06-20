@@ -7,7 +7,7 @@ from panda3d.core import (
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 
-from library.core import storage
+from library.core import assets, storage
 from library.core.audio import GameAudio
 from library.core.config import Config
 from library.core.constants import (
@@ -63,6 +63,7 @@ class MK7Tuner3D(ShowBase):
         self.camLens.setAspectRatio(DEFAULT_ASPECT)
         self._register_overlay_bin()
         enable_gltf(self)
+        assets.preload_assets(self)
         self.setup_lights()
         self.mono_font = self.load_mono_font()
         self.audio = GameAudio(self)

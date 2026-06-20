@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from library.core.assets.assets import sound_path
+from library.core.assets.assets import load_sound
 from library.core.constants import AUDIO, FX_VOLUME
 from library.core.utils import clamp
 
@@ -49,7 +49,7 @@ class GameAudio:
 
     # -- loading -----------------------------------------------------------
     def _sound(self, key):
-        sound = self.mgr.getSound(sound_path(key), False)
+        sound = load_sound(self.mgr, key, False)
         return sound if sound is not None and sound.length() > 0 else None
 
     def _loop(self, key):
