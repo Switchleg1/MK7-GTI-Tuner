@@ -30,10 +30,10 @@ class Game:
         # lets a task hide the pills (e.g. the race hides them while it's live).
         self.simon_panel = None
         self.discord_panel = None
-        # Game-level chrome buttons (Ask Simon / Ask Discord / Back), a ButtonController
+        # Game-level chrome buttons (Ask Simon / Ask Discord / Back), a UIObjectController
         # built by the app on first hub entry. The Ask buttons open the panels above;
         # the Back button is pointed at the active task's on_back by TaskBase.
-        self.buttons = None
+        self.ui = None
         self.advisors_visible = True
         self.new_game()
 
@@ -63,9 +63,9 @@ class Game:
         while it's live and restores them when it concludes. No-op before the chrome
         buttons / panels are built (first hub entry)."""
         self.advisors_visible = visible
-        if self.buttons is not None:
+        if self.ui is not None:
             for key in ("ask_simon", "ask_discord"):
-                button = self.buttons.get(key)
+                button = self.ui.get(key)
                 if button is not None:
                     button.is_visible(visible)
         if not visible:

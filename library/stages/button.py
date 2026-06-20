@@ -11,8 +11,8 @@ from library.core.constants import (
     BUTTON_FLASH_SCALE, BUTTON_STYLES, GREEN_2, LINE, WHITE,
 )
 from library.core.utils import rgba
+from library.stages.base_object import _UNSET, BaseObject
 
-_UNSET = object()  # "argument not supplied" sentinel (so None can be a real value)
 _FLASH_SCALE = Vec4(BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, BUTTON_FLASH_SCALE, 1.0)
 _ACCENT_H = 0.015  # height of the garage-style top accent strip
 
@@ -27,28 +27,24 @@ def _brighten(color: Vec4, factor: float = BUTTON_CLICK_BRIGHTEN) -> Vec4:
     return Vec4(min(1.0, color.x * factor), min(1.0, color.y * factor), min(1.0, color.z * factor), color.w)
 
 
-class Button:
-    """One managed button in two visual styles (``style=``):
+class Button(BaseObject):
+    """A managed button (derives BaseObject) in three **styles** (`constants.BUTTON_STYLES`):
+    **box** (rounded glass: ui_box fill tinted by the colour + ui_ring border, white
+    text, click flashes the *clicked colour*), **pill** (textured simon_button, the
+    colour tints the *text*, optional left ``icon``, click flashes by colour-scale
+    brighten), and **garage** (box + a green top accent strip).
 
-    - **box** (default): a translucent rounded glass box (ui_box fill tinted by the
-      colour + ui_ring border, white text). Clicking flashes the *clicked colour*.
-    - **pill**: a textured pill (simon_button) with the colour as the *text* tint and an
-      optional left ``icon``. Clicking flashes by brightening the whole pill.
-
-    Built once (by a ButtonController) and then tweaked via getter/setter methods --
-    ``text()`` / ``color()`` / ``enabled()`` / ``is_visible()`` / ``command_fn()`` (no
-    arg = read, one arg = set). ``is_visible`` defaults True; a not-visible button is
-    stashed on ``render`` (off-screen and unclickable). ``render(dt)`` enforces
-    visibility and advances the click flash. Never destroyed by a redraw."""
+    Built once, then tweaked via ``text()`` / ``color()`` / ``enabled()`` /
+    ``is_visible()`` / ``command_fn()`` (the last two + ``pos()`` come from BaseObject).
+    ``render(dt)`` enforces visibility (BaseObject) and advances the click flash."""
 
     def __init__(self, parent, font, *, text, pos, size, command, enabled=True, is_visible=True,
                  normal_color=None, clicked_color=None, click_hold=None, text_scale=0.044,
                  style="box", icon=None):
+        super().__init__(is_visible=is_visible, enabled=enabled)
         self.font = font
         self.command = command
         self.style = BUTTON_STYLES.get(style, BUTTON_STYLES["box"])
-        self._enabled = enabled
-        self._visible = is_visible
         self.click_hold = BUTTON_CLICK_HOLD if click_hold is None else click_hold
         self.size = size
         self._flash = 0.0
@@ -58,9 +54,8 @@ class Button:
 
         w, h = size
         fs = (-w / 2, w / 2, -h / 2, h / 2)
-        # Only nudge the text for pills / icons; box buttons keep DirectButton's default.
         extra = {}
-        if icon or self.style["text_dy"]:
+        if icon or self.style["text_dy"]:  # only nudge text for pills / icons
             extra["text_pos"] = (0.06 if icon else 0.0, self.style["text_dy"])
         self.node = DirectButton(
             parent=parent, text=text, command=self._clicked, pos=pos, scale=1, text_scale=text_scale,
@@ -84,12 +79,11 @@ class Button:
                                       frameColor=_vec(self.style["accent"]), relief=DGG.FLAT,
                                       frameTexture=assets.image_path("ui_box"))
             self.accent.setTransparency(TransparencyAttrib.MAlpha)
-        if not self._visible:
-            self.node.stash()
+        self._post_init()
 
     # -- derived colours (style-aware) -------------------------------------
     def _fill(self) -> Vec4:
-        if self.style["tint"] == "fill":  # box: the colour IS the fill
+        if self.style["tint"] == "fill":  # box/garage: the colour IS the fill
             return _vec(BTN_DISABLED_FILL) if not self._enabled else self.normal_color
         return _vec(WHITE)                # pill: the texture supplies the look
 
@@ -103,6 +97,8 @@ class Button:
 
     def _refresh(self):
         """Re-apply text/ring (always) and fill (unless a fill-flash is in progress)."""
+        if self.node is None:
+            return
         self.node["text_fg"] = self._text_color()
         if self.ring is not None:
             self.ring["frameColor"] = self._ring_color()
@@ -111,7 +107,6 @@ class Button:
 
     # -- interaction -------------------------------------------------------
     def _clicked(self):
-        """DirectButton command: flash, then run the user command."""
         if not self._enabled or not self._visible:
             return
         self._flash = self.click_hold
@@ -123,13 +118,7 @@ class Button:
             self.command()
 
     def render(self, dt):
-        # Visibility: hidden buttons are stashed (off-screen AND unclickable).
-        stashed = self.node.isStashed()
-        if self._visible and stashed:
-            self.node.unstash()
-        elif not self._visible and not stashed:
-            self.node.stash()
-        # Click flash: revert once the hold elapses.
+        super().render(dt)  # visibility (BaseObject)
         if self._flash > 0.0:
             self._flash -= dt
             if self._flash <= 0.0:
@@ -138,7 +127,7 @@ class Button:
                 else:
                     self.node.clearColorScale()
 
-    # -- getter / setter properties (set any time after build) -------------
+    # -- getter / setters (visibility/enabled/pos are on BaseObject) -------
     def text(self, value=_UNSET):
         if value is _UNSET:
             return self.node["text"]
@@ -158,17 +147,6 @@ class Button:
         self._auto_clicked = value is None
         self.clicked_color = _brighten(self.normal_color) if self._auto_clicked else _vec(value)
 
-    def enabled(self, value=_UNSET):
-        if value is _UNSET:
-            return self._enabled
-        self._enabled = value
-        self._refresh()
-
-    def is_visible(self, value=_UNSET):
-        if value is _UNSET:
-            return self._visible
-        self._visible = value  # applied on the next render()
-
     def command_fn(self, value=_UNSET):
         if value is _UNSET:
             return self.command
@@ -178,11 +156,6 @@ class Button:
         if value is _UNSET:
             return self.click_hold
         self.click_hold = value
-
-    def pos(self, value=_UNSET):
-        if value is _UNSET:
-            return self.node.getPos()
-        self.node.setPos(*value)
 
     # -- bulk edit (used by the controller when (re)creating) --------------
     def configure(self, *, text=None, pos=None, size=None, command=_UNSET, enabled=None, is_visible=None,
@@ -219,6 +192,3 @@ class Button:
         if click_hold is not None:
             self.click_hold = click_hold
         self._refresh()
-
-    def destroy(self):
-        self.node.destroy()  # ring + icon are children, freed with it

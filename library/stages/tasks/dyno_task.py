@@ -116,27 +116,54 @@ class DynoTask(TaskBase):
         return self.points[-1]["pw"]
 
     # -- UI ----------------------------------------------------------------
-    def build_buttons(self):
+    def _gauge_layout(self):
+        """Per-gauge tile rects: (x, z, w, h, gauge_tuple), in a 2x3 grid on the left."""
         left, right = self.bounds()
-        cx = ((left + right) / 2 + right) / 2
-        self.buttons.add("run", "Run Dyno Pull", (cx, 0, -0.30), (0.46, 0.12), self.start_pull,
-                         self.game.car.flashed and not self.running, GREEN_2)
-
-    def build_ui(self, left, right):
         mid = (left + right) / 2
         cols, rows = 2, 3
         gx_lo, gx_hi, gz_lo, gz_hi = left, mid - 0.03, -0.60, 0.50
         tile_w, tile_h = (gx_hi - gx_lo) / cols, (gz_hi - gz_lo) / rows
+        out = []
         for index, gauge in enumerate(DYNO_GAUGES):
             row, col = divmod(index, cols)
             x = gx_lo + tile_w * col
             z = gz_hi - tile_h * (row + 1)
-            self._gauge(x + 0.012, z + 0.012, tile_w - 0.024, tile_h - 0.024, *gauge)
+            out.append((x + 0.012, z + 0.012, tile_w - 0.024, tile_h - 0.024, gauge))
+        return out
+
+    def build_objects(self):
+        left, right = self.bounds()
+        mid = (left + right) / 2
+        self.ui.add_button("run", "Run Dyno Pull", ((mid + right) / 2, 0, -0.30), (0.46, 0.12),
+                           self.start_pull, self.game.car.flashed and not self.running, GREEN_2)
+        # Gauge labels (title/unit/scale static; value/min:max edited each redraw).
+        for index, (x, z, w, h, gauge) in enumerate(self._gauge_layout()):
+            label, _key, lo, hi, _danger, unit, _dec = gauge
+            cx = x + w / 2
+            self.ui.add_text(f"g{index}-title", label, (cx, 0, z + h - 0.045), 0.024, TEXT, CENTER)
+            for i in range(3):
+                self.ui.add_text(f"g{index}-s{i}", f"{lo + (hi - lo) * i / 2:.0f}", (x + 0.02, 0, z + h * i / 2 - 0.008), 0.020, DIM)
+            self.ui.add_text(f"g{index}-val", "", (cx, 0, z + h * 0.44), 0.058, WHITE, CENTER)
+            self.ui.add_text(f"g{index}-mm", "", (cx, 0, z + h * 0.26), 0.022, DIM, CENTER)
+            self.ui.add_text(f"g{index}-unit", unit, (cx, 0, z + 0.025), 0.022, DIM, CENTER)
+        # Graph + controls labels.
+        gx0p = mid + 0.04
+        self.ui.add_text("graph-title", "POWER  whp : rpm", (gx0p + 0.03, 0, 0.45), 0.026, DYNO_TRACE)
+        self.ui.add_text("graph-z", "", (gx0p + 0.03, 0, 0.40), 0.022, DIM)
+        self.ui.add_text("graph-t", f"T[{round(DYNO_RPM_RANGE[1])}]", (right - 0.03, 0, 0.40), 0.022, DIM, TextNode.ARight)
+        self.ui.add_text("status", "", ((mid + right) / 2, 0, -0.42), 0.034, DIM, CENTER)
+        self.ui.add_text("grade", "", ((mid + right) / 2, 0, -0.54), 0.034, DIM, CENTER, wordwrap=30)
+
+    def build_ui(self, left, right):
+        mid = (left + right) / 2
+        for index, (x, z, w, h, gauge) in enumerate(self._gauge_layout()):
+            self._gauge(index, x, z, w, h, gauge)
         self._graph_panel(mid + 0.04, right, -0.16, 0.50)
         self._controls(mid, right)
         self._draw_graph()
 
-    def _gauge(self, x, z, w, h, label, key, lo, hi, danger, unit, decimals):
+    def _gauge(self, index, x, z, w, h, gauge):
+        _label, key, lo, hi, danger, _unit, decimals = gauge
         xr, zt = x + w, z + h
         self.frame((x, xr, z, zt), color=DYNO_TILE, border=LINE)
         value = self.values.get(key, 0.0)
@@ -146,13 +173,9 @@ class DynoTask(TaskBase):
         self.frame((x, xr, z, green_top), color=DYNO_ZONE_GREEN, border=None)
         if vf > df:
             self.frame((x, xr, z + h * df, z + h * vf), color=DYNO_ZONE_RED, border=None)
-        for i in range(3):
-            self.label(f"{lo + (hi - lo) * i / 2:.0f}", (x + 0.02, 0, z + h * i / 2 - 0.008), 0.020, DIM)
-        cx = x + w / 2
-        self.label(label, (cx, 0, zt - 0.045), 0.024, TEXT, align=CENTER)
-        self.label(self._fmt(value, decimals), (cx, 0, z + h * 0.44), 0.058, WHITE, align=CENTER)
-        self.label(f"{self._fmt(self.vmin.get(key, value), decimals)} : {self._fmt(self.vmax.get(key, value), decimals)}", (cx, 0, z + h * 0.26), 0.022, DIM, align=CENTER)
-        self.label(unit, (cx, 0, z + 0.025), 0.022, DIM, align=CENTER)
+        self.ui.get(f"g{index}-val").text(self._fmt(value, decimals))
+        self.ui.get(f"g{index}-mm").text(
+            f"{self._fmt(self.vmin.get(key, value), decimals)} : {self._fmt(self.vmax.get(key, value), decimals)}")
 
     @staticmethod
     def _fmt(value, decimals):
@@ -160,10 +183,8 @@ class DynoTask(TaskBase):
 
     def _graph_panel(self, x0, x1, z0, z1):
         self.frame((x0, x1, z0, z1), color=DYNO_TILE, border=LINE)
-        self.label("POWER  whp : rpm", (x0 + 0.03, 0, z1 - 0.05), 0.026, DYNO_TRACE)
         peak = round(max((p["pw"] for p in self.points), default=0))
-        self.label(f"Z[{peak}]", (x0 + 0.03, 0, z1 - 0.10), 0.022, DIM)
-        self.label(f"T[{round(DYNO_RPM_RANGE[1])}]", (x1 - 0.03, 0, z1 - 0.10), 0.022, DIM, align=TextNode.ARight)
+        self.ui.get("graph-z").text(f"Z[{peak}]")
         gx0, gx1, gz0, gz1 = x0 + 0.06, x1 - 0.05, z0 + 0.06, z1 - 0.16
         for i in range(5):
             gx = gx0 + (gx1 - gx0) * i / 4
@@ -199,14 +220,17 @@ class DynoTask(TaskBase):
 
     def _controls(self, mid, right):
         game = self.game
-        cx = (mid + right) / 2
-        self.buttons.get("run").enabled(game.car.flashed and not self.running)
+        self.ui.get("run").enabled(game.car.flashed and not self.running)
         if self.running:
             state, color = f"pulling... {round(self.values['rpm'])} rpm", AMBER
         elif game.car.flashed:
             state, color = "Loaded. Send it.", DIM
         else:
             state, color = "Flash a tune first.", DIM
-        self.label(state, (cx, 0, -0.42), 0.034, color, align=CENTER)
+        status = self.ui.get("status")
+        status.text(state)
+        status.color(color)
         grade = game.car.grade
-        self.label(grade or "Run a pull to grade the map.", (cx, 0, -0.54), 0.034, GREEN if grade.startswith("Grade") else DIM, align=CENTER, wordwrap=30)
+        grade_lbl = self.ui.get("grade")
+        grade_lbl.text(grade or "Run a pull to grade the map.")
+        grade_lbl.color(GREEN if grade.startswith("Grade") else DIM)

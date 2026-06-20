@@ -9,8 +9,8 @@ from panda3d.core import MouseButton, Point3, TextNode, TransparencyAttrib, Vec3
 from library.core.assets import assets
 from library.core.constants import BLUE, GARAGE_CAMERA, TASK_CAMERAS, UI_REFRESH_SECONDS, WHEEL_PREFIX, WHEEL_STATIC
 from library.game.geometry import make_box
-from library.stages.button_controller import ButtonController
 from library.stages.hud import Hud
+from library.stages.ui_object_controller import UIObjectController
 
 
 class TaskBase(Hud):
@@ -36,18 +36,18 @@ class TaskBase(Hud):
         self.flames = []
         self.reactions = []
         self.allow_back = True
-        # Each task owns its own button controller. Buttons are BUILT ONCE in
-        # build_buttons() (on enter) and only tweaked afterwards (text/color/enabled/
-        # is_visible) -- they persist across redraws, so clicks aren't dropped by the
-        # rebuild and they can flash on press. They live on their own layer, lifted
-        # above the redrawn frames/labels each pass, and are freed on exit.
-        self.buttons = ButtonController(app, self.root.attachNewNode("task-buttons"))
+        # Each task owns a UIObjectController. Its text + buttons are BUILT ONCE in
+        # build_objects() (on enter) and only tweaked afterwards (text/color/enabled/
+        # is_visible) -- they persist across redraws (no destroy/recreate per render),
+        # so clicks aren't dropped and labels don't churn. They live on their own layer,
+        # lifted above the redrawn frames/images each pass, and are freed on exit.
+        self.ui = UIObjectController(app, self.root.attachNewNode("task-ui"))
 
     # -- lifecycle ---------------------------------------------------------
     def enter(self):
         self.set_camera()
         self.build_scene()
-        self.build_buttons()  # create this task's buttons once
+        self.build_objects()  # create this task's text + buttons once
         self.redraw()
         self.bind_keys()
 
@@ -55,10 +55,10 @@ class TaskBase(Hud):
         audio = getattr(self.app, "audio", None)
         if audio:
             audio.silence()  # stop the engine note from droning into the next stage
-        back = self.game.buttons.get("back") if self.game.buttons is not None else None
+        back = self.game.ui.get("back") if self.game.ui is not None else None
         if back is not None:
             back.is_visible(False)  # hide the shared Back button leaving the task
-        self.buttons.destroy()  # free this task's buttons + their layer
+        self.ui.destroy()  # free this task's text + buttons + their layer
         self.scene.removeNode()
         self.destroy()
 
@@ -73,10 +73,12 @@ class TaskBase(Hud):
     def build_scene(self):
         self.add_garage_scene()
 
-    def build_buttons(self):
-        """Create this task's buttons ONCE (on enter) via ``self.buttons.add(key, ...)``.
-        After this, only change their properties (``text``/``color``/``enabled``/
-        ``is_visible``) -- typically from ``build_ui``, which runs each redraw."""
+    def build_objects(self):
+        """Create this task's persistent UI objects ONCE (on enter) via
+        ``self.ui.add_text(key, ...)`` / ``self.ui.add_button(key, ...)``. After this,
+        only change their properties (``text``/``color``/``enabled``/``is_visible``) --
+        typically from ``build_ui``, which runs each redraw and also draws the transient
+        frames/images that aren't managed objects."""
 
     def build_ui(self, left, right):
         pass
@@ -202,25 +204,25 @@ class TaskBase(Hud):
                 self.reactions.remove(r)
 
     def redraw(self):
-        self.clear()                 # rebuild decoration (labels/frames); buttons persist
+        self.clear()                 # rebuild the transient header/frames/images
         left, right = self.bounds()
+        self.build_ui(left, right)   # draws frames/images + tweaks UI-object props (not create)
         self.draw_header(self.game)
         self.label(self.title, (0, 0, 0.64), 0.052, BLUE, align=TextNode.ACenter)
         self._sync_back()            # point the shared (game-level) Back button at this task
-        self.build_ui(left, right)   # draws labels/frames + tweaks button props (not create)
-        self.buttons.lift()          # keep buttons above the frames/labels just rebuilt
+        self.ui.lift()               # keep the text/buttons above the frames just rebuilt
 
     def _sync_back(self):
         """The Back button is a game-level chrome button shared across tasks. Point it at
         this task's on_back and show it only while Back is allowed (the race hides it
         mid-run via allow_back)."""
-        back = self.game.buttons.get("back") if self.game.buttons is not None else None
+        back = self.game.ui.get("back") if self.game.ui is not None else None
         if back is not None:
             back.command_fn(self.on_back)
             back.is_visible(self.allow_back)
 
     def panel_boxes(self, left, right):
-        """The two panel-box extents (no drawing) -- so build_buttons can place buttons
+        """The two panel-box extents (no drawing) -- so build_objects can place objects
         relative to them without depending on the (redrawn) frames."""
         gap = 0.04
         mid = (left + right) / 2
@@ -240,15 +242,14 @@ class TaskBase(Hud):
         """Called every frame by the app's render loop: advance flames/reactions,
         run the subclass ``tick``, and redraw when dirty (or on the live timer).
 
-        A redraw destroys and rebuilds every button (``clear()``), so doing it while
-        the mouse button is held would drop the click: the press lands on the old
-        button and the release on its freshly-built replacement, which never saw the
-        press. So we defer the redraw until the button is released -- the sim (tick)
-        keeps running; only the UI rebuild waits."""
+        The redraw rebuilds the transient frames/images (not the managed text/buttons),
+        so doing it while the mouse is held could still drop a click on a recreated
+        widget (the Back pill / maps sliders aren't managed objects); we defer it until
+        release -- the sim (tick) keeps running; only the rebuild waits."""
         self.update_flames(dt)
         self.update_reactions(dt)
         self.tick(dt)
-        self.buttons.render(dt)  # advance click-flash (cheap; runs even while held)
+        self.ui.render(dt)  # advance object visibility + click-flash (cheap; runs even while held)
         if self._mouse_held():
             return
         now = time.perf_counter()

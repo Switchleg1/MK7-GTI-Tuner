@@ -138,24 +138,30 @@ class StreetTask(TaskBase):
                                 scale=random.uniform(0.05, 0.075), rise=random.uniform(0.30, 0.50),
                                 life=random.uniform(0.9, 1.2))
 
-    def build_buttons(self):
+    def build_objects(self):
         left, _ = self.bounds()
         flashed = self.game.car.flashed
-        self.buttons.add("throttle", "Throttle", (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, flashed, GREEN_2)
-        self.buttons.add("pops", "Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, flashed)
+        self.ui.add_button("throttle", "Throttle", (left + 0.28, 0, -0.34), (0.42, 0.12), self.do_throttle, flashed, GREEN_2)
+        self.ui.add_button("pops", "Preview Pops", (left + 0.78, 0, -0.34), (0.46, 0.12), self.do_pops, flashed)
+        self.ui.add_text("rpm", "", (left + 0.06, 0, 0.34), 0.055, TEXT)
+        self.ui.add_text("cred", "", (left + 0.20, 0, 0.185), 0.046, GREEN)
+        self.ui.add_text("karen", "", (left + 0.20, 0, 0.025), 0.046, AMBER)
+        self.ui.add_text("hint", "Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.",
+                         (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)
 
     def build_ui(self, left, right):
         bro = self.game.bro
-        self.label(f"{round(self.rpm)} RPM", (left + 0.06, 0, 0.34), 0.055, TEXT)
+        self.ui.get("rpm").text(f"{round(self.rpm)} RPM")
         self.image("emoji_cred", (left + 0.10, 0, 0.20), 0.05)
-        self.label(f"Cred {round(bro.cred)}", (left + 0.20, 0, 0.185), 0.046, GREEN)
+        self.ui.get("cred").text(f"Cred {round(bro.cred)}")
         self.image("emoji_karen", (left + 0.10, 0, 0.04), 0.05)
-        self.label(f"Karen {round(bro.karen)}%", (left + 0.20, 0, 0.025), 0.046, RED if bro.karen >= 80 else AMBER)
+        karen = self.ui.get("karen")
+        karen.text(f"Karen {round(bro.karen)}%")
+        karen.color(RED if bro.karen >= 80 else AMBER)
         bar_x, bar_w = left + 0.06, 0.62
         self.frame((bar_x, bar_x + bar_w, -0.075, -0.05), color=PANEL, border=None)
         fill = bar_w * clamp(bro.karen / 100, 0, 1)
         self.frame((bar_x, bar_x + max(0.001, fill), -0.075, -0.05), color=RED, border=None)
-        throttle = self.buttons.get("throttle")
+        throttle = self.ui.get("throttle")
         throttle.text("Throttle [HELD]" if self._held else "Throttle")
         throttle.color(GREEN if self._held else GREEN_2)
-        self.label("Hold Space to keep it pinned, then release to crackle - Preview Pops for cred. The Karen meter is watching.", (left + 0.06, 0, -0.50), 0.034, DIM, wordwrap=46)

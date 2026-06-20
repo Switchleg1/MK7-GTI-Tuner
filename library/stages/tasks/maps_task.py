@@ -6,8 +6,10 @@ from library.core.constants import (
 from library.game.tuning import pop_score
 from library.stages.task_base import TaskBase
 
-# Derived once: slider attr -> tune key (the SLIDERS table itself lives in constants).
+# Derived once: slider attr -> tune key, and each row's (attr, box index, z).
 SLIDER_KEY = {attr: key for attr, key, _, _ in SLIDERS}
+_ROW_Z = (0.30, 0.18, 0.06, 0.18, 0.06, -0.06)  # first 3 left panel, last 3 right
+SLIDER_ROWS = [(SLIDERS[i][0], 0 if i < 3 else 1, _ROW_Z[i]) for i in range(len(SLIDERS))]
 
 
 class MapsTask(TaskBase):
@@ -20,48 +22,59 @@ class MapsTask(TaskBase):
     # Fixed button Z rows (the slider rows above them are static, so these don't move).
     FUEL_Z, PRESET_Z, UMAP_Z, SLOT_Z, ASSIGN_Z = -0.05, -0.23, -0.47, -0.28, -0.628
 
-    def build_buttons(self):
+    def build_objects(self):
         car = self.game.car
         lbox, rbox = self.panel_boxes(*self.bounds())
+        boxes = (lbox, rbox)
         for i, fuel in enumerate(FUELS):
-            self.buttons.add(f"fuel-{fuel}", fuel, (lbox[0] + 0.42 + i * 0.20, 0, self.FUEL_Z), (0.18, 0.075),
-                             (lambda f=fuel: self._set_fuel(f)), True, GREEN_2, 0.036)
+            self.ui.add_button(f"fuel-{fuel}", fuel, (lbox[0] + 0.42 + i * 0.20, 0, self.FUEL_Z), (0.18, 0.075),
+                               (lambda f=fuel: self._set_fuel(f)), True, GREEN_2, 0.036)
         for index, (pkey, pname) in enumerate(PRESET_BUTTONS):
-            self.buttons.add(f"preset-{pkey}", pname, (lbox[0] + 0.21 + index * 0.30, 0, self.PRESET_Z),
-                             (0.27, 0.085), self.bind(self.game.apply_preset, pkey))
+            self.ui.add_button(f"preset-{pkey}", pname, (lbox[0] + 0.21 + index * 0.30, 0, self.PRESET_Z),
+                               (0.27, 0.085), self.bind(self.game.apply_preset, pkey))
         # A fixed pool of "unlocked map" buttons -- shown/retargeted as maps are earned.
         for i in range(4):
-            self.buttons.add(f"umap-{i}", "", (lbox[0] + 0.40, 0, self.UMAP_Z - i * 0.082), (0.74, 0.072),
-                             None, is_visible=False)
+            self.ui.add_button(f"umap-{i}", "", (lbox[0] + 0.40, 0, self.UMAP_Z - i * 0.082), (0.74, 0.072),
+                               None, is_visible=False)
         for index in range(len(car.slots)):
-            self.buttons.add(f"slot-{index}", "", (rbox[0] + 0.34, 0, self.SLOT_Z - index * 0.082),
-                             (0.56, 0.072), self.bind(self.game.select_slot, index), is_visible=(index == 0))
-        self.buttons.add("assign", "Assign Current Tune", (rbox[0] + 0.36, 0, self.ASSIGN_Z), (0.58, 0.082),
-                         self.bind(self.game.assign_slot), car.flashed)
+            self.ui.add_button(f"slot-{index}", "", (rbox[0] + 0.34, 0, self.SLOT_Z - index * 0.082),
+                               (0.56, 0.072), self.bind(self.game.select_slot, index), is_visible=(index == 0))
+        self.ui.add_button("assign", "Assign Current Tune", (rbox[0] + 0.36, 0, self.ASSIGN_Z), (0.58, 0.082),
+                           self.bind(self.game.assign_slot), car.flashed)
+        # text: static titles + dynamic readouts (slider values / burble / dirty)
+        self.ui.add_text("t-power", "POWER MAPS", (lbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
+        self.ui.add_text("t-fuel", "Fuel", (lbox[0] + 0.06, 0, -0.055), 0.032, DIM)
+        self.ui.add_text("dirty", "", (lbox[0] + 0.06, 0, self.PRESET_Z - 0.13), 0.030, AMBER)
+        self.ui.add_text("t-unlocked", "UNLOCKED MAPS", (lbox[0] + 0.06, 0, self.UMAP_Z + 0.05), 0.026, GREEN, is_visible=False)
+        self.ui.add_text("t-pops", "POPS & BANGS", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
+        self.ui.add_text("burble", "", (rbox[0] + 0.19, 0, 0.30), 0.046, AMBER)
+        self.ui.add_text("t-slots", "SWITCH SLOTS", (rbox[0] + 0.05, 0, -0.18), 0.032, DIM)
+        for attr, box_i, z in SLIDER_ROWS:
+            self.ui.add_text(f"val-{attr}", "", (boxes[box_i][0] + 0.06, 0, z + 0.035), 0.030, TEXT)
 
     def build_ui(self, left, right):
         self._ready = False
-        self.value_labels = {}
         car = self.game.car
         lbox, rbox = self.panel_pair(left, right)
-
-        # -- left panel: power maps --------------------------------------
-        self.label("POWER MAPS", (lbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
-        z = 0.30
-        for attr, key, vrange, fmt in SLIDERS[:3]:
-            self._param_row(lbox, attr, fmt, vrange, z)
-            z -= 0.12
-        self.label("Fuel", (lbox[0] + 0.06, 0, z + 0.005), 0.032, DIM)
-        z -= 0.17
-        self.lbl_dirty = self.label("Flash required for changed tune." if car.dirty else "",
-                                    (lbox[0] + 0.06, 0, z - 0.13), 0.030, AMBER)
+        boxes = (lbox, rbox)
+        self.image("emoji_pops", (rbox[0] + 0.10, 0, 0.305), 0.045)
+        # Sliders are transient (rebuilt each redraw); their value labels are managed.
+        for attr, box_i, z in SLIDER_ROWS:
+            vrange = next(s[2] for s in SLIDERS if s[0] == attr)
+            fmt = next(s[3] for s in SLIDERS if s[0] == attr)
+            value = car.tune[SLIDER_KEY[attr]]
+            node = self.slider((boxes[box_i][0] + 0.64, 0, z), vrange, value, width=0.5)
+            setattr(self, attr, node)
+            node["command"] = self._on_slide  # wired after build so init doesn't fire it
+            self.ui.get(f"val-{attr}").text(fmt(value))
+        self.ui.get("burble").text(f"Burble index: {round(pop_score(car.tune))}")
+        self.ui.get("dirty").text("Flash required for changed tune." if car.dirty else "")
         # Unlocked maps: pro-granted first (rarer), then community; capped to the pool.
         maps = self.game.bro.unlocked_maps
         ordered = ([k for k in maps if k in PRO_MAPS] + [k for k in maps if k not in PRO_MAPS])[:4]
-        if ordered:
-            self.label("UNLOCKED MAPS", (lbox[0] + 0.06, 0, self.UMAP_Z + 0.05), 0.026, GREEN)
+        self.ui.get("t-unlocked").is_visible(bool(ordered))
         for i in range(4):
-            button = self.buttons.get(f"umap-{i}")
+            button = self.ui.get(f"umap-{i}")
             if i < len(ordered):
                 key = ordered[i]
                 button.text(UNLOCKABLE_MAPS[key]["name"])
@@ -69,31 +82,12 @@ class MapsTask(TaskBase):
                 button.is_visible(True)
             else:
                 button.is_visible(False)
-
-        # -- right panel: pops & bangs + switch slots --------------------
-        self.label("POPS & BANGS", (rbox[0] + 0.05, 0, 0.40), 0.044, BLUE)
-        self.image("emoji_pops", (rbox[0] + 0.10, 0, 0.305), 0.045)
-        self.lbl_burble = self.label(f"Burble index: {round(pop_score(car.tune))}",
-                                     (rbox[0] + 0.19, 0, 0.30), 0.046, AMBER)
-        z = 0.18
-        for attr, key, vrange, fmt in SLIDERS[3:]:
-            self._param_row(rbox, attr, fmt, vrange, z)
-            z -= 0.12
-        self.label("SWITCH SLOTS", (rbox[0] + 0.05, 0, z), 0.032, DIM)
         for index, slot in enumerate(car.slots):
-            button = self.buttons.get(f"slot-{index}")
+            button = self.ui.get(f"slot-{index}")
             button.is_visible(car.switch_patch or index == 0)
             button.text(f"Slot {index + 1}: {slot.get('name', 'empty') if slot else 'empty'}")
             button.enabled(bool(slot))
-
         self._ready = True
-
-    def _param_row(self, box, attr, fmt, vrange, z):
-        value = self.game.car.tune[SLIDER_KEY[attr]]
-        self.value_labels[attr] = self.label(fmt(value), (box[0] + 0.06, 0, z + 0.035), 0.030, TEXT)
-        node = self.slider((box[0] + 0.64, 0, z), vrange, value, width=0.5)
-        setattr(self, attr, node)
-        node["command"] = self._on_slide  # wired after build so init doesn't fire it
 
     def _on_slide(self):
         if not getattr(self, "_ready", False):
@@ -110,13 +104,12 @@ class MapsTask(TaskBase):
 
     def _refresh_readouts(self):
         car = self.game.car
-        for attr, label in self.value_labels.items():
-            _, _, _, fmt = next(s for s in SLIDERS if s[0] == attr)
-            label["text"] = fmt(car.tune[SLIDER_KEY[attr]])
-        self.lbl_burble["text"] = f"Burble index: {round(pop_score(car.tune))}"
-        self.lbl_dirty["text"] = "Flash required for changed tune." if car.dirty else ""
+        for attr, key, vrange, fmt in SLIDERS:
+            self.ui.get(f"val-{attr}").text(fmt(car.tune[SLIDER_KEY[attr]]))
+        self.ui.get("burble").text(f"Burble index: {round(pop_score(car.tune))}")
+        self.ui.get("dirty").text("Flash required for changed tune." if car.dirty else "")
 
     def _set_fuel(self, fuel):
         self.game.car.tune["fuel"] = fuel
         self.game.car.dirty = self.game.car.flashed
-        self.dirty = True  # discrete click -> full redraw updates the highlight
+        self.dirty = True  # discrete click -> full redraw updates the slot/readout state

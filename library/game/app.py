@@ -17,12 +17,12 @@ from library.core.constants import (
 from library.core.music import MusicPlayer
 from library.core.panda_config import enable_gltf
 from library.game.game import Game
-from library.stages.button_controller import ButtonController
 from library.stages.discord_panel import DiscordPanel
 from library.stages.garage_stage import GarageStage
 from library.stages.menu_stage import MenuStage
 from library.stages.notifications import Notifications
 from library.stages.simon_panel import SimonPanel
+from library.stages.ui_object_controller import UIObjectController
 from library.stages.tasks.bench_task import BenchTask
 from library.stages.tasks.dyno_task import DynoTask
 from library.stages.tasks.maps_task import MapsTask
@@ -102,8 +102,8 @@ class MK7Tuner3D(ShowBase):
             self.game.simon_panel.render(dt)
         if self.game.discord_panel is not None:
             self.game.discord_panel.render(dt)
-        if self.game.buttons is not None:
-            self.game.buttons.render(dt)
+        if self.game.ui is not None:
+            self.game.ui.render(dt)
         return Task.cont
 
     # -- setup -------------------------------------------------------------
@@ -171,8 +171,8 @@ class MK7Tuner3D(ShowBase):
         behind it (the cull bin only handles what's drawn on top, not what's clicked).
         The chrome buttons lift FIRST -- above the task UI but below the panels, so an
         open Discord window's shade still covers the Ask buttons."""
-        if self.game.buttons is not None:
-            self.game.buttons.lift()
+        if self.game.ui is not None:
+            self.game.ui.lift()
         for overlay in (self.notifications, self.toast, self.game.simon_panel, self.game.discord_panel):
             if overlay is not None:
                 overlay.root.reparentTo(self.aspect2d)
@@ -234,17 +234,17 @@ class MK7Tuner3D(ShowBase):
         Back (TaskBase points it at the active task's on_back, and shows it only in a
         task). On their own OVERLAY_BIN layer so they draw over stage UI; lifted below
         the panels for mouse priority (an open Discord shade covers them)."""
-        layer = self.aspect2d.attachNewNode("game-buttons")
+        layer = self.aspect2d.attachNewNode("game-chrome")
         layer.setBin(OVERLAY_BIN, OVERLAY_SORT["panel"])
-        self.game.buttons = ButtonController(self, layer)
+        self.game.ui = UIObjectController(self, layer)
         right = self.getAspectRatio() - 0.04
         left = -self.getAspectRatio() + 0.04
-        self.game.buttons.add("ask_discord", "Ask Discord", (right - 0.34, 0, -0.71), (0.62, 0.155),
-                              self.game.discord_panel.ask, True, BLUE, 0.05, style="pill")
-        self.game.buttons.add("ask_simon", "Ask Simon", (right - 0.34, 0, -0.85), (0.60, 0.155),
-                              self.game.simon_panel.ask, True, VIOLET, 0.05, style="pill", icon="simon")
-        self.game.buttons.add("back", "< Back", (left + 0.34, 0, -0.85), (0.60, 0.155),
-                              lambda: None, True, VIOLET, 0.05, style="pill", is_visible=False)
+        self.game.ui.add_button("ask_discord", "Ask Discord", (right - 0.34, 0, -0.71), (0.62, 0.155),
+                                self.game.discord_panel.ask, True, BLUE, 0.05, style="pill")
+        self.game.ui.add_button("ask_simon", "Ask Simon", (right - 0.34, 0, -0.85), (0.60, 0.155),
+                                self.game.simon_panel.ask, True, VIOLET, 0.05, style="pill", icon="simon")
+        self.game.ui.add_button("back", "< Back", (left + 0.34, 0, -0.85), (0.60, 0.155),
+                                lambda: None, True, VIOLET, 0.05, style="pill", is_visible=False)
 
     def enter_hub(self):
         if self.game.simon_panel is None:  # build the shared panels + chrome once, on first hub entry

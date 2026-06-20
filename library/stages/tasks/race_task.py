@@ -124,38 +124,40 @@ class RaceTask(TaskBase):
         for w in wheels:
             w.setP(w.getP() - delta)
         # Status / hint / gap labels stay smooth between periodic redraws.
-        if self.dash.get("status") is not None:
+        status = self.ui.get("status")
+        if status is not None:
             text, _, hint = self._race_status()
-            self.dash["status"]["text"] = text
-            self.dash["hint"]["text"] = hint
+            status.text(text)
+            self.ui.get("hint").text(hint)
+            gap_lbl = self.ui.get("gap")
             if self.race and self.race["active"]:
                 gap = self.race["p"]["d"] - self.race["r"]["d"]
                 if abs(gap) > 0.5:
-                    self.dash["gap"]["text"] = (f"YOU +{gap:.0f}m" if gap > 0 else f"RIVAL +{-gap:.0f}m")
-                    self.dash["gap"]["text_fg"] = GREEN if gap > 0 else RED
+                    gap_lbl.text(f"YOU +{gap:.0f}m" if gap > 0 else f"RIVAL +{-gap:.0f}m")
+                    gap_lbl.color(GREEN if gap > 0 else RED)
                 else:
-                    self.dash["gap"]["text"] = "DEAD EVEN"
-                    self.dash["gap"]["text_fg"] = AMBER
+                    gap_lbl.text("DEAD EVEN")
+                    gap_lbl.color(AMBER)
             else:
-                self.dash["gap"]["text"] = ""
+                gap_lbl.text("")
 
     def _update_dash(self, rpm, gear, mph):
         d = self.dash
-        if not d:
+        if not d.get("needle"):
             return
-        # Tach needle position.
+        # Tach needle position (a frame); the digits are managed text.
         frac = clamp((rpm - 850) / (7300 - 850), 0, 1)
         d["needle"].setX(d["tach_x0"] + frac * (d["tach_x1"] - d["tach_x0"]))
-        d["rpm"]["text"] = f"{int(rpm)}"
-        d["gear"]["text"] = "N" if rpm <= 900 and gear == 1 else str(gear)
-        d["mph"]["text"] = f"{int(mph)}"
+        self.ui.get("rpm").text(f"{int(rpm)}")
+        self.ui.get("gear").text("N" if rpm <= 900 and gear == 1 else str(gear))
+        self.ui.get("mph").text(f"{int(mph)}")
         # Shift light: brightens (and the bezel goes red) past the redline.
         if rpm >= SHIFT_RPM:
             d["shift_bg"]["frameColor"] = (1.0, 0.20, 0.20, 0.90)
-            d["shift_lbl"]["text_fg"] = WHITE
+            self.ui.get("shift").color(WHITE)
         else:
             d["shift_bg"]["frameColor"] = PANEL_DARK
-            d["shift_lbl"]["text_fg"] = DIM
+            self.ui.get("shift").color(DIM)
 
     def bind_keys(self):
         self.accept("space", self.do_key)
@@ -192,58 +194,76 @@ class RaceTask(TaskBase):
                 f"Rival ran {rival['et']:.2f}s. Tune up or buy parts, then run it back.")
 
     # -- UI ----------------------------------------------------------------
-    def build_buttons(self):
+    def build_objects(self):
         game = self.game
         left, right = self.bounds()
+        C, R = TextNode.ACenter, TextNode.ARight
         # Skreets ladder (top-right): one button per rival, fixed positions.
         for index, rival in enumerate(game.rivals):
-            self.buttons.add(f"rival-{index}", f"{rival.name}  ${rival.purse}",
-                             (right - 0.42, 0, 0.58 - index * 0.075), (0.78, 0.062),
-                             self.bind(self._select_rival, index),
-                             index <= game.bro.unlocked_rival, GREEN_2, 0.026)
-        # Stage / Launch (top-left).
-        self.buttons.add("stage", "Stage & Race", (left + 0.22, 0, 0.66), (0.40, 0.085),
-                         self.bind(self._start_race), game.car.flashed, GREEN_2, 0.032)
-        self.buttons.add("launch", "Launch (SPACE)", (left + 0.22, 0, 0.56), (0.40, 0.085),
-                         self.do_key, False, None, 0.032)
+            self.ui.add_button(f"rival-{index}", f"{rival.name}  ${rival.purse}",
+                               (right - 0.42, 0, 0.58 - index * 0.075), (0.78, 0.062),
+                               self.bind(self._select_rival, index),
+                               index <= game.bro.unlocked_rival, GREEN_2, 0.026)
+        self.ui.add_button("stage", "Stage & Race", (left + 0.22, 0, 0.66), (0.40, 0.085),
+                           self.bind(self._start_race), game.car.flashed, GREEN_2, 0.032)
+        self.ui.add_button("launch", "Launch (SPACE)", (left + 0.22, 0, 0.56), (0.40, 0.085),
+                           self.do_key, False, None, 0.032)
+        # Status / ladder title / emotional-damage readout.
+        self.ui.add_text("status", "", (0, 0, 0.92), 0.046, TEXT, C, wordwrap=44)
+        self.ui.add_text("hint", "", (0, 0, 0.85), 0.028, DIM, C, wordwrap=64)
+        self.ui.add_text("gap", "", (0, 0, 0.77), 0.044, AMBER, C)
+        self.ui.add_text("ladder-title", "SKREETS LADDER", (right - 0.05, 0, 0.66), 0.030, BLUE, R, is_visible=False)
+        self.ui.add_text("ed", "", (left + 0.22, 0, 0.47), 0.026, DIM, C)
+        self.ui.add_text("ed-hint", "shaky hands - launches suffer", (left + 0.22, 0, 0.435), 0.020, DIM, C, is_visible=False)
+        # Tach dash labels (the bar geometry / needle / boxes are frames in _build_dash).
+        tx0, tx1, z1 = -0.72, 0.72, -0.76
+        span = tx1 - tx0
+        for r in (1000, 2000, 3000, 4000, 5000, 6000, 7000):
+            tx = tx0 + (r - 850) / (7300 - 850) * span
+            self.ui.add_text(f"tach-{r}", f"{r // 1000}", (tx, 0, z1 + 0.035), 0.022, DIM, C)
+        self.ui.add_text("rpm", "0", (0, 0, -0.69), 0.075, TEXT, C)
+        self.ui.add_text("t-rpm", "RPM", (0, 0, -0.62), 0.024, DIM, C)
+        self.ui.add_text("gear", "N", (tx0 - 0.13, 0, -0.84), 0.085, GREEN, C)
+        self.ui.add_text("t-gear", "GEAR", (tx0 - 0.13, 0, -0.69), 0.022, DIM, C)
+        self.ui.add_text("mph", "0", (tx1 + 0.13, 0, -0.83), 0.075, TEXT, C)
+        self.ui.add_text("t-mph", "MPH", (tx1 + 0.13, 0, -0.69), 0.022, DIM, C)
+        self.ui.add_text("shift", "SHIFT", (0, 0, -0.555), 0.034, DIM, C)
 
     def build_ui(self, left, right):
         game = self.game
-        text, color, hint = self._race_status()
-        self.dash["status"] = self.label(text, (0, 0, 0.92), 0.046, color, align=TextNode.ACenter, wordwrap=44)
-        self.dash["hint"] = self.label(hint, (0, 0, 0.85), 0.028, DIM, align=TextNode.ACenter, wordwrap=64)
-        self.dash["gap"] = self.label("", (0, 0, 0.77), 0.044, AMBER, align=TextNode.ACenter)
-
         staged = self._race_active()
-        # The rival ladder is only shown when a race isn't running.
-        if not staged:
-            self.label("SKREETS LADDER", (right - 0.05, 0, 0.66), 0.030, BLUE, align=TextNode.ARight)
+        self.ui.get("ladder-title").is_visible(not staged)
         for index in range(len(game.rivals)):
-            button = self.buttons.get(f"rival-{index}")
+            button = self.ui.get(f"rival-{index}")
             button.is_visible(not staged)
             button.enabled(index <= game.bro.unlocked_rival)
             button.color(RED if index == game.bro.selected_rival else GREEN_2)
         launching = (not staged) or not self.race["p"]["launched"]
-        self.buttons.get("stage").enabled(game.car.flashed and not staged)
-        launch = self.buttons.get("launch")
+        self.ui.get("stage").enabled(game.car.flashed and not staged)
+        launch = self.ui.get("launch")
         launch.text(("Launch" if launching else "Shift") + " (SPACE)")
         launch.enabled(staged)
-        
+        # Status / hint (also updated smoothly in tick via _spin_wheels).
+        text, color, hint = self._race_status()
+        status = self.ui.get("status")
+        status.text(text)
+        status.color(color)
+        self.ui.get("hint").text(hint)
         # Emotional damage readout (it saps power + launch grip on the strip).
         ed = game.bro.emotional_damage
-        ecol = RED if ed >= 60 else AMBER if ed >= 30 else DIM
-        self.label(f"EMOTIONAL DAMAGE  {round(ed)}%", (left + 0.22, 0, 0.47), 0.026, ecol, align=TextNode.ACenter)
-        if ed >= ED_TAUNT_THRESHOLD:
-            self.label("shaky hands - launches suffer", (left + 0.22, 0, 0.435), 0.020, DIM, align=TextNode.ACenter)
+        ed_lbl = self.ui.get("ed")
+        ed_lbl.text(f"EMOTIONAL DAMAGE  {round(ed)}%")
+        ed_lbl.color(RED if ed >= 60 else AMBER if ed >= 30 else DIM)
+        self.ui.get("ed-hint").is_visible(ed >= ED_TAUNT_THRESHOLD)
         self._build_dash(left, right)
 
     def _build_dash(self, left, right):
+        # The tach bar / needle / boxes are transient frames cached for tick updates;
+        # the digits (rpm/gear/mph/shift + tick numbers) are managed text (build_objects).
         d = self.dash
-        # Tach bar geometry (bottom centre).
         d["tach_x0"], d["tach_x1"] = -0.72, 0.72
         z0, z1 = -0.82, -0.76
         span = d["tach_x1"] - d["tach_x0"]
-        # Backdrop + zone fills.
         self.frame((d["tach_x0"] - 0.01, d["tach_x1"] + 0.01, z0 - 0.012, z1 + 0.012),
                    color=PANEL_DARK, border=BOX_LINE)
         amber_x = d["tach_x0"] + (5500 - 850) / (7300 - 850) * span
@@ -251,30 +271,16 @@ class RaceTask(TaskBase):
         self.frame((d["tach_x0"], amber_x, z0, z1), color=GREEN_2, border=None)
         self.frame((amber_x, red_x, z0, z1), color=AMBER, border=None)
         self.frame((red_x, d["tach_x1"], z0, z1), color=RED, border=None)
-        # Tick marks every 1000 rpm.
         for r in (1000, 2000, 3000, 4000, 5000, 6000, 7000):
             tx = d["tach_x0"] + (r - 850) / (7300 - 850) * span
             self.frame((tx - 0.003, tx + 0.003, z1, z1 + 0.025), color=WHITE, border=None)
-            self.label(f"{r // 1000}", (tx, 0, z1 + 0.035), 0.022, DIM, align=TextNode.ACenter)
-        # Needle (positioned in _update_dash).
         d["needle"] = self.frame((-0.006, 0.006, -0.058, 0.058), color=WHITE, border=None)
         d["needle"].setPos(d["tach_x0"], 0, (z0 + z1) / 2)
-        # Big digital RPM (above the tach).
-        d["rpm"] = self.label("0", (0, 0, -0.69), 0.075, TEXT, align=TextNode.ACenter)
-        self.label("RPM", (0, 0, -0.62), 0.024, DIM, align=TextNode.ACenter)
-        # Gear letter (left of the tach).
         gx = d["tach_x0"] - 0.13
         self.frame((gx - 0.10, gx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
-        d["gear"] = self.label("N", (gx, 0, -0.84), 0.085, GREEN, align=TextNode.ACenter)
-        self.label("GEAR", (gx, 0, -0.69), 0.022, DIM, align=TextNode.ACenter)
-        # MPH (right of the tach).
         mx = d["tach_x1"] + 0.13
         self.frame((mx - 0.10, mx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
-        d["mph"] = self.label("0", (mx, 0, -0.83), 0.075, TEXT, align=TextNode.ACenter)
-        self.label("MPH", (mx, 0, -0.69), 0.022, DIM, align=TextNode.ACenter)
-        # Shift light (centre, above the RPM digits).
         d["shift_bg"] = self.frame((-0.11, 0.11, -0.58, -0.50), color=PANEL_DARK, border=BOX_LINE)
-        d["shift_lbl"] = self.label("SHIFT", (0, 0, -0.555), 0.034, DIM, align=TextNode.ACenter)
         
     def _select_rival(self, index: int):
         if index <= self.game.bro.unlocked_rival:
