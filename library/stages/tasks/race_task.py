@@ -40,7 +40,7 @@ class RaceTask(TaskBase):
 
     title = "RACE"
     key = "race"
-    live = True
+    live = False
 
     def build_scene(self):
         assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.scene)
@@ -61,7 +61,7 @@ class RaceTask(TaskBase):
             self.app.camLens.setFov(CHASE_FOV)
         self.app.camera.setPos(*CHASE_CAM_POS)
         self.app.camera.lookAt(*CHASE_CAM_LOOK)
-        # Cached dash widgets (rebuilt each redraw; tick checks for them).
+        # Cached dash widgets, built once in build_objects and updated per-frame.
         self.dash = {}
         self.race = None
 
@@ -112,9 +112,11 @@ class RaceTask(TaskBase):
             load = AUDIO["pull_load"] if player["launched"] and not player["done"] else 0.2
             self.app.audio.set_engine(rpm, load)
             self._update_dash(rpm, gear, mph)
+            self._update_status()
         else:
             self.app.audio.idle(900)
             self._update_dash(850, 1, 0)
+            self._update_status()
 
     def _spin_wheels(self, wheels, velocity_mps, dt):
         # Roughly: angular velocity (deg/s) = v / circumference * 360.
@@ -123,11 +125,14 @@ class RaceTask(TaskBase):
         delta = velocity_mps / TIRE_CIRC * 360.0 * dt
         for w in wheels:
             w.setP(w.getP() - delta)
-        # Status / hint / gap labels stay smooth between periodic redraws.
+
+    def _update_status(self):
+        # Status / hint / gap labels stay smooth without periodic redraws.
         status = self.ui.get("status")
         if status is not None:
-            text, _, hint = self._race_status()
+            text, color, hint = self._race_status()
             status.text(text)
+            status.color(color)
             self.ui.get("hint").text(hint)
             gap_lbl = self.ui.get("gap")
             if self.race and self.race["active"]:
@@ -215,7 +220,9 @@ class RaceTask(TaskBase):
         self.ui.add_text("ladder-title", "SKREETS LADDER", (right - 0.05, 0, 0.66), 0.030, BLUE, R, is_visible=False)
         self.ui.add_text("ed", "", (left + 0.22, 0, 0.47), 0.026, DIM, C)
         self.ui.add_text("ed-hint", "shaky hands - launches suffer", (left + 0.22, 0, 0.435), 0.020, DIM, C, is_visible=False)
-        # Tach dash labels (the bar geometry / needle / boxes are frames in _build_dash).
+        # Tach dash geometry and labels. Everything here is built once; tick/build_ui
+        # only move the needle and update text/color/visibility.
+        self._build_dash_objects()
         tx0, tx1, z1 = -0.72, 0.72, -0.76
         span = tx1 - tx0
         for r in (1000, 2000, 3000, 4000, 5000, 6000, 7000):
@@ -255,32 +262,41 @@ class RaceTask(TaskBase):
         ed_lbl.text(f"EMOTIONAL DAMAGE  {round(ed)}%")
         ed_lbl.color(RED if ed >= 60 else AMBER if ed >= 30 else DIM)
         self.ui.get("ed-hint").is_visible(ed >= ED_TAUNT_THRESHOLD)
-        self._build_dash(left, right)
 
-    def _build_dash(self, left, right):
-        # The tach bar / needle / boxes are transient frames cached for tick updates;
-        # the digits (rpm/gear/mph/shift + tick numbers) are managed text (build_objects).
+    def _build_dash_objects(self):
         d = self.dash
         d["tach_x0"], d["tach_x1"] = -0.72, 0.72
         z0, z1 = -0.82, -0.76
         span = d["tach_x1"] - d["tach_x0"]
-        self.frame((d["tach_x0"] - 0.01, d["tach_x1"] + 0.01, z0 - 0.012, z1 + 0.012),
-                   color=PANEL_DARK, border=BOX_LINE)
         amber_x = d["tach_x0"] + (5500 - 850) / (7300 - 850) * span
         red_x = d["tach_x0"] + (SHIFT_RPM - 850) / (7300 - 850) * span
-        self.frame((d["tach_x0"], amber_x, z0, z1), color=GREEN_2, border=None)
-        self.frame((amber_x, red_x, z0, z1), color=AMBER, border=None)
-        self.frame((red_x, d["tach_x1"], z0, z1), color=RED, border=None)
+
+        self.ui.add_frame(
+            "dash-tach-bg",
+            frame_size=(d["tach_x0"] - 0.01, d["tach_x1"] + 0.01, z0 - 0.012, z1 + 0.012),
+            color=PANEL_DARK, border=BOX_LINE)
+        self.ui.add_frame("dash-zone-green", frame_size=(d["tach_x0"], amber_x, z0, z1),
+                          color=GREEN_2, border=None)
+        self.ui.add_frame("dash-zone-amber", frame_size=(amber_x, red_x, z0, z1),
+                          color=AMBER, border=None)
+        self.ui.add_frame("dash-zone-red", frame_size=(red_x, d["tach_x1"], z0, z1),
+                          color=RED, border=None)
         for r in (1000, 2000, 3000, 4000, 5000, 6000, 7000):
             tx = d["tach_x0"] + (r - 850) / (7300 - 850) * span
-            self.frame((tx - 0.003, tx + 0.003, z1, z1 + 0.025), color=WHITE, border=None)
-        d["needle"] = self.frame((-0.006, 0.006, -0.058, 0.058), color=WHITE, border=None)
+            self.ui.add_frame(f"dash-tick-{r}", frame_size=(tx - 0.003, tx + 0.003, z1, z1 + 0.025),
+                              color=WHITE, border=None)
+        d["needle"] = self.ui.add_frame("dash-needle", frame_size=(-0.006, 0.006, -0.058, 0.058),
+                                        color=WHITE, border=None)
         d["needle"].pos((d["tach_x0"], 0, (z0 + z1) / 2))
+
         gx = d["tach_x0"] - 0.13
-        self.frame((gx - 0.10, gx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
+        self.ui.add_frame("dash-gear-box", frame_size=(gx - 0.10, gx + 0.10, -0.90, -0.66),
+                          color=PANEL_DARK, border=BOX_LINE)
         mx = d["tach_x1"] + 0.13
-        self.frame((mx - 0.10, mx + 0.10, -0.90, -0.66), color=PANEL_DARK, border=BOX_LINE)
-        d["shift_bg"] = self.frame((-0.11, 0.11, -0.58, -0.50), color=PANEL_DARK, border=BOX_LINE)
+        self.ui.add_frame("dash-mph-box", frame_size=(mx - 0.10, mx + 0.10, -0.90, -0.66),
+                          color=PANEL_DARK, border=BOX_LINE)
+        d["shift_bg"] = self.ui.add_frame("dash-shift-bg", frame_size=(-0.11, 0.11, -0.58, -0.50),
+                                          color=PANEL_DARK, border=BOX_LINE)
         
     def _select_rival(self, index: int):
         if index <= self.game.bro.unlocked_rival:
@@ -391,6 +407,7 @@ class RaceTask(TaskBase):
         self.race["active"] = False
         self.allow_back = True
         game.set_advisors_visible(True)  # race over -- bring the advisor pills back
+        self.dirty = True
 
     def _race_result_text(self) -> str:
         if not self.race:
