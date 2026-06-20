@@ -130,6 +130,7 @@ REPS = [(0, "Civic Bait"), (60, "Cars & Coffee Regular"), (160, "Local Legend"),
 
 # Dyno grade bands: (minimum score, grade letter, flavour note). Iterated high->low.
 GRADE_TABLE = [
+    (95, "F", "you know what this means")
     (85, "S", "tuner of the year"),
     (72, "A", "fast, loud, barely legal"),
     (58, "B", "solid, more in it"),
