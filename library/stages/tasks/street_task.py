@@ -6,7 +6,7 @@ import time
 
 from library.core.constants import (
     AMBER, BUST_FINE, DIM, ED_BUST, GREEN, GREEN_2, POP_CRED_CONST,
-    KAREN_AFTER_BUST, KAREN_COOLDOWN_PER_SEC, KAREN_HEAT_CONST, 
+    KAREN_AFTER_BUST, KAREN_COOLDOWN_PER_SEC, KAREN_HEAT_CONST,
     PANEL, RED, TEXT, POP_UNLOCKS, BUST_UNLOCKS
 )
 from library.core.utils import clamp

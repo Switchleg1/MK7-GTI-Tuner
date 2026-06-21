@@ -96,10 +96,90 @@ FUEL = {
 DEFAULT_TUNE = {"boost": 20.0, "timing": 12.0, "lambda": 0.83, "fuel": "93", "of": 35.0, "or": 30.0, "th": 25.0, "name": "Your Tune"}
 
 PRESETS = {
-    "stock": {"boost": 18.0, "timing": 10.0, "lambda": 0.85, "fuel": "91", "of": 8.0, "or": 6.0, "th": 5.0, "name": "Stock"},
-    "stage1": {"boost": 22.0, "timing": 13.0, "lambda": 0.83, "fuel": "93", "of": 30.0, "or": 28.0, "th": 25.0, "name": "Stage 1"},
-    "stage2": {"boost": 24.5, "timing": 14.0, "lambda": 0.82, "fuel": "E30", "of": 45.0, "or": 42.0, "th": 40.0, "name": "Stage 2 E30"},
-    "crackle": {"boost": 23.0, "timing": 13.0, "lambda": 0.84, "fuel": "E30", "of": 95.0, "or": 92.0, "th": 85.0, "name": "Crackle Monster"},
+    "stock": {
+        "boost": 18.0,
+        "timing": 10.0,
+        "lambda": 0.85,
+        "fuel": "91",
+        "of": 8.0,
+        "or": 6.0,
+        "th": 5.0,
+        "name": "Stock"
+    },
+    "stage1": {
+        "boost": 22.0,
+        "timing": 13.0,
+        "lambda": 0.83,
+        "fuel": "93",
+        "of": 30.0,
+        "or": 28.0,
+        "th": 25.0,
+        "name": "Stage 1"
+    },
+    "stage2": {
+        "boost": 24.5,
+        "timing": 14.0,
+        "lambda": 0.82,
+        "fuel": "E30",
+        "of": 45.0,
+        "or": 42.0,
+        "th": 40.0,
+        "name": "Stage 2 E30"
+    },
+    "crackle": {
+        "boost": 23.0,
+        "timing": 13.0,
+        "lambda": 0.84,
+        "fuel": "E30",
+        "of": 95.0,
+        "or": 92.0,
+        "th": 85.0,
+        "name": "Crackle Monster"
+    },
+}
+
+# Community maps unlockable via Discord (selectable in TUNE once unlocked).
+COMMUNITY_MAPS = {
+    "exley_stage_e": {
+        "boost": 21.0,
+        "timing": 12.0,
+        "lambda": 0.82,
+        "fuel": "93",
+        "of": 28.0,
+        "or": 26.0,
+        "th": 22.0,
+        "name": "Exley Stage E"
+    },
+    "zumble_jb4": {
+        "boost": 25.5,
+        "timing": 11.0,
+        "lambda": 0.83,
+        "fuel": "93",
+        "of": 40.0,
+        "or": 38.0,
+        "th": 35.0,
+        "name": "Zumble JB4 Stack"
+    },
+    "wunder_remote": {
+        "boost": 24.0,
+        "timing": 14.0,
+        "lambda": 0.81,
+        "fuel": "E30",
+        "of": 50.0,
+        "or": 48.0,
+        "th": 44.0,
+        "name": "Wunder Remote v3"
+    },
+    "bri3d_leak": {
+        "boost": 26.0,
+        "timing": 15.0,
+        "lambda": 0.80,
+        "fuel": "E85",
+        "of": 90.0,
+        "or": 88.0,
+        "th": 80.0,
+        "name": "bri3d leaked E85"
+    },
 }
 
 # TUNE-screen UI tables: preset buttons (key, label), the fuel choices, and the
@@ -540,6 +620,28 @@ MODES = [
 ]
 
 # --------------------------------------------------------------------------
+# Arcade scoreboard. A single running score on the bro (TunerBro.score), fed by
+# races, pops & bangs, achievements, and the Bench Wizard's Trial. The SCORE task
+# shows it on an 80s arcade hall-of-fame board against made-up handles whose fixed
+# scores span a full playthrough, so the player climbs the board as they progress.
+# --------------------------------------------------------------------------
+SCOREBOARD_NAMES = [
+    ("ED",      7500),
+    ("DAVE",    6200),
+    ("SIMON",   4400),
+    ("DAMON",   2100),
+    ("EDDY",    1050),
+    ("1LOW",    480),
+    ("TACOS",   210),
+    ("BURN",    90),
+    ("N00B",    30),
+]
+
+# Arcade neon palette for the SCORE board.
+ARCADE_BG = rgba("#05060a", 1.0)
+ARCADE_SCANLINE = rgba("#0c1830", 0.5)
+
+# --------------------------------------------------------------------------
 # Discord ("MQB Vibe Coders") -- the chat window + community roster.
 # Roster rows feed DiscordUser subclasses (role -> Admin/GreenName/NormalUser);
 # "persona" drives chatter flavour and the help-request outcome lean. Only a
@@ -702,14 +804,6 @@ DISCORD_LOG_WORDS = ["log", "datalog", "longview", "data log"]
 DISCORD_GOOD_WORDS = ["boost", "knock", "kr", "lambda", "timing", "egt", "e85", "e30",
                       "fmic", "intercooler", "downpipe", "fuel", "3rd gear", "wot", "afr", "octane"]
 
-# Community maps unlockable via Discord (selectable in TUNE once unlocked).
-COMMUNITY_MAPS = {
-    "exley_stage_e": {"boost": 21.0, "timing": 12.0, "lambda": 0.82, "fuel": "93", "of": 28.0, "or": 26.0, "th": 22.0, "name": "Exley Stage E"},
-    "zumble_jb4": {"boost": 25.5, "timing": 11.0, "lambda": 0.83, "fuel": "93", "of": 40.0, "or": 38.0, "th": 35.0, "name": "Zumble JB4 Stack"},
-    "wunder_remote": {"boost": 24.0, "timing": 14.0, "lambda": 0.81, "fuel": "E30", "of": 50.0, "or": 48.0, "th": 44.0, "name": "Wunder Remote v3"},
-    "bri3d_leak": {"boost": 26.0, "timing": 15.0, "lambda": 0.80, "fuel": "E85", "of": 90.0, "or": 88.0, "th": 80.0, "name": "bri3d leaked E85"},
-}
-
 # Discord window layout (aspect2d units).
 DISCORD_WIN = {"half_w": 1.46, "half_h": 0.80, "center_z": 0.02}
 DISCORD_RAIL_W = 0.14      # server icon rail
@@ -720,13 +814,28 @@ DISCORD_MSG_LINES = 7      # messages shown in the scrollback
 DISCORD_ONLINE_MAX = 8
 DISCORD_OFFLINE_MAX = 5
 
+
+# --------------------------------------------------------------------------
+# The Bench Wizard (secret endgame): once a pro builds enough cred, a mystery
+# tuner DMs a three-part Trial. Pass it -> god status + a giant one-time payout.
+# Pure arcade flavour.
+# --------------------------------------------------------------------------
+WIZARD_CRED = 10000         # cred needed before the Wizard's DM arrives
+GOD_PAYOUT  = 1_000_000     # one-time reward for passing the Trial
+
+# --------------------------------------------------------------------------
+# Amount of credit earned when completing certain things
+# --------------------------------------------------------------------------
+DEFAULT_UNLOCK_CRED     = 200
+ECU_UNLOCK_CRED         = 100
+GOD_UNLOCK_CRED         = 500       # passing the Bench Wizard's Trial (god status)
+
 # --------------------------------------------------------------------------
 # Green Name path: cross the cred bar to go verified, then sell tunes for cash
 # and DM the pros (Ed / Dave) for pro-only map stages -- while the Discord stops
 # spoon-feeding you in #help. EDIT FREELY (handles, lines, maps).
 # --------------------------------------------------------------------------
-GREEN_NAME_CRED = 200  # cred needed before the community hands you the green name
-
+GREEN_NAME_CRED = 200       # cred needed before the community hands you the green name
 
 #-------------------------------------------------------------------------------
 # Minimum amount allowed in the bro's bank account when braking parts or getting 
@@ -765,14 +874,6 @@ DISCORD_GREEN_BRUSHOFF = [
     "we don't spoon-feed green names",
 ]
 
-# --------------------------------------------------------------------------
-# The Bench Wizard (secret endgame): once a pro builds enough cred, a mystery
-# tuner DMs a three-part Trial. Pass it -> god status + a giant one-time payout.
-# Pure arcade flavour.
-# --------------------------------------------------------------------------
-WIZARD_CRED = 500        # cred needed before the Wizard's DM arrives
-GOD_PAYOUT = 1_000_000   # one-time reward for passing the Trial
-
 # Trial board data. Phase 1: power the rig by clicking these in order. Phase 2:
 # land the probes on the live pads, avoid the decoys. Plus board geometry (world
 # units in the stage's 3D scene) and the pad color-scales.
@@ -798,14 +899,15 @@ BUST_FINE = 250                # base citation; scaled by your cred / rep
 KAREN_AFTER_BUST = 30.0        # they don't forget instantly
 
 POP_UNLOCKS = {
-    50: ("burble_brain", "Burble Brain"),
-    90: ("cat_delete", "Cat Delete Speedrun"),
-    150: ("onelow", "Onelow status"),
+    50: ("burble_brain", "Burble Brain", 150),
+    90: ("cat_delete", "Cat Delete Speedrun", 300),
+    150: ("onelow", "Onelow status", 600),
 }
 
 BUST_UNLOCKS = {
-    1: ("menace", "Neighborhood Menace"),
-    2: ("karen_killer", "Karen Killer")
+    1: ("menace", "Neighborhood Menace", 150),
+    2: ("karen_killer", "Karen Killer", 300),
+    2: ("on_parol", "Out On Parole", 600),
 }
 
 # --------------------------------------------------------------------------

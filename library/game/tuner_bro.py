@@ -75,7 +75,7 @@ class TunerBro:
                 "green_name", "tunes_sold", "god", 
                 "emotional_damage",
                 "total_pops", "total_busts",
-                "map_switches",
+                "map_switches", "score",
             )
         }
 

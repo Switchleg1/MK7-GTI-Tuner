@@ -5,7 +5,7 @@ import random
 from library.core.constants import (
     DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_DISCORD_BAD, ED_DISCORD_GOOD_HEAL,
     ED_TAUNT_THRESHOLD, ED_TAUNTS, GOD_PAYOUT, GREEN_NAME_CRED, MAX_LOG_LINES,
-    SAVE_VERSION, WIZARD_CRED,
+    SAVE_VERSION, GOD_UNLOCK_CRED, DEFAULT_UNLOCK_CRED, WIZARD_CRED,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -93,11 +93,12 @@ class Game:
             if stat >= key:
                 self.unlock(k, s)
                 
-    def unlock(self, key: str, label: str) -> bool:
+    def unlock(self, key: str, label: str, credit: int = DEFAULT_UNLOCK_CRED) -> bool:
         if key in self.achievements:
             return False
         self.achievements.add(key)
         self.toast_queue.append(label)
+        self.bro.add_cred(credit)  # achievements feed the arcade score
         return True
 
     def dave(self, pool: str):
@@ -176,6 +177,7 @@ class Game:
             return
         self.bro.god = True
         self.bro.earn(GOD_PAYOUT)
+        self.bro.add_cred(GOD_UNLOCK_CRED)  # the Wizard's Trial is the big arcade payout
         self.unlock("god_status", "Passed the Trial")
         self.dave("god")
         self.log(f"TRIAL PASSED. god status granted. +${GOD_PAYOUT:,}.", "ok")

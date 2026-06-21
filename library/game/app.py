@@ -12,7 +12,7 @@ from library.core.audio import GameAudio
 from library.core.config import Config
 from library.core.constants import (
     BG, BLUE, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, OVERLAY_BIN, OVERLAY_SORT,
-    TOAST_SECONDS, VIOLET, WINDOW_TITLE,
+    TOAST_SECONDS, VIOLET, WINDOW_TITLE, ECU_UNLOCK_CRED
 )
 from library.core.music import MusicPlayer
 from library.core.panda_config import enable_gltf
@@ -27,6 +27,7 @@ from library.stages.tasks.bench_task import BenchTask
 from library.stages.tasks.dyno_task import DynoTask
 from library.stages.tasks.maps_task import MapsTask
 from library.stages.tasks.race_task import RaceTask
+from library.stages.tasks.scoreboard_task import ScoreboardTask
 from library.stages.tasks.shop_task import ShopTask
 from library.stages.tasks.street_task import StreetTask
 from library.stages.toast import Toast
@@ -40,6 +41,7 @@ TASK_CLASSES = {
     "street": StreetTask,
     "race": RaceTask,
     "shop": ShopTask,
+    "scoreboard": ScoreboardTask,
 }
 
 
@@ -191,7 +193,7 @@ class MK7Tuner3D(ShowBase):
         # mark_unlocked() and wipe the player's flashed tune + switch-patch slots.
         self.game.car.mark_unlocked()
         self.session_started = True
-        if self.game.unlock("first_flash", "Boot Patched, Baby"):
+        if self.game.unlock("first_flash", "Boot Patched, Baby", ECU_UNLOCK_CRED):
             self.game.dave("flash")
         self.enter_hub()
 
@@ -257,7 +259,8 @@ class MK7Tuner3D(ShowBase):
                 panel.root.setBin(OVERLAY_BIN, OVERLAY_SORT["panel"])  # over stage UI, under toasts
             self._build_chrome_buttons()
         self.set_stage(GarageStage(self, self.game, on_pick=self.open_task,
-                                   on_summon=self.open_wizard, on_menu=lambda: self.enter_menu(resumable=True)))
+                                   on_summon=self.open_wizard, on_menu=lambda: self.enter_menu(resumable=True),
+                                   on_scores=lambda: self.open_task("scoreboard")))
 
     def open_task(self, key: str):
         self.set_stage(TASK_CLASSES[key](self, self.game, on_back=self.enter_hub))

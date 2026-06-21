@@ -14,12 +14,13 @@ class GarageStage(Hud):
 
     music_key = "garage"
 
-    def __init__(self, app, game, on_pick, on_summon=None, on_menu=None):
+    def __init__(self, app, game, on_pick, on_summon=None, on_menu=None, on_scores=None):
         super().__init__(app, "garage-hub")
         self.game = game
         self.on_pick = on_pick
         self.on_summon = on_summon  # launch the Bench Wizard Trial when summoned
         self.on_menu = on_menu      # open the pause menu (save / load / options)
+        self.on_scores = on_scores  # open the arcade high-score board
         self.scene = app.render.attachNewNode("scene-garage")
         self.car = None
 
@@ -50,6 +51,8 @@ class GarageStage(Hud):
         self._draw_header(left, right)
         if self.on_menu:
             self.ui.add_button("menu", "MENU", (left + 0.21, 0, 0.66), (0.34, 0.09), self.on_menu, True, PANEL, 0.04)
+        if self.on_scores:
+            self.ui.add_button("scores", "HIGH SCORES", (right - 0.27, 0, 0.66), (0.46, 0.09), self.on_scores, True, VIOLET, 0.038)
         self.ui.add_text("title", "GARAGE", (0, 0, 0.66), 0.06, GREEN, align=TextNode.ACenter)
         self.ui.add_text("subtitle", "Pick a task. Ask Simon if you're stuck.", (0, 0, 0.58), 0.034, DIM, align=TextNode.ACenter)
         if self.on_summon and self.game.wizard_available():

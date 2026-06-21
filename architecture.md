@@ -97,12 +97,13 @@ library/
              config.py storage.py
   game/      app.py game.py tuner_bro.py rival_green_name.py car.py car_library.py
              discord.py discord_user.py discord_admin.py discord_green_name.py
-             discord_normal_user.py geometry.py tuning.py simos.py
+             discord_normal_user.py geometry.py tuning.py simos.py scoreboard.py
   stages/    hud.py task_base.py garage_stage.py menu_stage.py simon_panel.py discord_panel.py
              wizard_trial_stage.py unlock_stage.py toast.py notifications.py phone_screen.py
              character.py picker.py progress_bar.py
              base_object.py text.py button.py frame.py image.py slider.py entry.py ui_object_controller.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
+             scoreboard_task.py
   assetgen/  glb_builder.py asset_*.py generate_assets.py   (offline; not shipped)
 data/        models/*.glb  images/*.png  audio/*.wav
 ```
@@ -222,7 +223,8 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   the "wheels fly off" bug). Falls back to the old procedural `tire_`/`rim_` nodes if a
   model has no `w:` geometry.
 - `garage_stage.py` — `GarageStage(Hud)`: the home hub — ground + glb GTI on a slow
-  turntable, header, a **MENU** button (`on_menu`), and a row of task cards from `MODES`.
+  turntable, header, a **MENU** button (`on_menu`), a **HIGH SCORES** button (`on_scores`
+  → opens the scoreboard task), and a row of task cards from `MODES`.
   Its buttons go through its own `UIObjectController` (`self.ui`): the task cards use
   the **garage** style (green accent), MENU + the wizard DM use `box`. `on_pick(key)`.
   All four of these screens express their UI as **managed objects on `self.ui`** (a
@@ -299,8 +301,9 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   (`SAVE_VERSION 1` saved the ladder and froze stale specs into old saves — e.g. a rival's
   `model` — so a constant edit didn't take effect on load; v2 drops it.)
 - `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress,
-  `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`). Room
-  for emotional damage / route / skills.
+  `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`), and the
+  arcade `scoreboard.py` — `build_scoreboard(name, score)`: the arcade hall-of-fame — the fixed
+  made-up handles (`SCOREBOARD_NAMES`) plus the player's row, sorted + ranked.
 - `rival_green_name.py` — `RivalGreenName`: a ladder rival = encounter metadata
   (`name`/`purse`/`color`/win-loss clips) **plus a `Car`** built from the spec's `car_id`
   (from `RIVALS`). Rivals start mod-free; the ladder will be tuned later by giving them
@@ -349,6 +352,15 @@ gear + final drive + tire circ, `_step_car` makes power = `whp_at(curve, rpm)` (
 at low speed, **zero on the rev limiter** so you must shift), and the rival `_auto_shift`s
 near its redline (the player shifts on SPACE). Each car's curve + mass/grip are built once
 per run in `_start_race`.
+
+The **ScoreboardTask** (`library/stages/tasks/scoreboard_task.py`, opened by the garage's
+HIGH SCORES button) is an 80s-arcade HALL OF FAME: a CRT backdrop + scanlines, the bro's
+big `score`, a stats line, and a ranked board from `scoreboard.build_scoreboard` (the player
+vs the made-up handles), with the player's row + exit prompt blinking in `tick`. The score
+itself is accrued through the existing flow — **race wins** (`race_task._resolve_race`,
+purse), **pops** (`street_task._register_pops`),
+**achievements** (`Game.unlock`, `SCORE_PER_ACHIEVEMENT`), and the **Trial**
+(`Game.grant_god`, `GOD_SCORE`)
 
 ## Key conventions
 
