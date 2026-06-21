@@ -128,8 +128,6 @@ class MapsTask(TaskBase):
         game = self.game
         game.car.select_slot(index)
         if 0 <= index < len(game.car.slots) and game.car.slots[index]:
-            game.bro.map_switches += 1
-            if game.bro.map_switches >= 10:
-                game.unlock("stalk_wizard", "Stalk Wizard")
+            game.bro.map_switches += 1  # the stalk_wizard trophy is polled off map_switches
             if random.random() < 0.4:
                 game.dave("mapswitch")

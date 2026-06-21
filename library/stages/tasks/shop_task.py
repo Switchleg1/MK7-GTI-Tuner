@@ -83,9 +83,7 @@ class ShopTask(TaskBase):
         cost = next(item[2] for item in MODS if item[0] == mod_id)
         if game.car.mods[mod_id] or not game.bro.spend(cost):
             return
-        self._log_result(game.car.set_mod(mod_id))
-        if all(game.car.mods.values()):
-            game.unlock("fully_built", "Fully Built (Wallet Empty)")
+        self._log_result(game.car.set_mod(mod_id))  # fully_built trophy is polled off car.fully_built
         game.dave("shop")
 
     def _sell_tune(self):
@@ -102,10 +100,7 @@ class ShopTask(TaskBase):
         pay = int(TUNE_SALE["base"] + max(0.0, whp - 210) * TUNE_SALE["per_whp"])
         game.bro.earn(pay)
         game.bro.add_cred(TUNE_SALE["cred"])
-        game.bro.tunes_sold += 1
-        game.unlock("first_sale", "Side Hustle")
-        if game.bro.tunes_sold >= 10:
-            game.unlock("tune_mill", "Tune Mill")
+        game.bro.tunes_sold += 1  # first_sale / tune_mill trophies are polled off tunes_sold
         game.log(f"sold a tune for ${pay}  ({game.bro.tunes_sold} sold)", "ok")
         game.dave("sell")
         game.maybe_green()
@@ -121,8 +116,7 @@ class ShopTask(TaskBase):
         if pro.grant_map in game.bro.unlocked_maps:
             game.log(f"{pro.name}: you already have {PRO_MAPS[pro.grant_map]['name']}.", "info")
         elif game.bro.tunes_sold >= pro.min_tunes:
-            game.bro.unlock_map(pro.grant_map)
-            game.unlock("pro_network", "Pro Network")
+            game.bro.unlock_map(pro.grant_map)  # pro_network trophy is polled off bro.pro_maps
             game.log(f"{pro.name} hooked you up: {PRO_MAPS[pro.grant_map]['name']} unlocked.", "ok")
             game.dave("pro")
         else:

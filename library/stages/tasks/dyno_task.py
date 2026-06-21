@@ -144,17 +144,15 @@ class DynoTask(TaskBase):
         """Record the pull, log the grade, and fire grade-based achievements/quips."""
         game = self.game
         self._log_result(game.car.record_dyno(result))
+        # The money_shift / tuner_of_year / cat_delete trophies are polled off the car's
+        # recorded dyno result + grade; here we just apply the gameplay sting + Dave's quip.
         if result["blown"]:
-            game.unlock("money_shift", "Money Shift")
             game.hurt_bro(ED_BLOWN)
             game.dave("blown")
         elif game.car.grade.startswith("Grade S"):
-            game.unlock("tuner_of_year", "Tuner of the Year")
             game.dave("sgrade")
         else:
             game.dave("dyno")
-        if result["pop"] > 90:
-            game.unlock("cat_delete", "Cat Delete Speedrun")
 
     # -- UI ----------------------------------------------------------------
     # The gauge cluster gets the left ~38% of the width; the graph gets the rest.

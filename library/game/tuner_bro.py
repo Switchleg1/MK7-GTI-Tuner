@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from library.core.utils import clamp
 from library.game.tuning import rep_title
-from library.core.constants import MINIMUM_BRO_BANK_VALUE
+from library.core.constants import COMMUNITY_MAPS, MINIMUM_BRO_BANK_VALUE, PRO_MAPS
 
 
 class TunerBro:
@@ -28,9 +28,19 @@ class TunerBro:
         self.total_pops                 = 0
         self.total_busts                = 0
         self.map_switches               = 0
+        self.beat_king                  = False     # beat the final ladder rival (the "King" trophy)
 
     def rep(self) -> str:
         return rep_title(self.cred)
+
+    # -- derived stats (read by the ACHIEVEMENTS check table) --------------
+    @property
+    def community_maps(self) -> int:
+        return sum(1 for key in self.unlocked_maps if key in COMMUNITY_MAPS)
+
+    @property
+    def pro_maps(self) -> int:
+        return sum(1 for key in self.unlocked_maps if key in PRO_MAPS)
 
     def can_afford(self, cost: float) -> bool:
         return self.cash >= cost
@@ -75,7 +85,7 @@ class TunerBro:
                 "green_name", "tunes_sold", "god", 
                 "emotional_damage",
                 "total_pops", "total_busts",
-                "map_switches", "score",
+                "map_switches", "beat_king",
             )
         }
 

@@ -48,6 +48,29 @@ class Car:
         if tune is not None and tune != DEFAULT_TUNE:
             self.flash_ecu()
 
+    # -- achievement stats (read by the ACHIEVEMENTS check table) ----------
+    @property
+    def e30_lifestyle(self) -> bool:
+        """Flashed an E30 map at 24+ psi -> the "It's a Lifestyle" trophy."""
+        tune = self.flashed_tune
+        return bool(self.flashed and tune and tune.get("fuel") == "E30" and tune.get("boost", 0) >= 24)
+
+    @property
+    def is_grade_s(self) -> bool:
+        return self.grade.startswith("Grade S")
+
+    @property
+    def last_blown(self) -> bool:
+        return bool(self.dyno_result and self.dyno_result.get("blown"))
+
+    @property
+    def dyno_pop(self) -> float:
+        return self.dyno_result.get("pop", 0.0) if self.dyno_result else 0.0
+
+    @property
+    def fully_built(self) -> bool:
+        return bool(self.mods) and all(self.mods.values())
+
     # -- queries -----------------------------------------------------------
     def ecu_status(self) -> str:
         return "FLASHED" if self.flashed else "UNLOCKED" if self.patched else "LOCKED"

@@ -12,7 +12,7 @@ from library.core.audio import GameAudio
 from library.core.config import Config
 from library.core.constants import (
     BG, BLUE, DEFAULT_ASPECT, DEFAULT_HEIGHT, DEFAULT_WIDTH, OVERLAY_BIN, OVERLAY_SORT,
-    TOAST_SECONDS, VIOLET, WINDOW_TITLE, ECU_UNLOCK_CRED
+    TOAST_SECONDS, UNLOCK_POLL_SECONDS, VIOLET, WINDOW_TITLE,
 )
 from library.core.music import MusicPlayer
 from library.core.panda_config import enable_gltf
@@ -32,6 +32,8 @@ from library.stages.tasks.shop_task import ShopTask
 from library.stages.tasks.street_task import StreetTask
 from library.stages.toast import Toast
 from library.stages.unlock_stage import UnlockStage
+from library.stages.dongle_stage import DongleStage
+from library.stages.wizard_choice_stage import WizardChoiceStage
 from library.stages.wizard_trial_stage import WizardTrialStage
 
 TASK_CLASSES = {
@@ -79,6 +81,7 @@ class MK7Tuner3D(ShowBase):
         # tasks can toggle them via game.set_advisors_visible().
         self.stage = None
         self.session_started = False                      # a career is in progress (enables pause menu)
+        self._unlock_timer = 0.0                          # throttles the achievement poll (see _render)
         # NB: ``self.config`` is ShowBase's Panda config -- don't shadow it; ours is ``options``.
         self.options = Config.load()                      # options.cfg (sound, ...)
         self.options.apply(self)                          # push saved volumes into music + audio
@@ -96,6 +99,13 @@ class MK7Tuner3D(ShowBase):
         self.music.update(dt)
         self.toast.render(dt)
         self.notifications.render(dt)
+        # achievement polling: once a career is live, scan the ACHIEVEMENTS table ~4x/sec
+        # (no per-action unlock calls -- gameplay just keeps the stats current).
+        if self.session_started:
+            self._unlock_timer += dt
+            if self._unlock_timer >= UNLOCK_POLL_SECONDS:
+                self._unlock_timer = 0.0
+                self.game.check_unlocks()
         # 2. the current stage
         if self.stage is not None:
             self.stage.render(dt)
@@ -192,9 +202,8 @@ class MK7Tuner3D(ShowBase):
         # Kept OUT of enter_hub so returning to the hub from a task doesn't re-run
         # mark_unlocked() and wipe the player's flashed tune + switch-patch slots.
         self.game.car.mark_unlocked()
-        self.session_started = True
-        if self.game.unlock("first_flash", "Boot Patched, Baby", ECU_UNLOCK_CRED):
-            self.game.dave("flash")
+        self.session_started = True   # enables the achievement poll, which catches first_flash
+        self.game.dave("flash")
         self.enter_hub()
 
     # -- menu + save/load --------------------------------------------------
@@ -266,4 +275,13 @@ class MK7Tuner3D(ShowBase):
         self.set_stage(TASK_CLASSES[key](self, self.game, on_back=self.enter_hub))
 
     def open_wizard(self):
+        """Answering the Wizard's DM offers a choice of proofs (bench an ECU or build a
+        dongle); either one passed grants god status + the same payout."""
+        self.set_stage(WizardChoiceStage(self, self.game, on_bench=self.open_bench_trial,
+                                         on_dongle=self.open_dongle, on_back=self.enter_hub))
+
+    def open_bench_trial(self):
         self.set_stage(WizardTrialStage(self, self.game, on_done=self.enter_hub))
+
+    def open_dongle(self):
+        self.set_stage(DongleStage(self, self.game, on_done=self.enter_hub))

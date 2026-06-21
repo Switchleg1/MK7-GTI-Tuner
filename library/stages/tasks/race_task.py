@@ -45,20 +45,23 @@ class RaceTask(TaskBase):
     title = "RACE"
     key = "race"
     live = False
+    flash_interval = 0.5
 
     def build_scene(self):
+        self.next_flash         = 0
+        self.show_warning       = False
         assets.load_model(assets.ModelType.GEOMETRY, "ground").reparentTo(self.scene)
-        self.player_car = assets.load_model(assets.ModelType.CAR, "mk7_gti")
+        self.player_car         = assets.load_model(assets.ModelType.CAR, "mk7_gti")
         self.player_car.reparentTo(self.scene)
         self.player_car.setPos(-2.2, 0, 0.0)
-        self.player_wheels = self.prepare_wheels(self.player_car)
-        self.rival_car = None       # set by _load_rival_car (which replaces any current one)
-        self.rival_wheels = None
-        self._rival_model = None
+        self.player_wheels      = self.prepare_wheels(self.player_car)
+        self.rival_car          = None       # set by _load_rival_car (which replaces any current one)
+        self.rival_wheels       = None
+        self._rival_model       = None
         self._load_rival_car()
         # Wheel pivots for both cars -- spun in tick so the cars look like they're
         # moving even though they hold their scene Y position.
-        self.spin = 0.0
+        self.spin               = 0.0
         self._build_track()
         # Chase camera (overrides TASK_CAMERAS["race"] for the duration of the stage).
         if self.app.camLens:
@@ -66,9 +69,9 @@ class RaceTask(TaskBase):
         self.app.camera.setPos(*CHASE_CAM_POS)
         self.app.camera.lookAt(*CHASE_CAM_LOOK)
         # Cached dash widgets, built once in build_ui and updated per-frame.
-        self.dash = {}
-        self.race = None
-        self.result_video = None
+        self.dash               = {}
+        self.race               = None
+        self.result_video       = None
         self.music_paused_for_video = False
 
     def exit(self):
@@ -105,6 +108,16 @@ class RaceTask(TaskBase):
 
     # -- per-frame ---------------------------------------------------------
     def tick(self, dt):
+        #update blown engine warning
+        if self.game.car.car_perf()["blown"]:
+            self.next_flash -= dt
+            while self.next_flash <= 0.0:
+                self.show_warning = not self.show_warning
+                self.next_flash += self.flash_interval
+            self.ui.get("blown").is_visible(self.show_warning)
+        else:
+            self.ui.get("blown").is_visible(False)
+            
         self._update_result_video(dt)
         if self.result_video is not None:
             self.app.audio.silence()
@@ -236,6 +249,7 @@ class RaceTask(TaskBase):
         self.ui.add_button("launch", "Launch (SPACE)", (left + 0.22, 0, 0.56), (0.40, 0.085),
                            self.do_key, False, None, 0.032)
         # Status / ladder title / emotional-damage readout.
+        self.ui.add_text("blown", "*Engine is blown - Go Fix it*", (0, 0.0, 0.25), 0.10, RED, C, is_visible=True)
         self.ui.add_text("status", "", (0, 0, 0.92), 0.046, TEXT, C, wordwrap=44)
         self.ui.add_text("hint", "", (0, 0, 0.85), 0.028, DIM, C, wordwrap=64)
         self.ui.add_text("gap", "", (0, 0, 0.77), 0.044, AMBER, C)
@@ -284,7 +298,7 @@ class RaceTask(TaskBase):
         ed_lbl.text(f"EMOTIONAL DAMAGE  {round(ed)}%")
         ed_lbl.color(RED if ed >= 60 else AMBER if ed >= 30 else DIM)
         self.ui.get("ed-hint").is_visible(ed >= ED_TAUNT_THRESHOLD)
-
+                
     def _build_dash_objects(self):
         d = self.dash
         d["tach_x0"], d["tach_x1"] = -0.72, 0.72
@@ -437,12 +451,13 @@ class RaceTask(TaskBase):
         if won:
             game.bro.earn(foe.purse)
             game.bro.add_cred(round(foe.purse / 5))
-            game.unlock("first_win", "Won Some Cash")
+            # first_win / ladder trophies are polled off bro.unlocked_rival; king needs a
+            # flag (unlocked_rival caps below the count, so beating the LAST rival is its own
+            # signal). We still own the ladder-progression bookkeeping here.
             if game.bro.selected_rival == game.bro.unlocked_rival and game.bro.unlocked_rival < len(game.rivals) - 1:
                 game.bro.unlocked_rival += 1
-                game.unlock("ladder", "Climbing the Ladder")
             if game.bro.selected_rival == len(game.rivals) - 1:
-                game.unlock("king", "King of the Streets")
+                game.bro.beat_king = True
             game.dave("win")
             game.soothe_bro(ED_HEAL_ON_WIN)  # a win settles the nerves
             video_playing = self._play_result_video(foe.video_win)

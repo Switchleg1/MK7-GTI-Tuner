@@ -48,7 +48,4 @@ class BenchTask(TaskBase):
     def _flash_ecu(self):
         game = self.game
         self._log_result(game.car.flash_ecu())
-        game.unlock("first_flash", "Boot Patched, Baby")
-        if game.car.tune["fuel"] == "E30" and game.car.tune["boost"] >= 24:
-            game.unlock("e30_lifestyle", "It's Not Stage 2, It's a Lifestyle")
-        game.dave("flash")
+        game.dave("flash")  # first_flash / e30_lifestyle trophies are polled off the car's flash state

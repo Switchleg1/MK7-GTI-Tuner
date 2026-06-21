@@ -3,9 +3,9 @@ from __future__ import annotations
 import random
 
 from library.core.constants import (
-    DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_DISCORD_BAD, ED_DISCORD_GOOD_HEAL,
+    ACHIEVEMENTS, DAVE_LINES, DISCORD_GREEN_BRUSHOFF, ED_DISCORD_BAD, ED_DISCORD_GOOD_HEAL,
     ED_TAUNT_THRESHOLD, ED_TAUNTS, GOD_PAYOUT, GREEN_NAME_CRED, MAX_LOG_LINES,
-    SAVE_VERSION, GOD_UNLOCK_CRED, DEFAULT_UNLOCK_CRED, WIZARD_CRED,
+    SAVE_VERSION, WIZARD_CRED, TRIAL_ACHIEVEMENT,
 )
 from library.core.utils import pick
 from library.game.car import Car
@@ -60,6 +60,7 @@ class Game:
         self.achievements: set[str]         = set()  # unlocked ids
         self.toast_queue: list[str]         = []     # achievement labels awaiting a toast
         self.dave_queue: list[str]          = []       # Dyno Dave quips awaiting display
+        self._wizard_announced              = False    # transient: the Wizard DM flavour fired this session
 
     @property
     def car(self) -> Car:
@@ -86,19 +87,45 @@ class Game:
         self.logs.append((message, kind))
         self.logs = self.logs[-MAX_LOG_LINES:]
 
-    # -- achievements + Dave (drained by the Notifications overlay) ---------
-    def check_unlock(self, stat, table):
-        for key, value in table.items():
-            k, s = value
-            if stat >= key:
-                self.unlock(k, s)
-                
-    def unlock(self, key: str, label: str, credit: int = DEFAULT_UNLOCK_CRED) -> bool:
-        if key in self.achievements:
+    # -- achievements (table-driven; drained by the Notifications overlay) ---
+    def check_unlocks(self):
+        """Poll the ACHIEVEMENTS table (called ~4x/sec at the game level): unlock every
+        still-locked achievement whose check now reads true. Achievements are stat-driven,
+        so gameplay code only has to keep the stats current -- no scattered unlock() calls.
+        An empty check is skipped (those are unlocked explicitly, e.g. the Wizard endings)."""
+        for key, ach in ACHIEVEMENTS.items():
+            if not ach.check or key in self.achievements:
+                continue
+            for path, required in ach.check:
+                value = self._resolve(path)
+                try:
+                    hit = value is not None and value >= required
+                except TypeError:
+                    hit = False
+                if hit:
+                    self.unlock(key)
+                    break
+
+    def _resolve(self, path: str):
+        """Resolve a dotted stat path against the game -- 'bro.total_pops' -> self.bro.
+        total_pops, 'car.flashed' -> self.car.flashed, 'wizard_ready' -> self.wizard_ready."""
+        obj = self
+        for part in path.split("."):
+            obj = getattr(obj, part, None)
+            if obj is None:
+                return None
+        return obj
+
+    def unlock(self, key: str) -> bool:
+        """Mark an achievement earned (idempotent): toast its label + pay its cred, both
+        from the ACHIEVEMENTS table. Returns True only the first time. Used by
+        check_unlocks() for polled trophies and called directly for the manual ones."""
+        if key in self.achievements or key not in ACHIEVEMENTS:
             return False
+        ach = ACHIEVEMENTS[key]
         self.achievements.add(key)
-        self.toast_queue.append(label)
-        self.bro.add_cred(credit)  # achievements feed the arcade score
+        self.toast_queue.append(ach.label)
+        self.bro.add_cred(ach.cred)  # achievements feed cred (= the arcade score)
         return True
 
     def dave(self, pool: str):
@@ -139,8 +166,7 @@ class Game:
                 "replies": [{"name": who.name, "color": who.color, "text": line}]}
 
     def _grant_community_map(self, key: str):
-        self.bro.unlock_map(key)
-        self.unlock("community_map", "Community Map Plug")
+        self.bro.unlock_map(key)  # the "community_map" trophy is polled off bro.community_maps
 
     def _apply_discord(self, outcome: dict):
         handler = self._DISCORD_EFFECTS.get(outcome["effect"])
@@ -154,10 +180,11 @@ class Game:
 
     # -- green name (verified pro path) ------------------------------------
     def maybe_green(self):
-        """Promote to verified green name once cred crosses the bar (once)."""
+        """Promote to verified green name once cred crosses the bar (once). The
+        "green_name" trophy itself is polled off ``bro.green_name``; this just flips the
+        gameplay flag + flavour."""
         if not self.bro.green_name and self.bro.cred >= GREEN_NAME_CRED:
             self.bro.green_name = True
-            self.unlock("green_name", "Green Name")
             self.dave("green")
             self.log("VERIFIED: you got the green name. the noobs DM you now.", "ok")
         self.maybe_wizard()
@@ -166,21 +193,30 @@ class Game:
         """The Bench Wizard only DMs an established green name (until you pass)."""
         return self.bro.green_name and self.bro.cred >= WIZARD_CRED and not self.bro.god
 
+    @property
+    def wizard_ready(self) -> bool:
+        """Pollable alias for the ACHIEVEMENTS table ('wizard_ready' -> wizard_summon)."""
+        return self.wizard_available()
+
     def maybe_wizard(self):
-        if self.wizard_available() and self.unlock("wizard_summon", "A Mysterious DM"):
+        # The "wizard_summon" trophy is polled off wizard_ready; this just drops the
+        # flavour DM once (transient guard, so it doesn't re-log every cred tick).
+        if self.wizard_available() and not self._wizard_announced:
+            self._wizard_announced = True
             self.log("a hooded tuner DMs you a three-part Trial. prove yourself.", "violet")
             self.dave("wizard")
 
-    def grant_god(self):
-        """Trial passed: god status + a giant one-time payout."""
+    def grant_god(self, achievement: str = TRIAL_ACHIEVEMENT):
+        """A Wizard challenge passed -- bench an ECU (the Trial) OR build a dongle: god
+        status + a giant one-time payout. ``achievement`` is the trophy KEY for the path
+        taken (its cred reward comes from the table); the reward is identical, name differs."""
         if self.bro.god:
             return
         self.bro.god = True
         self.bro.earn(GOD_PAYOUT)
-        self.bro.add_cred(GOD_UNLOCK_CRED)  # the Wizard's Trial is the big arcade payout
-        self.unlock("god_status", "Passed the Trial")
+        self.unlock(achievement)  # the trophy's table cred (GOD_UNLOCK_CRED) is the big arcade payout
         self.dave("god")
-        self.log(f"TRIAL PASSED. god status granted. +${GOD_PAYOUT:,}.", "ok")
+        self.log(f"WIZARD CHALLENGE PASSED. god status granted. +${GOD_PAYOUT:,}.", "ok")
 
     # -- save --------------------------------------------------------------
     def to_dict(self) -> dict:

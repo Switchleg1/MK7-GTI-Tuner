@@ -99,7 +99,8 @@ library/
              discord.py discord_user.py discord_admin.py discord_green_name.py
              discord_normal_user.py geometry.py tuning.py simos.py scoreboard.py
   stages/    hud.py task_base.py garage_stage.py menu_stage.py simon_panel.py discord_panel.py
-             wizard_trial_stage.py unlock_stage.py toast.py notifications.py phone_screen.py
+             wizard_choice_stage.py wizard_trial_stage.py dongle_stage.py
+             unlock_stage.py toast.py notifications.py phone_screen.py
              character.py picker.py progress_bar.py
              base_object.py text.py button.py frame.py image.py slider.py entry.py ui_object_controller.py
     tasks/   bench_task.py maps_task.py dyno_task.py street_task.py race_task.py shop_task.py
@@ -245,10 +246,25 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   button (`game.ui.get("ask_discord")` → `DiscordPanel.ask()`).
   Typing + Enter calls `game.ask_discord(text)` and appends the replies + the result
   line. Own node tree; companion to `SimonPanel`.
+- `wizard_choice_stage.py` — `WizardChoiceStage(Hud)`: a 2D modal shown when the Wizard's
+  DM is answered (`app.open_wizard`). Two cards — **Bench an ECU** (`on_bench` →
+  `WizardTrialStage`) and **Make Dongles** (`on_dongle` → `DongleStage`). Both paths grant
+  the same reward; only the trophy differs (see `grant_god`).
 - `wizard_trial_stage.py` — `WizardTrialStage(Hud)`: the Bench Wizard's three-part Trial
-  (power the rig → probe a 3D pogo board → hit the sync window) → `Game.grant_god()`. Its 2D
-  overlay is managed objects on `self.ui` (the animated sync marker is a persistent `Frame`
-  moved in `render`); the 3D board lives under its own `scene` node.
+  (power the rig → probe a 3D pogo board → hit the sync window) → `Game.grant_god()` (default
+  `TRIAL_ACHIEVEMENT` → "Passed the Trial"). Its 2D overlay is managed objects on `self.ui`
+  (the animated sync marker is a persistent `Frame` moved in `render`); the 3D board lives
+  under its own `scene` node.
+- `dongle_stage.py` — `DongleStage(Hud)`: the *other* Wizard challenge — **Make Dongles**, a
+  3D drag-and-drop game. Loads `misc/dongle.glb` (the *assembled* dongle), splits it by node-
+  name prefix into a fixed PCB base + four draggable parts (OBD port / blue IC / green IC /
+  diode), each grouped under a pivot at its centroid (so its natural position IS its home).
+  Scatters the loose parts around a glowing target socket per part; a left-press (`Picker`)
+  grabs the part under the cursor, it floats toward the camera and follows a board-plane
+  projection of the mouse (`_cursor_on_plane`), and release seats it if within
+  `DONGLE_SNAP_DIST` of home (else it drops back to the bench). Seat all four →
+  `Game.grant_god(DONGLE_ACHIEVEMENT)` → "Certified Plug". `board_root` is unrotated at the
+  origin so world == board frame; all tuning lives in the `DONGLE_*` constants.
 - `notifications.py` — `Notifications`: a session-long top-screen overlay (achievement
   toasts + Dyno Dave bubbles) drained from `game.toast_queue` / `game.dave_queue`.
   `render(dt)` is called by the app loop (no task of its own).
@@ -286,6 +302,20 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 A save-ready object tree: each node has `to_dict`/`from_dict`, and `Game.to_dict` rolls
 them into a single career snapshot written to `savegame.json` (see `storage.py`). Display
 reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated on `Game`.
+- **Achievements are table-driven (no scattered unlock calls).** `constants.ACHIEVEMENTS`
+  is the single source: `key → Achievement(label, blurb, cred, check)`, where `check` is a
+  list of `(stat_path, required)` pairs. The app calls **`Game.check_unlocks()` every ~250ms**
+  (`UNLOCK_POLL_SECONDS`, gated on `session_started`); it resolves each dotted `stat_path`
+  against the game (`Game._resolve` — e.g. `"bro.total_pops"`, `"car.flashed"`,
+  `"wizard_ready"`) and unlocks the moment ANY pair reads `>= required` (uniform for ints and
+  bools). `Game.unlock(key)` is idempotent and pulls the label + cred from the table. So
+  gameplay code only keeps **stats** current (`bro.total_pops`, `tunes_sold`, `beat_king`,
+  `car.fully_built`, …) — the dyno/bench/shop/race/street tasks no longer call `unlock` at
+  all. A few derived booleans/ints back the compound checks (`Car.e30_lifestyle`/`is_grade_s`/
+  `last_blown`/`dyno_pop`/`fully_built`, `TunerBro.community_maps`/`pro_maps`,
+  `Game.wizard_ready`). The only **manual** unlocks are the two Wizard endings (`god_status`/
+  `dongle_dealer`, `check=()`) — both set `bro.god`, so no stat tells them apart; `grant_god(key)`
+  unlocks the chosen one. To add an achievement: add one table row + a stat for it to watch.
 - `game.py` — `Game`: root/session. Holds `bro: TunerBro`, `rivals: [RivalGreenName]`,
   `cars: CarLibrary`, `discord: Discord` (model), transient `logs`, a `car` property, and
   the orchestration that spans nodes (`buy_mod`, `register_pops`, `ask_discord`, log). It
@@ -300,10 +330,13 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   rebuilt by `new_game`; only progress (`bro.unlocked_rival`/`selected_rival`) persists.
   (`SAVE_VERSION 1` saved the ladder and froze stale specs into old saves — e.g. a rival's
   `model` — so a constant edit didn't take effect on load; v2 drops it.)
-- `tuner_bro.py` — `TunerBro`: the user — cash, cred, Karen/heat, rep, ladder progress,
-  `unlocked_maps` (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`), and the
-  arcade `scoreboard.py` — `build_scoreboard(name, score)`: the arcade hall-of-fame — the fixed
+- `tuner_bro.py` — `TunerBro`: the user — cash, **cred** (which doubles as the arcade
+  score), Karen/heat, rep, ladder progress, `unlocked_maps`
+  (`spend`/`earn`/`pay_repair`/`add_cred`/`add_heat`/`unlock_map`).
+- `scoreboard.py` — `build_scoreboard(name, score)`: the arcade hall-of-fame — the fixed
   made-up handles (`SCOREBOARD_NAMES`) plus the player's row, sorted + ranked.
+  `build_achievements(unlocked)`: the trophy case — every key in the `ACHIEVEMENTS` registry
+  flagged unlocked-or-not, unlocked floated to the top (drives the scoreboard's pane).
 - `rival_green_name.py` — `RivalGreenName`: a ladder rival = encounter metadata
   (`name`/`purse`/`color`/win-loss clips) **plus a `Car`** built from the spec's `car_id`
   (from `RIVALS`). Rivals start mod-free; the ladder will be tuned later by giving them
@@ -355,12 +388,15 @@ per run in `_start_race`.
 
 The **ScoreboardTask** (`library/stages/tasks/scoreboard_task.py`, opened by the garage's
 HIGH SCORES button) is an 80s-arcade HALL OF FAME: a CRT backdrop + scanlines, the bro's
-big `score`, a stats line, and a ranked board from `scoreboard.build_scoreboard` (the player
-vs the made-up handles), with the player's row + exit prompt blinking in `tick`. The score
-itself is accrued through the existing flow — **race wins** (`race_task._resolve_race`,
-purse), **pops** (`street_task._register_pops`),
-**achievements** (`Game.unlock`, `SCORE_PER_ACHIEVEMENT`), and the **Trial**
-(`Game.grant_god`, `GOD_SCORE`)
+big score, a stats line, and a ranked board from `scoreboard.build_scoreboard` (the player
+vs the made-up handles), with the player's row + exit prompt blinking in `tick`. **The score
+is simply the bro's `cred`** — there's no separate points stat; everything that already
+grants cred (race purses, pops & bangs via `POP_CRED_CONST`, tune sales, achievement
+unlocks via `Game.unlock`, and the Wizard challenge via `Game.grant_god`) climbs the board.
+An **ACHIEVEMENTS** button opens a scrollable trophy pane *over* the board (built once,
+hidden, toggled by key-prefix visibility so the 80s board is untouched): every trophy from
+the `ACHIEVEMENTS` registry via `scoreboard.build_achievements` — unlocked ones gold at the
+top, locked ones dimmed with how-to hints — scrolled by the wheel, ▲▼ buttons, or arrow keys.
 
 ## Key conventions
 

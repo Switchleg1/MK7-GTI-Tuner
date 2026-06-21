@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import namedtuple
+
 from panda3d.core import Vec4
 
 from library.core.utils import rgba
@@ -15,6 +17,7 @@ DEFAULT_FOV_DEG = 105
 TRACK_M = 402.336  # quarter-mile (m). Per-car gearing/curve/tire now live in CAR_TABLE.
 
 UI_REFRESH_SECONDS = 0.25
+UNLOCK_POLL_SECONDS = 0.25   # how often the game scans the ACHIEVEMENTS table for new unlocks
 MAX_LOG_LINES = 20
 
 BG = rgba("#070a0d")
@@ -414,6 +417,7 @@ MISC_MODEL_DIRECTORY = "misc"
 MISC_MODEL_FILES = {
     "phone": "phone.glb",
     "obd": "obd.glb",
+    "dongle": "dongle.glb",   # the assembled tuner dongle for the Make Dongles mini-game
 }
 
 IMAGE_FILES = {
@@ -620,10 +624,10 @@ MODES = [
 ]
 
 # --------------------------------------------------------------------------
-# Arcade scoreboard. A single running score on the bro (TunerBro.score), fed by
-# races, pops & bangs, achievements, and the Bench Wizard's Trial. The SCORE task
-# shows it on an 80s arcade hall-of-fame board against made-up handles whose fixed
-# scores span a full playthrough, so the player climbs the board as they progress.
+# Arcade scoreboard. The score IS the bro's cred (races, pops & bangs, tune sales,
+# achievements, and the Bench Wizard's Trial all feed cred). The SCORE task shows it
+# on an 80s arcade hall-of-fame board against made-up handles whose fixed scores span
+# a full playthrough, so the player climbs the board as they progress.
 # --------------------------------------------------------------------------
 SCOREBOARD_NAMES = [
     ("ED",      7500),
@@ -820,7 +824,7 @@ DISCORD_OFFLINE_MAX = 5
 # tuner DMs a three-part Trial. Pass it -> god status + a giant one-time payout.
 # Pure arcade flavour.
 # --------------------------------------------------------------------------
-WIZARD_CRED = 10000         # cred needed before the Wizard's DM arrives
+WIZARD_CRED = 4400          # cred needed before the Wizard's DM arrives
 GOD_PAYOUT  = 1_000_000     # one-time reward for passing the Trial
 
 # --------------------------------------------------------------------------
@@ -829,6 +833,43 @@ GOD_PAYOUT  = 1_000_000     # one-time reward for passing the Trial
 DEFAULT_UNLOCK_CRED     = 200
 ECU_UNLOCK_CRED         = 100
 GOD_UNLOCK_CRED         = 500       # passing the Bench Wizard's Trial (god status)
+
+# --------------------------------------------------------------------------
+# Achievements (the trophy case). ONE declarative table: label + how-to blurb +
+# cred reward + a check. The game polls `Game.check_unlocks()` ~4x/sec; for each
+# still-locked entry it evaluates `check` -- a list of (stat_path, required) pairs
+# resolved against the Game (dotted, e.g. "bro.total_pops", "car.flashed") -- and
+# unlocks it the moment ANY pair reads >= its required value (works for ints AND
+# bools). An empty check `()` means "unlocked explicitly in code, never auto-polled"
+# (the two Wizard endings -- both set bro.god, so no stat can tell them apart). To add
+# a new achievement, add ONE row here (and a stat for it to watch); no other code.
+# --------------------------------------------------------------------------
+Achievement = namedtuple("Achievement", "label blurb cred check")
+ACHIEVEMENTS = {
+    "first_flash":   Achievement("Boot Patched, Baby", "Flash the ECU for the very first time.", ECU_UNLOCK_CRED, [("car.flashed", True)]),
+    "e30_lifestyle": Achievement("It's Not Stage 2, It's a Lifestyle", "Flash an E30 map at 24+ psi of boost.", DEFAULT_UNLOCK_CRED, [("car.e30_lifestyle", True)]),
+    "money_shift":   Achievement("Money Shift", "Grenade a motor on the dyno.", DEFAULT_UNLOCK_CRED, [("car.last_blown", True)]),
+    "tuner_of_year": Achievement("Tuner of the Year", "Land a Grade S dyno pull.", DEFAULT_UNLOCK_CRED, [("car.is_grade_s", True)]),
+    "cat_delete":    Achievement("Cat Delete Speedrun", "Tune a burble loud enough to delete the cat.", 300, [("bro.total_pops", 90), ("car.dyno_pop", 90)]),
+    "burble_brain":  Achievement("Burble Brain", "Rack up 50 pops & bangs on the street.", 150, [("bro.total_pops", 50)]),
+    "onelow":        Achievement("Onelow status", "Rack up 150 pops & bangs on the street.", 600, [("bro.total_pops", 150)]),
+    "menace":        Achievement("Neighborhood Menace", "Earn your first Karen citation.", 150, [("bro.total_busts", 1)]),
+    "karen_killer":  Achievement("Karen Killer", "Cap out the Karen meter twice.", 300, [("bro.total_busts", 2)]),
+    "on_parol":      Achievement("Out On Parole", "Catch a third citation.", 600, [("bro.total_busts", 3)]),
+    "first_win":     Achievement("Won Some Cash", "Win your first street race.", DEFAULT_UNLOCK_CRED, [("bro.unlocked_rival", 1)]),
+    "ladder":        Achievement("Climbing the Ladder", "Beat the next rival on the ladder.", DEFAULT_UNLOCK_CRED, [("bro.unlocked_rival", 1)]),
+    "king":          Achievement("King of the Streets", "Beat the whole ladder.", DEFAULT_UNLOCK_CRED, [("bro.beat_king", True)]),
+    "fully_built":   Achievement("Fully Built (Wallet Empty)", "Own every mod on the car.", DEFAULT_UNLOCK_CRED, [("car.fully_built", True)]),
+    "first_sale":    Achievement("Side Hustle", "Sell your first tune as a green name.", DEFAULT_UNLOCK_CRED, [("bro.tunes_sold", 1)]),
+    "tune_mill":     Achievement("Tune Mill", "Sell ten tunes.", DEFAULT_UNLOCK_CRED, [("bro.tunes_sold", 10)]),
+    "pro_network":   Achievement("Pro Network", "Get a pro to hand you a map stage.", DEFAULT_UNLOCK_CRED, [("bro.pro_maps", 1)]),
+    "community_map": Achievement("Community Map Plug", "Score a community map from #help.", DEFAULT_UNLOCK_CRED, [("bro.community_maps", 1)]),
+    "green_name":    Achievement("Green Name", "Get verified -- earn the green name.", DEFAULT_UNLOCK_CRED, [("bro.green_name", True)]),
+    "stalk_wizard":  Achievement("Stalk Wizard", "Flip between map slots ten times.", DEFAULT_UNLOCK_CRED, [("bro.map_switches", 10)]),
+    "wizard_summon": Achievement("A Mysterious DM", "Catch the Bench Wizard's mysterious DM.", DEFAULT_UNLOCK_CRED, [("wizard_ready", True)]),
+    "god_status":    Achievement("Passed the Trial", "Bench an ECU and pass the Wizard's Trial.", GOD_UNLOCK_CRED, ()),
+    "dongle_dealer": Achievement("Certified Plug", "Hand-build a dongle for the Bench Wizard.", GOD_UNLOCK_CRED, ()),
+}
 
 # --------------------------------------------------------------------------
 # Green Name path: cross the cred bar to go verified, then sell tunes for cash
@@ -886,6 +927,44 @@ PAD_GOLD = rgba("#c9a227")
 PAD_GREEN = (0.4, 1.6, 0.7, 1)   # color scale for a probed live pad
 PAD_RED = (1.9, 0.35, 0.35, 1)   # color scale for a decoy flash
 
+# The two paths the Bench Wizard offers (see WizardChoiceStage). Pass either trophy key
+# to Game.grant_god(): same god status + payout + cred, different trophy. (These two are
+# unlocked explicitly by grant_god -- both set bro.god, so no pollable stat tells them
+# apart -- hence their ACHIEVEMENTS check is empty.)
+TRIAL_ACHIEVEMENT  = "god_status"     # bench an ECU (WizardTrialStage)
+DONGLE_ACHIEVEMENT = "dongle_dealer"  # build a dongle (DongleStage)
+
+# --------------------------------------------------------------------------
+# Make Dongles (the alt endgame mini-game). The model (data/models/misc/dongle.glb)
+# is the *assembled* dongle, so each part's natural position IS its correct home: we
+# group the nodes by name prefix, scatter the loose parts to a tray, and the player
+# drags each onto its glowing socket. Seat all of them -> grant_god(DONGLE_ACHIEVEMENT).
+# (component id, .glb node-name prefix, display label, tint)
+# --------------------------------------------------------------------------
+DONGLE_PARTS = [
+    ("obd",   "OBD",   "OBD PORT", rgba("#cdd6dd")),
+    ("blue",  "Blue",  "BLUE IC",  rgba("#3b7bf0")),
+    ("green", "Green", "GREEN IC", rgba("#36c06a")),
+    ("diode", "Diode", "DIODE",    rgba("#ff7a3c")),
+]
+DONGLE_BASE_PREFIXES = ("Main_PCB", "Top_Via")  # the fixed board (never draggable)
+DONGLE_CAMERA = {"pos": (0, 14.0, 1.6), "look_at": (0, -0.2, -0.4), "fov": 52}
+DONGLE_DRAG_Y = 2.2          # world Y a grabbed part floats at (toward the camera) while dragging
+DONGLE_TRAY_Y = 0.55         # world Y the loose parts rest at before they're picked up
+# Where each loose part starts (board-plane x, z). They sit OFF the PCB footprint
+# (board is x +/-3, z +/-2.5) so they read as "loose on the bench": the wide OBD lies
+# across the bottom, the smaller parts flank the board left/right.
+DONGLE_SCATTER = {
+    "obd":   (0.0, -3.35),
+    "blue":  (-4.0, 0.6),
+    "diode": (-4.0, -1.5),
+    "green": (4.0, 0.6),
+}
+DONGLE_SNAP_DIST = 0.95      # how close (board-plane units) a drop must land to seat home
+DONGLE_OK = (0.4, 1.7, 0.7, 1)   # color-scale flash when a part seats
+DONGLE_GHOST_ALPHA = 0.30        # translucency of an empty target socket
+DONGLE_GHOST_MIN = 0.7           # min ghost-socket footprint (so the tiny diode still reads)
+
 # Every map that can land in bro.unlocked_maps (Discord community + pro-granted),
 # resolved by apply + the TUNE selector. (Discord's random pool stays COMMUNITY_MAPS.)
 UNLOCKABLE_MAPS = {**COMMUNITY_MAPS, **PRO_MAPS}
@@ -897,18 +976,8 @@ KAREN_HEAT_CONST = 5.0
 POP_CRED_CONST = 18.0
 BUST_FINE = 250                # base citation; scaled by your cred / rep
 KAREN_AFTER_BUST = 30.0        # they don't forget instantly
-
-POP_UNLOCKS = {
-    50: ("burble_brain", "Burble Brain", 150),
-    90: ("cat_delete", "Cat Delete Speedrun", 300),
-    150: ("onelow", "Onelow status", 600),
-}
-
-BUST_UNLOCKS = {
-    1: ("menace", "Neighborhood Menace", 150),
-    2: ("karen_killer", "Karen Killer", 300),
-    2: ("on_parol", "Out On Parole", 600),
-}
+# (Pops/busts now feed achievements via the ACHIEVEMENTS table's bro.total_pops /
+# bro.total_busts checks -- the old POP_UNLOCKS / BUST_UNLOCKS threshold dicts are gone.)
 
 # --------------------------------------------------------------------------
 # Emotional Damage (0..100): getting clowned -- a bad Discord outcome, a blown
