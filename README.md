@@ -1,13 +1,10 @@
 # MK7 GTI Tuner (3D)
 
-A 3D Panda3D remake of the *MK7 GTI Tuner* parody game. You unlock and flash a
-MK7 Golf GTI's ECU, then tune it, dyno it, run the streets, race the strip, and
-spend your winnings on mods.
+MK7 GTI Tuner is a fast, funny, and wildly addictive tuning game where you build your GTI, flash maps, chase dyno numbers, 
+race rivals, sell sketchy tunes, and try not to emotionally collapse when the internet clowns your setup. 
+It mixes car culture, ECU tuning, street-race chaos, and garage humor into one slick little package.
 
-The headline of this build is the **cinematic ECU unlock**: instead of clicking
-through instant buttons, you watch a guy sitting in the open driver door plug an
-OBD2 adapter into the car, pull out his phone, and flash the ECU — with real
-delays, progress bars, and the ECU readout streaming onto the phone screen.
+Download MK7 GTI Tuner now, fire up SimosTools, and prove your Mk7 has what it takes to climb the ladder.
 
 ## Requirements
 
@@ -22,20 +19,6 @@ delays, progress bars, and the ECU readout streaming onto the phone screen.
 ```
 python mk7_gti_tuner.py
 ```
-
-## Regenerate assets
-
-Models and images are committed under `data/`, but you can rebuild them any time
-(run from the project root):
-
-```
-python -m library.assetgen.generate_assets
-```
-
-This writes `data/models/*.glb`, `data/images/*.png`, and `data/audio/*.wav`. All
-geometry is built procedurally in Panda's Z-up convention and loaded with
-`skip_axis_conversion=True`; the sound effects are synthesized with the standard
-library (no extra deps) by `library/assetgen/asset_audio.py`.
 
 ## Build a standalone .exe (Windows)
 
@@ -111,12 +94,3 @@ formats for now; a packed custom format may come later.
 Saves and options are **not** in `data/` — they're written to a per-user, writable
 location so they survive a packaged build: `%APPDATA%\MK7 GTI Tuner\` on Windows
 (`savegame.json`, `options.cfg`).
-
-## Project rules
-
-- One class (or data class) per file.
-- All defaults, thresholds, sequences, and placements live in `constants.py`.
-- Logic lives in tables and is iterated — no large `if/elif` staircases.
-- Keep modules small and modular.
-
-See `architecture.md` for the module map and how the pieces fit together.
