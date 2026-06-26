@@ -356,7 +356,7 @@ class RaceTask(TaskBase):
         if model:
             self.rival_car = assets.load_model(assets.ModelType.CAR, model)
             self.rival_car.reparentTo(self.scene)
-            self.rival_car.setColorScale(0.5, 0.6, 1.25, 1)
+            self.rival_car.setColorScale(rival.color)
             self.rival_car.setPos(RIVAL_X, 0, 0.0)
             self.rival_wheels = self.prepare_wheels(self.rival_car)
         else:

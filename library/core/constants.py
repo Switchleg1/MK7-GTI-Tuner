@@ -309,7 +309,8 @@ RIVALS = [
         "video_win":    []
     },
     {
-        "name":         "BMW M2", "car_id": "bmw_m2",
+        "name":         "BMW M2",
+        "car_id":       "bmw_m2",
         "purse":        850,
         "color":        rgba("#222222"),
         "mods":         ["intake", "dp", "fmic"],
@@ -318,14 +319,14 @@ RIVALS = [
         "video_win":    []
     },
     {
-        "name":         "Rival Shop Mk7",
+        "name":         "Lil Sporty",
         "car_id":       "mk7_gti",
         "purse":        1600,
-        "color":        rgba("#e7232b"),
+        "color":        rgba("#ff51ab"),
         "mods":         ["intake", "dp", "fmic", "clutch", "fuel", "turbo"],
         "tune":         PRESETS["stage2"],
-        "video_loss":   ["loss/ed_dis.mp4"],
-        "video_win":    []
+        "video_loss":   ["loss/kyle_dis.mp4"],
+        "video_win":    ["win/kyle_cry.mp4"]
     },
 ]
 
