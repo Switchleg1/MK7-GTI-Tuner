@@ -312,21 +312,49 @@ RIVALS = [
         "name":         "BMW M2",
         "car_id":       "bmw_m2",
         "purse":        850,
-        "color":        rgba("#222222"),
+        "color":        rgba("#742E2E"),
         "mods":         ["intake", "dp", "fmic"],
         "tune":         DEFAULT_TUNE,
         "video_loss":   ["loss/ed_dis.mp4"],
         "video_win":    []
     },
     {
+        "name":         "4x4 Girl",
+        "car_id":       "mk7_gti",
+        "purse":        1150,
+        "color":        rgba("#7e86cf"),
+        "mods":         ["intake", "dp", "fmic", "fuel", "turbo"],
+        "tune":         {
+            "boost": 23.0,
+            "timing": 14.0,
+            "lambda": 0.82,
+            "fuel": "E30",
+            "of": 45.0,
+            "or": 42.0,
+            "th": 40.0,
+            "name": "Stage 2 E30"
+        },
+        "video_loss":   ["loss/4x4_dis.mp4", "loss/4x4_win.mp4"],
+        "video_win":    ["win/4x4_shift.mp4"]
+    },
+    {
         "name":         "Lil Sporty",
         "car_id":       "mk7_gti",
-        "purse":        1600,
+        "purse":        1700,
         "color":        rgba("#ff51ab"),
         "mods":         ["intake", "dp", "fmic", "clutch", "fuel", "turbo"],
-        "tune":         PRESETS["stage2"],
+        "tune":         {
+            "boost": 27.0,
+            "timing": 14.0,
+            "lambda": 0.82,
+            "fuel": "E85",
+            "of": 45.0,
+            "or": 42.0,
+            "th": 40.0,
+            "name": "K-tuned"
+        },
         "video_loss":   ["loss/kyle_dis.mp4"],
-        "video_win":    ["win/kyle_cry.mp4"]
+        "video_win":    ["win/kyle_cry.mp4", "win/kyle_cry_2.mp4"]
     },
 ]
 

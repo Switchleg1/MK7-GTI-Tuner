@@ -349,6 +349,7 @@ class RaceTask(TaskBase):
         model = rival.model if rival else None
         if model and model == self._rival_model and self.rival_car:
             self.rival_car.setPos(RIVAL_X, 0, 0.0)  # same model already loaded; just re-stage
+            self.rival_car.setColorScale(rival.color)
             return
         if self.rival_car:
             self.rival_car.removeNode()  # also frees its wheel pivots (children)
@@ -360,8 +361,8 @@ class RaceTask(TaskBase):
             self.rival_car.setPos(RIVAL_X, 0, 0.0)
             self.rival_wheels = self.prepare_wheels(self.rival_car)
         else:
-            self.rival_car = None
-            self.rival_wheels = None
+            self.rival_car      = None
+            self.rival_wheels   = None
 
     def _race_active(self) -> bool:
         return bool(self.race and self.race["active"])
