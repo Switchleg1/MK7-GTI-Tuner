@@ -100,6 +100,7 @@ library/
              discord_normal_user.py geometry.py tuning.py simos.py scoreboard.py
   stages/    hud.py task_base.py garage_stage.py menu_stage.py simon_panel.py discord_panel.py
              wizard_choice_stage.py wizard_trial_stage.py dongle_stage.py
+             shop_item.py review_overlay.py
              unlock_stage.py toast.py notifications.py phone_screen.py
              character.py picker.py progress_bar.py
              base_object.py text.py button.py frame.py image.py slider.py entry.py ui_object_controller.py
@@ -127,7 +128,12 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   grip, redline, spool, boost ceiling — keyed by `car_id`) and **`MOD_TABLE`** (per-mod
   spool/weight/grip/boost-ceiling deltas + compounding rpm `curve` adders; its keys match
   the `MODS` ids). `TRACK_M` is the only global gearing value left (per-car gearing moved
-  into `CAR_TABLE`).
+  into `CAR_TABLE`). **`TURBOS`** is the mutually-exclusive turbo family (is38/cts_jb600/
+  vortex/arashi_3076): each carries the `MOD_TABLE`-shaped spool/curve PLUS its
+  `compute_tune` caps (`boost_limit`/`blown_boost` — lower = grenades sooner), a
+  `dave_on_blow` Dave-pool key, `ed_cut` flavour, and `name`/`price`/`blurb`/`review`.
+  `MOD_REVIEWS` holds the bolt-on full reviews. (`mods["turbo"]` stays a bool anchor;
+  `Car.turbo` picks the variant — see car.py.)
 - `utils.py` — `clamp`, `pick`, `rgba`.
 - `audio.py` — `GameAudio`: the runtime sound service on the shell. A looping engine
   note (+ intake roar + turbo whistle) pitched by RPM via `setPlayRate` and leveled by
@@ -347,9 +353,16 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   rivals, which never flash). **`build_whp()`** composes the final rpm→whp curve = base
   curve + owned mods (+ the flashed tune, which scales it) via `tuning.build_whp_curve`;
   `whp_at(rpm)` interpolates it; `car_perf()` returns the curve + peak whp + mass/grip
-  (base ± mod deltas) + blown/rel. State-change methods return `(message, kind)` so `Game`
-  logs them. `apply_preset` accepts `PRESETS` **and** `COMMUNITY_MAPS` keys. Adds `car_id`
-  to its save dict (old saves load as `mk7_gti`).
+  (base ± mod deltas) + blown/rel. **Turbo variants (owned + equipped):** `Car.owned_turbos`
+  is the set you've bought and `Car.turbo` is the one fitted; `buy_turbo(id)` owns+equips,
+  `equip_turbo(id)` switches free among owned. `_turbo_spec()` resolves the fitted variant
+  (defaulting to IS38 for rivals/old saves that only have the `mods["turbo"]` bool) and
+  `_effects_table()` = `MOD_TABLE` with `"turbo"` swapped for that spec, so `build_whp`/
+  `car_perf`/`compute` reflect the chosen turbo. `blow_dave_pool()` picks the Dave pool when
+  it grenades. State-change methods return `(message, kind)` so `Game` logs them.
+  `apply_preset` accepts `PRESETS` **and** `COMMUNITY_MAPS` keys. Save dict adds `car_id` +
+  `turbo` + `owned_turbos` (old v3 saves with `mods["turbo"]` migrate to IS38 + back-fill
+  owned; `SAVE_VERSION` 4).
 - `car_library.py` — `CarLibrary`: the bro's car(s) + active index (`active()`);
   reconstructs each car from its saved `car_id` so the physics spec reloads.
 - `discord.py` — `Discord`: the *MQB Vibe Coders* server. Builds the roster from
@@ -361,10 +374,12 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   role subclasses (Admin trusts good, GreenName pulls money, NormalUser is persona-only).
 - `app.py` — `MK7Tuner3D`: the ShowBase shell + stage manager + `TASK_CLASSES`.
 - `geometry.py` — box/grid builders (the exhaust-flame cubes).
-- `tuning.py` — tune + curve math: `compute_tune` (calibration → tune-only peak whp +
-  knock/EGT/reliability/pop/blown; **hardware power lives in the mod curves now, not
-  here**), `build_whp_curve(base, owned_mods, tune_peak, idle, redline)` + `whp_at(curve,
-  rpm)` (the curve engine), plus grading, pops, rep.
+- `tuning.py` — tune + curve math: `compute_tune(tune, mods, turbo=None)` (calibration →
+  tune-only peak whp + knock/EGT/reliability/pop/blown; the optional `turbo` spec sets the
+  boost ceiling + blow-up threshold, else it falls back to the `mods["turbo"]` bool;
+  **hardware power lives in the mod curves now, not here**), `build_whp_curve(base,
+  owned_mods, …, effects=MOD_TABLE)` (a car passes its own `effects` so `"turbo"` resolves
+  to the fitted variant) + `whp_at(curve, rpm)`, plus grading, pops, rep.
 - `simos.py` — "Ask Simon" rules engine; `build_context(game, tab)` reads bro + car (and
   shows Simon the real **built** peak whp, not the tune-only figure).
 
@@ -385,6 +400,25 @@ gear + final drive + tire circ, `_step_car` makes power = `whp_at(curve, rpm)` (
 at low speed, **zero on the rev limiter** so you must shift), and the rival `_auto_shift`s
 near its redline (the player shifts on SPACE). Each car's curve + mass/grip are built once
 per run in `_start_race`.
+
+The **ShopTask** (`library/stages/tasks/shop_task.py`) is a **2×3 grid of cards** (`N_CARDS=6`),
+one per `ShopItem` (`shop_item.py`): thumbnail · name · brief description · an owned/equipped
+tag · **Read review** · **Buy/Equip**. `build_catalog()` builds the list from the 6 bolt-on
+`MODS` + the 4 `TURBOS`; the task holds the 6 fixed card slots and an item paints itself into
+a slot via `ShopItem.bind_to_slot` (wiring that slot's two buttons back to `_card_action` /
+`_open_review`), the same windowed-scroll pattern as the scoreboard pane (scroll by a row =
+`COLS`, via wheel / ▲▼ / arrows). **Equippable families:** `ShopItem.category` ("turbo" today,
+"intercooler" next) marks mutually-exclusive items you **own many of and equip one** —
+`is_owned`/`is_equipped`/`owned_label`/`action` drive a dual button: **Buy $price** (unowned,
+GREEN) → **Equip** (owned, not fitted, free swap, VIOLET) → **Equipped** (disabled). Bolt-on
+mods (`category=None`) are cumulative. `_card_action` spends + `Car.buy_turbo`/`Car.set_mod`,
+or free `Car.equip_turbo`; `ed_cut` turbos log an "Ed gets his cut" line. `_open_review` opens
+the **`ReviewOverlay`** (`review_overlay.py`) — a faux-browser pane that animates a tiny rect
+at the pressed button out to a near-fullscreen, slightly-translucent window (LerpPos+LerpScale
+via `direct.interval`, like `unlock_stage`) showing the item's full `review` with the
+**detective clipart** (`detective.png`) on the right; the title-bar **X** or Esc animates it
+back into the button. The green-name pro storefront (sell tunes / DM the pros) is unchanged
+below the grid.
 
 The **ScoreboardTask** (`library/stages/tasks/scoreboard_task.py`, opened by the garage's
 HIGH SCORES button) is an 80s-arcade HALL OF FAME: a CRT backdrop + scanlines, the bro's

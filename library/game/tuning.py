@@ -24,11 +24,16 @@ def rep_title(cred: float) -> str:
     return title
 
 
-def compute_tune(tune: dict, mods: dict) -> dict:
+def compute_tune(tune: dict, mods: dict, turbo: dict | None = None) -> dict:
     """The calibration sim: turns the tune (boost/timing/lambda/fuel) into a tune-driven
     peak ``whp`` plus the safety diagnostics (knock/EGT/reliability/pop/blown). Power
     from *hardware* (intake/dp/turbo/...) is NOT here -- it flows through the curve in
-    ``build_whp_curve``; mods still factor into headroom/EGT/reliability/boost ceiling."""
+    ``build_whp_curve``; mods still factor into headroom/EGT/reliability/boost ceiling.
+
+    ``turbo`` is the selected turbo's spec (a ``TURBOS`` entry) and supplies the boost
+    ceiling + blow-up threshold (so a CTS grenades sooner than an Arashi). When omitted,
+    it falls back to the old behaviour keyed off the ``mods["turbo"]`` bool (hybrid vs
+    stock limits) so bare callers (e.g. simos) are unaffected."""
     fuel = FUEL[tune["fuel"]]
     headroom = fuel["head"] + (2 if mods["fmic"] else 0) + (3 if mods["fuel"] else 0)
     knock_idx = (tune["boost"] - 18) * 0.85 + (tune["timing"] - 9) * 1.25 + (tune["lambda"] - 0.82) * 14 - headroom
@@ -41,6 +46,9 @@ def compute_tune(tune: dict, mods: dict) -> dict:
         + fuel["pwr"]
         - abs(tune["lambda"] - 0.83) * 40
     )
+    # A bigger turbo (any aftermarket unit) relieves EGT; a specific turbo sets the
+    # boost ceiling + blow-up threshold (else fall back to the hybrid/stock bool limits).
+    has_turbo = turbo is not None or mods["turbo"]
     egt = (
         720
         + (tune["boost"] - 18) * 9
@@ -49,11 +57,17 @@ def compute_tune(tune: dict, mods: dict) -> dict:
         + tune["of"] * 1.4
         + tune["or"] * 1.7
         - (45 if mods["fmic"] else 0)
-        - (25 if mods["turbo"] else 0)
+        - (25 if has_turbo else 0)
     )
     pop = pop_score(tune)
-    boost_limit = TUNE_THRESHOLDS["hybrid_turbo_boost_limit"] if mods["turbo"] else TUNE_THRESHOLDS["stock_turbo_boost_limit"]
-    blown_limit = TUNE_THRESHOLDS["hybrid_turbo_blown_boost"] if mods["turbo"] else TUNE_THRESHOLDS["stock_turbo_blown_boost"]
+    if turbo is not None:
+        boost_limit, blown_limit = turbo["boost_limit"], turbo["blown_boost"]
+    elif mods["turbo"]:
+        boost_limit = TUNE_THRESHOLDS["hybrid_turbo_boost_limit"]
+        blown_limit = TUNE_THRESHOLDS["hybrid_turbo_blown_boost"]
+    else:
+        boost_limit = TUNE_THRESHOLDS["stock_turbo_boost_limit"]
+        blown_limit = TUNE_THRESHOLDS["stock_turbo_blown_boost"]
     rel = (
         100
         - max(0, knock_idx) * 6
@@ -104,7 +118,8 @@ def _mod_curve_value(nodes: list, rpm: float):
 
 
 def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0,
-                    idle: int = 900, redline: int = 6700, step: int = 100) -> list:
+                    idle: int = 900, redline: int = 6700, step: int = 100,
+                    effects: dict | None = None) -> list:
     """Compose a car's final rpm->whp curve from its stock ``base_curve`` + owned mods
     (+ tune). Returns ``[(rpm, whp), ...]`` from idle to redline.
 
@@ -113,11 +128,14 @@ def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0
       hot tune lifts any car's stock curve by the same percentage (1.0 = stock tune).
     - Each owned mod's ``spool`` shifts the sub-peak onset (- earlier / + later) and its
       ``curve`` nodes add whp, compounding (``base + scaler * running_total``). Mods are
-      applied in the given order (MOD_TABLE order)."""
+      applied in the given order.
+    - ``effects`` is the spool/curve lookup (defaults to ``MOD_TABLE``); a car passes its
+      own table so the ``"turbo"`` entry resolves to the SELECTED turbo variant's spec."""
+    effects = effects or MOD_TABLE
     factor = tune_factor
     peak_rpm = max(base_curve, key=lambda p: p[1])[0]
     lo_rpm, hi_rpm = base_curve[0][0], base_curve[-1][0]
-    spool_delta = sum(MOD_TABLE[m]["spool"] for m in owned_mods)
+    spool_delta = sum(effects[m]["spool"] for m in owned_mods)
     grid = []
     rpm = idle
     while rpm <= redline + 1:
@@ -128,7 +146,7 @@ def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0
         whp = whp_at(base_curve, look) * factor
         accumulated = 0.0
         for mod_id in owned_mods:
-            base, scaler = _mod_curve_value(MOD_TABLE[mod_id]["curve"], rpm)
+            base, scaler = _mod_curve_value(effects[mod_id]["curve"], rpm)
             add = base + scaler * accumulated
             whp += add
             accumulated += add

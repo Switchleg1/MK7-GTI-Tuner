@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import CAR_TABLE, MOD_TABLE, MODS, PRESETS, UNLOCKABLE_MAPS, DEFAULT_TUNE
+from library.core.constants import CAR_TABLE, MOD_TABLE, MODS, PRESETS, TURBOS, UNLOCKABLE_MAPS, DEFAULT_TUNE
 from library.game.tuning import (
     build_whp_curve, clone_tune, compute_tune, default_tune, grade_for_result, pop_score, whp_at,
 )
@@ -43,6 +43,13 @@ class Car:
         self.slots                  = [clone_tune(self.tune), None, None, None]
         self.active_slot            = 0
         self.mods                   = mods if mods is not None else {mod[0]: False for mod in MODS}
+        # Which turbo variant is fitted (None = stock). `mods["turbo"]` stays the bool
+        # "owns an aftermarket turbo"; this picks WHICH from TURBOS. A car built with
+        # `mods["turbo"]` True but no explicit variant (rivals, old saves) defaults to IS38.
+        self.turbo                  = "is38" if self.mods.get("turbo") else None
+        # Turbos are OWNED (bought once) and one is EQUIPPED. You can switch freely between
+        # ones you own. (Intercoolers will become the same kind of equippable family next.)
+        self.owned_turbos: list     = [self.turbo] if self.turbo else []
         self.dyno_result            = None
         self.grade                  = ""
         if tune is not None and tune != DEFAULT_TUNE:
@@ -84,16 +91,29 @@ class Car:
     def compute(self) -> dict:
         """The calibration diagnostics for the running tune (whp/knock/EGT/rel/pop/blown).
         Power-from-mods is not here -- see ``build_whp``."""
-        return compute_tune(self.flashed_tune or self.tune, self.mods)
+        return compute_tune(self.flashed_tune or self.tune, self.mods, self._turbo_spec())
 
     def owned_mods(self) -> list:
         return [mod_id for mod_id in self.mods if self.mods[mod_id]]
+
+    def _turbo_spec(self) -> dict | None:
+        """The fitted turbo's spec (a TURBOS entry), or None when stock. Falls back to
+        IS38 if the bool ``mods["turbo"]`` is set but no explicit variant (rivals/old saves)."""
+        if self.turbo:
+            return TURBOS.get(self.turbo, TURBOS["is38"])
+        return TURBOS["is38"] if self.mods.get("turbo") else None
+
+    def _effects_table(self) -> dict:
+        """MOD_TABLE with its generic ``"turbo"`` entry swapped for the SELECTED turbo's
+        spec, so the curve/perf math reflects which turbo is fitted."""
+        return {**MOD_TABLE, "turbo": self._turbo_spec() or MOD_TABLE["turbo"]}
 
     def build_whp(self) -> list:
         """The car's final rpm->whp curve = stock base curve scaled by the active tune,
         plus owned mods. The tune scales in once the car is flashed (the player flashes to
         write the map; rival cars are constructed already flashed, so their tune applies)."""
-        return build_whp_curve(self.base_curve, self.owned_mods(), self._tune_factor(), self.idle, self.redline)
+        return build_whp_curve(self.base_curve, self.owned_mods(), self._tune_factor(),
+                               self.idle, self.redline, effects=self._effects_table())
 
     def _tune_factor(self) -> float:
         """The active tune's power *relative to the stock tune* (car-agnostic, since
@@ -111,10 +131,11 @@ class Car:
         (base ± owned-mod deltas), and the blown/reliability flags from the tune."""
         curve = self.build_whp()
         owned = self.owned_mods()
-        weight = self.base_weight + sum(MOD_TABLE[m]["weight"] for m in owned)
-        grip = self.base_grip + sum(MOD_TABLE[m]["grip"] for m in owned)
+        eff = self._effects_table()
+        weight = self.base_weight + sum(eff[m]["weight"] for m in owned)
+        grip = self.base_grip + sum(eff[m]["grip"] for m in owned)
         if self.flashed:
-            diag = compute_tune(self.flashed_tune or self.tune, self.mods)
+            diag = compute_tune(self.flashed_tune or self.tune, self.mods, self._turbo_spec())
             blown, rel = diag["blown"], diag["rel"]
         else:
             blown, rel = False, 100.0
@@ -172,6 +193,28 @@ class Car:
         name = next(item[1] for item in MODS if item[0] == mod_id)
         return (f"installed {name}", "ok")
 
+    def buy_turbo(self, turbo_id: str):
+        """Purchase a turbo: add it to the owned set and equip it. Also sets the
+        ``mods["turbo"]`` bool so the bool-based callers (fully_built/simos/etc.) see it."""
+        if turbo_id not in self.owned_turbos:
+            self.owned_turbos.append(turbo_id)
+        self.turbo = turbo_id
+        self.mods["turbo"] = True
+        return (f"bought + fitted {TURBOS[turbo_id]['name']}", "ok")
+
+    def equip_turbo(self, turbo_id: str):
+        """Switch to a turbo you already own (free)."""
+        if turbo_id not in self.owned_turbos:
+            return None
+        self.turbo = turbo_id
+        return (f"equipped {TURBOS[turbo_id]['name']}", "ok")
+
+    def blow_dave_pool(self) -> str:
+        """Which DAVE_LINES pool plays when this car grenades on the dyno (a turbo can
+        override it -- e.g. the Vortex makes Dave deny it ever happened)."""
+        spec = self._turbo_spec()
+        return spec["dave_on_blow"] if spec else "blown"
+
     def record_dyno(self, result: dict):
         self.dyno_result = result
         self.grade = grade_for_result(result)
@@ -193,6 +236,8 @@ class Car:
             "slots",
             "active_slot",
             "mods",
+            "turbo",
+            "owned_turbos",
             "dyno_result",
             "grade"
         )}
@@ -200,3 +245,10 @@ class Car:
     def from_dict(self, data: dict):
         for key, value in data.items():
             setattr(self, key, value)
+        # v3 saves predate the turbo variant: a car that owned the (single) turbo loads
+        # as the IS38 baseline so its curve/caps resolve.
+        if self.turbo is None and self.mods.get("turbo"):
+            self.turbo = "is38"
+        # keep owned/equipped consistent (and back-fill owned for pre-owned_turbos saves)
+        if self.turbo and self.turbo not in self.owned_turbos:
+            self.owned_turbos = list(self.owned_turbos) + [self.turbo]

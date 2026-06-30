@@ -46,24 +46,36 @@ pause screen with **Save Game** and **Resume**.
 2. **Garage hub.** The GTI sits in the bay; click a task button to enter a task:
    - **TUNE** — boost/timing/fuel presets, switch-patch map slots, and any
      community maps you've earned from Discord.
-   - **DYNO** — strap it down, run a pull, get a graded result.
+   - **DYNO** — strap it down, run a pull, get a graded result (blow it up and Dyno
+     Dave will never let you forget it — unless you're running a Vortex, then he denies
+     it ever happened).
    - **STREET** — hold the throttle and preview pops for cred (mind the Karen meter).
    - **RACE** — quarter-mile vs the street ladder.
-   - **SHOP** — spend winnings on mods. **BENCH** — re-flash the current tune.
-3. Each task has a **Back** button (bottom-left) that returns you to the garage hub.
-4. **Music.** Each stage plays a random track from `data/music/<stage>/` and rolls to
+   - **SHOP** — a card-style storefront: buy bolt-on mods and pick a **turbo** (IS38 /
+     CTS JB600 / Vortex / Arashi 3076 — you can **own several and equip one**, swapping
+     for free). Every part has a **Read review** that pops a little in-game browser.
+   - **BENCH** — re-flash the current tune.
+   - **HIGH SCORES** (top-right) — an 80s arcade hall-of-fame ranking your **cred**
+     against the locals, plus a scrollable **trophy case** of every achievement.
+3. **The endgame.** Build enough cred as a verified **green name** and a hooded
+   **Bench Wizard** slides into your DMs with a challenge — your pick of **Bench an ECU**
+   (a three-part trial: power the rig, probe the board, hit the sync window) or
+   **Make Dongles** (drag each part onto its socket on the PCB). Pass either and you hit
+   **god status** + a giant payout (each path earns its own trophy).
+4. Each task has a **Back** button (bottom-left) that returns you to the garage hub.
+5. **Music.** Each stage plays a random track from `data/music/<stage>/` and rolls to
    another random one when it ends; a **NOW PLAYING** toast pops at the bottom for a
    few seconds when a song starts. Drop your own `.ogg`/`.mp3`/`.wav` files in the
    per-stage folders (`tuning/`, `skreetz/`, `dyno/`, `race/`, `shop/`, `bench/`,
    `garage/`, `unlock/`) — see `data/music/README.txt`. Empty folder = silence.
-5. **Ask Discord** (pill, any task). Opens the *MQB Vibe Coders* chat window — a
+6. **Ask Discord** (pill, any task). Opens the *MQB Vibe Coders* chat window — a
    server rail, the channel list, the `#ecu-tuning` thread, and a member list where
    only a fraction of the roster is online at a time. **Type a help request and press
    Enter**: the text (mention a datalog!), who's online, and a dice roll decide the
    outcome — cash, a free community map, or clout if it goes well; a broken part
    (costs cash) or lost clients (costs clout) if it doesn't. Admins help, green names
    want money, and the troll will gladly ruin your day.
-6. **Menu, saves & options.** **Esc** (or the hub **MENU** button) opens the pause menu:
+7. **Menu, saves & options.** **Esc** (or the hub **MENU** button) opens the pause menu:
    **Save Game** writes a career snapshot (cash, the car build + mods, ladder progress,
    Discord state) and **Load Game** restores it. (The rival roster itself isn't saved —
    it's rebuilt from the game's data each load, so tweaking rivals always takes effect.) **Options → Sound** has live music + FX
@@ -81,9 +93,12 @@ pause screen with **Save Game** and **Resume**.
 
 ```
 data/
-  models/   ground.glb car.glb character.glb phone.glb obd.glb   (.glb, glTF binary)
+  models/   cars/ (mk7_gti, civic_type_r, wrx_sti, bmw_m2, stock_civic .glb)
+            characters/character.glb  geometry/ground.glb
+            misc/ (phone, obd, dongle .glb)
   images/   phone_wallpaper.png simostools_icon.png flash_complete.png logo.png
             simon*.png emoji_*.png ui_box.png ui_ring.png knob.png avatar.png
+            detective.png   (fact-checker clipart on the review browser — placeholder; swap freely)
   audio/    engine_loop.wav intake_loop.wav turbo_loop.wav pop_*.wav bang_*.wav bov.wav
   music/    <stage>/*.ogg|*.mp3|*.wav   (background tracks; see music/README.txt)
 ```

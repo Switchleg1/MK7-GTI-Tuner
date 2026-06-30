@@ -234,6 +234,73 @@ MOD_TABLE = {
                "curve": [(3500, -5, 0.0), (4500, 15, 0.10), (5500, 35, 0.15), (6700, 45, 0.15)]},
 }
 
+# Turbo upgrades are a MUTUALLY-EXCLUSIVE family (you run ONE). `mods["turbo"]` stays a
+# bool ("owns an aftermarket turbo" -- keeps rivals/simos/fully_built/compute_tune happy);
+# `Car.turbo` picks WHICH variant from here. Each entry carries the curve-shape keys
+# (spool/weight/grip/max_boost/curve -- same shape as MOD_TABLE so build_whp_curve/car_perf
+# can read it) PLUS its compute_tune caps (`boost_limit`/`blown_boost` -- lower = grenades
+# sooner), `dave_on_blow` (which DAVE_LINES pool plays when it lets go on the dyno), and
+# `ed_cut` (flavour: the buy money funnels to Ed, a known rival). IS38 reuses MOD_TABLE.
+TURBOS = {
+    "is38": {**MOD_TABLE["turbo"], "name": "IS38", "price": 900, "ed_cut": True,
+             "boost_limit": 27, "blown_boost": 29, "dave_on_blow": "blown",
+             "blurb": "The proven hybrid. Solid all-rounder.",
+             "review": ("The IS38 is the tune-forum default for a reason: it just works. Spool is "
+                        "fine, mid-range is fine, top end is fine. Nobody ever got fired for buying "
+                        "an IS38.\n\nDave says: 'Boring. Reliable. Boring. I respect it.'\n\n"
+                        "Heads up: a slice of your money still ends up in Ed's pocket. Such is life.")},
+    "cts_jb600": {"spool": 400, "weight": 0, "grip": 0.0, "max_boost": 3,
+                  "curve": [(3800, -8, 0.0), (4800, 10, 0.08), (5800, 22, 0.10), (6700, 26, 0.10)],
+                  "name": "CTS JB600", "price": 650, "ed_cut": True,
+                  "boost_limit": 22, "blown_boost": 24, "dave_on_blow": "blown",
+                  "blurb": "Cheapest boost money can (barely) buy.",
+                  "review": ("Look, it's cheap. That's the whole pitch. Spool is a slideshow, boost "
+                             "tops out early, and the dyno operator keeps a fire extinguisher within "
+                             "reach when one of these is strapped down.\n\nForum consensus: grenades "
+                             "more often than any other turbo on this list, and when it goes, it goes "
+                             "BIG. You get what you pay for. You paid for very little.\n\n"
+                             "Two stars, would (financially have to) buy again.")},
+    "vortex": {"spool": 120, "weight": 0, "grip": 0.0, "max_boost": 5,
+               "curve": [(3300, -3, 0.0), (4300, 18, 0.10), (5300, 36, 0.14), (6700, 44, 0.15)],
+               "name": "Vortex", "price": 1600, "ed_cut": True,
+               "boost_limit": 27, "blown_boost": 29, "dave_on_blow": "blown_deny",
+               "blurb": "Snappy spool, decent boost. Premium price.",
+               "review": ("The boutique option. Spools up early and feels alive in the mid-range, and "
+                          "the boost curve is genuinely nice. It also costs more than the Arashi, which "
+                          "the marketing calls 'exclusivity'.\n\nThe catch: on the rare (cough) occasion "
+                          "one lets go on the dyno, Dyno Dave will look you dead in the eye and insist "
+                          "it was YOUR tune, YOUR fuel, YOUR fault — and then question your bloodline.\n\n"
+                          "Great turbo. Bring thick skin.")},
+    "arashi_3076": {"spool": 170, "weight": 0, "grip": 0.0, "max_boost": 6,
+                    "curve": [(3600, -6, 0.0), (4600, 14, 0.10), (5600, 40, 0.16), (6700, 58, 0.18)],
+                    "name": "Arashi 3076", "price": 1400, "ed_cut": False,
+                    "boost_limit": 29, "blown_boost": 31, "dave_on_blow": "blown",
+                    "blurb": "Monster top-end. None of your cash funds Ed.",
+                    "review": ("Spool is a touch lazier than the Vortex, but who cares once it's lit — "
+                               "the top end PULLS, holding boost to redline and making the most whp of "
+                               "anything here. Takes more boost before it complains, too.\n\nBest part: "
+                               "not one cent goes to Ed. The crew respects the Arashi. Ed is reportedly "
+                               "'not mad, just disappointed' (he's mad).\n\nIf you can afford it, this is "
+                               "the one.")},
+}
+
+# Full reviews for the bolt-on mods (their brief blurb is MODS[i][3]). Parody flavour;
+# edit freely. Keyed by the MODS id.
+MOD_REVIEWS = {
+    "intake": ("A intake. It makes the turbo-flutter louder and adds a couple of whp you will "
+               "absolutely tell everyone about. Dave calls it 'the gateway drug'."),
+    "dp": ("Catless downpipe: deletes the cat, wakes up the mid-range, and turns every tunnel into a "
+           "fireworks show. The cops WILL find you. Worth it."),
+    "fmic": ("Front-mount intercooler. Cooler charge, more knock headroom, lower EGTs — the unsexy "
+             "mod that keeps your motor alive when you get greedy. Buy it before the turbo."),
+    "clutch": ("Stage 2 clutch + LSD. Finally puts the power down instead of roasting one tyre at the "
+               "line. Your launches stop being a comedy routine."),
+    "wheels": ("Lightweight wheels. Less rotating mass, quicker to rev, and they look the part. The "
+               "single most Instagram-per-dollar mod on the car."),
+    "fuel": ("Port injection + low-pressure fuel pump. The unlock for E85 without leaning out and "
+             "grenading. Boring plumbing, huge enabler. Dave approves."),
+}
+
 # Each car: real-world-derived stock wheel-power curve [(rpm, whp)] + gearing + tire +
 # mass + grip. `power_curve` is the STOCK base; the player's tune scales it and owned
 # mods reshape it in build_whp_curve. `model` is the .glb key (see CAR_MODEL_FILES).
@@ -487,6 +554,7 @@ IMAGE_FILES = {
     "ui_ring": "ui_ring.png",    # rounded-rectangle outline -> panel / button border
     "knob": "knob.png",          # round slider thumb (placeholder; edit freely)
     "avatar": "avatar.png",      # default round discord avatar, tinted per user
+    "detective": "detective.png",  # fact-checker clipart on the review browser (placeholder)
 }
 
 # --------------------------------------------------------------------------
@@ -551,7 +619,7 @@ TOAST_Z = -0.85
 # saved -- it's static reference data from RIVALS (v1 saved it and froze stale
 # specs). SAVE_VERSION lets a future load reject or migrate an old layout.
 # --------------------------------------------------------------------------
-SAVE_VERSION = 3  # v3: Car carries car_id (curve-based model); old saves load as mk7_gti
+SAVE_VERSION = 4  # v4: Car carries turbo variant id; old saves with mods["turbo"] load as IS38
 CONFIG_FILE = "options.cfg"
 SAVE_FILE = "savegame.json"
 
@@ -1066,6 +1134,8 @@ DAVE_LINES = {
     "dyno": ["Numbers don't lie. The dyno might, but not today.", "That'll do. Send it again.", "Decent pull - chase a little more."],
     "sgrade": ["S-grade?! Tuner of the year, baby.", "Now THAT is a tune. Frame it."],
     "blown": ["...we don't talk about that one.", "That's a rebuild. GoFundMe time.", "Money shift. Classic. Painful."],
+    "blown_deny": ["That was NOT the turbo. That was YOUR tune, champ.", "Vortex doesn't fail. You failed. There's a difference, genius.",
+                   "Operator error. Read a book. Maybe two.", "Don't you DARE blame the Vortex. This one's on you, hero."],
     "win": ["GET THAT MONEY. Easy work.", "He never stood a chance.", "Cash money - go buy a turbo."],
     "lose": ["Oof. Hit the shop and run it back.", "He spanked you. Tune up.", "Slower car, faster wallet... oh wait."],
     "shop": ["Bolted on - she's meaner now.", "Good buy. Now go use it.", "Money well spent, for once."],

@@ -319,8 +319,39 @@ def _logo(path):
     img.write(Filename.fromOsSpecific(path))
 
 
+def _detective(path, size=256):
+    """Flat-clipart fact-checker (placeholder for the review browser): trench coat, hat,
+    moustache, holding a magnifying glass. Drawn 3x then downscaled. PNMImage y is
+    top-down, so smaller y = higher up. Swap data/images/detective.png for nicer art."""
+    s = size * 3
+    big = _new(s, s)
+    u = s / 256.0
+    def U(v):
+        return int(v * u)
+    coat = (0.74, 0.60, 0.38, 1.0)
+    coat_dk = (0.60, 0.47, 0.28, 1.0)
+    skin = (0.96, 0.80, 0.66, 1.0)
+    brown = (0.45, 0.32, 0.18, 1.0)
+    dkbrown = (0.30, 0.20, 0.12, 1.0)
+    _rounded_rect(big, U(74), U(150), U(182), U(254), U(22), coat)        # coat body
+    _thick_line(big, U(128), U(152), U(98), U(210), U(7), coat_dk)        # lapels
+    _thick_line(big, U(128), U(152), U(158), U(210), U(7), coat_dk)
+    _disc(big, U(128), U(112), U(34), skin)                              # head
+    _ellipse(big, U(128), U(126), U(20), U(7), dkbrown)                  # moustache
+    _disc(big, U(116), U(106), U(4), (0.15, 0.15, 0.18, 1.0))            # eyes
+    _disc(big, U(140), U(106), U(4), (0.15, 0.15, 0.18, 1.0))
+    _ellipse(big, U(128), U(88), U(48), U(12), brown)                   # hat brim
+    _rounded_rect(big, U(104), U(56), U(152), U(88), U(10), brown)       # hat crown
+    _thick_line(big, U(162), U(176), U(196), U(150), U(11), coat)        # arm to the glass
+    _thick_line(big, U(196), U(150), U(214), U(132), U(7), dkbrown)      # glass handle
+    _disc(big, U(196), U(116), U(27), (0.16, 0.19, 0.23, 1.0))           # glass rim
+    _disc(big, U(196), U(116), U(20), (0.62, 0.82, 0.96, 0.65))          # lens
+    _downscale(big, size).write(Filename.fromOsSpecific(path))
+
+
 def build(out_dir: str) -> list[str]:
     builders = {
+        "detective": _detective,
         "wallpaper": _wallpaper,
         "app_icon": _app_icon,
         "check": _check,

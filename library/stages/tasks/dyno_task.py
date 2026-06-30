@@ -148,7 +148,7 @@ class DynoTask(TaskBase):
         # recorded dyno result + grade; here we just apply the gameplay sting + Dave's quip.
         if result["blown"]:
             game.hurt_bro(ED_BLOWN)
-            game.dave("blown")
+            game.dave(game.car.blow_dave_pool())  # Vortex makes Dave deny it; others "blown"
         elif game.car.grade.startswith("Grade S"):
             game.dave("sgrade")
         else:
