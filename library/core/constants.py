@@ -325,17 +325,36 @@ RIVALS = [
         "color":        rgba("#7e86cf"),
         "mods":         ["intake", "dp", "fmic", "fuel", "turbo"],
         "tune":         {
-            "boost": 23.0,
-            "timing": 14.0,
+            "boost": 25.0,
+            "timing": 15.0,
             "lambda": 0.82,
             "fuel": "E30",
             "of": 45.0,
             "or": 42.0,
             "th": 40.0,
-            "name": "Stage 2 E30"
+            "name": "ED stage 1"
         },
         "video_loss":   ["loss/4x4_dis.mp4", "loss/4x4_win.mp4"],
         "video_win":    ["win/4x4_shift.mp4"]
+    },
+    {
+        "name":         "Dave",
+        "car_id":       "mk7_gti",
+        "purse":        1350,
+        "color":        rgba("#69ff0b"),
+        "mods":         ["intake", "dp", "fmic", "clutch", "fuel", "turbo"],
+        "tune":         {
+            "boost": 24.0,
+            "timing": 14.0,
+            "lambda": 0.82,
+            "fuel": "E85",
+            "of": 45.0,
+            "or": 42.0,
+            "th": 40.0,
+            "name": "Dave E85 tune"
+        },
+        "video_loss":   ["loss/ed_dis.mp4"],
+        "video_win":    ["win/davesE85special.mp4"]
     },
     {
         "name":         "Lil Sporty",
@@ -644,12 +663,12 @@ PHONE_UI_HALF_H = 0.72        # half height of the phone body
 # Mode select screen: (garage tab key, title, blurb)
 # --------------------------------------------------------------------------
 MODES = [
+    ("bench", "BENCH", "Re-flash new staged maps"),
     ("maps", "TUNE", "Boost, timing, fuel & pops"),
     ("dyno", "DYNO", "Pull it and grade the map"),
     ("street", "SKREETS", "Bangs, pops & cred"),
     ("race", "RACE", "Quarter-mile skreets ladder"),
     ("shop", "SHOP", "Spend winnings on mods"),
-    ("bench", "BENCH", "Re-flash new staged maps"),
 ]
 
 # --------------------------------------------------------------------------
