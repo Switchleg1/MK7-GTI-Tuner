@@ -200,7 +200,7 @@ SLIDERS = [
 
 # --------------------------------------------------------------------------
 # PARTS -- the SINGLE catalog of everything you can buy for the car. One row per part
-# holds BOTH its shop-facing copy (name/price/blurb/review/accent) AND its curve-shape
+# holds BOTH its shop-facing copy (name/price/blurb/review/accent/image) AND its curve-shape
 # effect (spool/weight/grip/max_boost/curve) that reshapes the rpm->whp curve in
 # tuning.build_whp_curve. `kind` splits two behaviours:
 #   "mod"   -- a bolt-on. Cumulative: bought once it's a bool on Car.mods and just stays
@@ -215,47 +215,49 @@ SLIDERS = [
 # `curve` = [(rpm, base_add, scaler)] whp adders interpolated across rpm; at each rpm the
 # gain is base_add + scaler * (running total of earlier parts' adds), so parts compound.
 # `spool` shifts boost onset (- earlier / + later), `weight` kg +/-, `grip` traction +/-,
-# `max_boost` raises the psi ceiling. Both the player's Car and rival Cars pull from
-# CAR_TABLE and compose their final curve via tuning.build_whp_curve.
+# `max_boost` raises the psi ceiling. `image` is the shop-card thumbnail: an IMAGE_FILES
+# key (drop a PNG in data/images, register it in IMAGE_FILES, put the key here) or "" for
+# the plain accent-coloured placeholder tile. Both the player's Car and rival Cars pull
+# from CAR_TABLE and compose their final curve via tuning.build_whp_curve.
 # --------------------------------------------------------------------------
 PARTS = {
     # -- bolt-on mods (cumulative bool on Car.mods) --
-    "intake": {"kind": "mod", "name": "Cold Air Intake", "price": 120, "accent": BLUE,
+    "intake": {"kind": "mod", "name": "Cold Air Intake", "price": 120, "accent": BLUE, "image": "",
                "blurb": "+6 whp, quicker spool.",
                "review": ("A intake. It makes the turbo-flutter louder and adds a couple of whp you will "
                           "absolutely tell everyone about. Dave calls it 'the gateway drug'."),
                "spool": -150, "weight": 0, "grip": 0.00, "max_boost": 0,
                "curve": [(3000, 3, 0.02), (5000, 6, 0.04), (6700, 6, 0.04)]},
-    "dp": {"kind": "mod", "name": "Catless Downpipe", "price": 250, "accent": BLUE,
+    "dp": {"kind": "mod", "name": "Catless Downpipe", "price": 250, "accent": BLUE, "image": "",
            "blurb": "+12 whp and much louder bangs. Cops notice fast.",
            "review": ("Catless downpipe: deletes the cat, wakes up the mid-range, and turns every tunnel "
                       "into a fireworks show. The cops WILL find you. Worth it."),
            "spool": -200, "weight": 0, "grip": 0.00, "max_boost": 1,
            "curve": [(3500, 6, 0.05), (5000, 10, 0.06), (6700, 12, 0.06)]},
-    "fmic": {"kind": "mod", "name": "Front-Mount Intercooler", "price": 300, "accent": BLUE,
+    "fmic": {"kind": "mod", "name": "Front-Mount Intercooler", "price": 300, "accent": BLUE, "image": "",
              "blurb": "More knock headroom and lower EGT.",
              "review": ("Front-mount intercooler. Cooler charge, more knock headroom, lower EGTs -- the "
                         "unsexy mod that keeps your motor alive when you get greedy. Buy it before the turbo."),
              "spool": 0, "weight": 5, "grip": 0.00, "max_boost": 1,
              "curve": [(4500, 4, 0.03), (6700, 8, 0.05)]},
-    "clutch": {"kind": "mod", "name": "Stage 2 Clutch + LSD", "price": 450, "accent": BLUE,
+    "clutch": {"kind": "mod", "name": "Stage 2 Clutch + LSD", "price": 450, "accent": BLUE, "image": "",
                "blurb": "Launch grip for the strip.",
                "review": ("Stage 2 clutch + LSD. Finally puts the power down instead of roasting one tyre "
                           "at the line. Your launches stop being a comedy routine."),
                "spool": 0, "weight": 0, "grip": 0.18, "max_boost": 0, "curve": []},
-    "wheels": {"kind": "mod", "name": "Lightweight Wheels", "price": 200, "accent": BLUE,
+    "wheels": {"kind": "mod", "name": "Lightweight Wheels", "price": 200, "accent": BLUE, "image": "",
                "blurb": "Less rotating weight.",
                "review": ("Lightweight wheels. Less rotating mass, quicker to rev, and they look the part. "
                           "The single most Instagram-per-dollar mod on the car."),
                "spool": 0, "weight": -50, "grip": 0.02, "max_boost": 0, "curve": []},
-    "fuel": {"kind": "mod", "name": "Port Injection + LPFP", "price": 700, "accent": BLUE,
+    "fuel": {"kind": "mod", "name": "Port Injection + LPFP", "price": 700, "accent": BLUE, "image": "",
              "blurb": "Feeds E85 safely.",
              "review": ("Port injection + low-pressure fuel pump. The unlock for E85 without leaning out "
                         "and grenading. Boring plumbing, huge enabler. Dave approves."),
              "spool": 0, "weight": 0, "grip": 0.00, "max_boost": 0,
              "curve": [(4000, 8, 0.05), (6000, 14, 0.08), (6700, 14, 0.08)]},
     # -- turbo family (own many, equip one; category="turbo") --
-    "is38": {"kind": "turbo", "category": "turbo", "name": "IS38", "price": 900, "accent": BLUE,
+    "is38": {"kind": "turbo", "category": "turbo", "name": "IS38", "price": 900, "accent": BLUE, "image": "",
              "blurb": "The proven hybrid. Solid all-rounder.",
              "review": ("The IS38 is the tune-forum default for a reason: it just works. Spool is "
                         "fine, mid-range is fine, top end is fine. Nobody ever got fired for buying "
@@ -264,7 +266,7 @@ PARTS = {
              "spool": 250, "weight": 0, "grip": 0.00, "max_boost": 5,
              "curve": [(3500, -5, 0.0), (4500, 15, 0.10), (5500, 35, 0.15), (6700, 45, 0.15)],
              "boost_limit": 27, "blown_boost": 29, "dave_on_blow": "blown", "ed_cut": True},
-    "cts_jb600": {"kind": "turbo", "category": "turbo", "name": "CTS JB600", "price": 650, "accent": RED,
+    "cts_jb600": {"kind": "turbo", "category": "turbo", "name": "CTS JB600", "price": 650, "accent": RED, "image": "",
                   "blurb": "Cheapest boost money can (barely) buy.",
                   "review": ("Look, it's cheap. That's the whole pitch. Spool is a slideshow, boost "
                              "tops out early, and the dyno operator keeps a fire extinguisher within "
@@ -275,7 +277,7 @@ PARTS = {
                   "spool": 400, "weight": 0, "grip": 0.0, "max_boost": 3,
                   "curve": [(3800, -8, 0.0), (4800, 10, 0.08), (5800, 22, 0.10), (6700, 26, 0.10)],
                   "boost_limit": 22, "blown_boost": 24, "dave_on_blow": "blown", "ed_cut": True},
-    "vortex": {"kind": "turbo", "category": "turbo", "name": "Vortex", "price": 1600, "accent": VIOLET,
+    "vortex": {"kind": "turbo", "category": "turbo", "name": "Vortex", "price": 1600, "accent": VIOLET, "image": "",
                "blurb": "Snappy spool, decent boost. Premium price.",
                "review": ("The boutique option. Spools up early and feels alive in the mid-range, and "
                           "the boost curve is genuinely nice. It also costs more than the Arashi, which "
@@ -286,7 +288,7 @@ PARTS = {
                "spool": 120, "weight": 0, "grip": 0.0, "max_boost": 5,
                "curve": [(3300, -3, 0.0), (4300, 18, 0.10), (5300, 36, 0.14), (6700, 44, 0.15)],
                "boost_limit": 30, "blown_boost": 32, "dave_on_blow": "blown_deny", "ed_cut": True},
-    "arashi_3076": {"kind": "turbo", "category": "turbo", "name": "Arashi 3076", "price": 1400, "accent": GREEN,
+    "arashi_3076": {"kind": "turbo", "category": "turbo", "name": "Arashi 3076", "price": 1400, "accent": GREEN, "image": "",
                     "blurb": "Monster top-end. None of your cash funds Ed.",
                     "review": ("Spool is a touch lazier than the Vortex, but who cares once it's lit — "
                                "the top end PULLS, holding boost to redline and making the most whp of "

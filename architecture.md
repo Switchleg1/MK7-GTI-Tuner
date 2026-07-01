@@ -128,7 +128,8 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   grip, redline, spool, `max_boost` (the stock boost-slider ceiling), boost ceiling —
   keyed by `car_id`) and **`PARTS`** — the SINGLE catalog of everything buyable. `TRACK_M`
   is the only global gearing value left (per-car gearing moved into `CAR_TABLE`). Each
-  `PARTS` row holds BOTH its shop copy (`name`/`price`/`blurb`/`review`/`accent`) AND its
+  `PARTS` row holds BOTH its shop copy (`name`/`price`/`blurb`/`review`/`accent`/`image` card
+  thumbnail — an `IMAGE_FILES` key or `""` placeholder) AND its
   curve effect (`spool`/`weight`/`grip`/`max_boost`/compounding rpm `curve` adders). `kind`
   splits behaviour: `"mod"` bolt-ons are cumulative bools on `Car.mods`; `"turbo"` rows are
   the mutually-exclusive turbo family (is38/cts_jb600/vortex/arashi_3076, `category="turbo"`)
@@ -411,7 +412,11 @@ one per `ShopItem` (`shop_item.py`): thumbnail · name · brief description · a
 tag · **Read review** · **Buy/Equip**. `build_catalog()` builds the list straight off the
 single `PARTS` table (6 bolt-on mods + the 4 turbos, in table order); the task holds the 6 fixed card slots and an item paints itself into
 a slot via `ShopItem.bind_to_slot` (wiring that slot's two buttons back to `_card_action` /
-`_open_review`), the same windowed-scroll pattern as the scoreboard pane (scroll by a row =
+`_open_review`). **Card thumbnail:** each part's `image` (a `PARTS`/`ShopItem` field) is an
+`IMAGE_FILES` key — `bind_to_slot` swaps the thumb `Frame`'s `frameTexture` (via the new
+`Frame.texture()`) to that art (untinted, initials tag hidden); a blank `""` falls back to
+the accent-coloured `ui_box` placeholder tile + `tag()` initials (all parts ship blank).
+That is the same windowed-scroll pattern as the scoreboard pane (scroll by a row =
 `COLS`, via wheel / ▲▼ / arrows). **Equippable families:** `ShopItem.category` ("turbo" today,
 "intercooler" next) marks mutually-exclusive items you **own many of and equip one** —
 `is_owned`/`is_equipped`/`owned_label`/`action` drive a dual button: **Buy $price** (unowned,

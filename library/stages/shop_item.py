@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import AMBER, BLUE, GREEN, GREEN_2, PARTS, VIOLET
+from library.core.constants import AMBER, BLUE, GREEN, GREEN_2, PARTS, VIOLET, WHITE
 
 
 class ShopItem:
@@ -12,16 +12,16 @@ class ShopItem:
     "turbo" today, "intercooler" next. Bolt-on mods have ``category=None`` (cumulative: once
     bought they're just on). The actual purchase / fitment lives on ``Car``."""
 
-    def __init__(self, key, name, blurb, review, price, accent, kind, category=None, image=None):
+    def __init__(self, key, name, blurb, review, price, accent, kind, category=None, image=""):
         self.key = key
         self.name = name
         self.blurb = blurb          # one-line card description
         self.review = review        # full review (the animated overlay)
         self.price = price
-        self.accent = accent        # thumbnail tint
+        self.accent = accent        # placeholder-tile tint (used when there's no image)
         self.kind = kind            # "mod" | "turbo"
         self.category = category    # equippable-family id, or None for cumulative bolt-ons
-        self.image = image          # optional IMAGE_FILES key; None -> placeholder tile
+        self.image = image          # thumbnail: an IMAGE_FILES key, or "" -> accent placeholder tile
 
     # -- state queries -----------------------------------------------------
     def is_owned(self, car) -> bool:
@@ -67,8 +67,20 @@ class ShopItem:
         car, bro = game.car, game.bro
         ui.get(f"card{slot}-name").text(self.name)
         ui.get(f"card{slot}-desc").text(self.blurb)
-        ui.get(f"card{slot}-thumb").color(self.accent)
-        ui.get(f"card{slot}-tag").text(self.tag())
+        # Thumbnail: a real image if this part carries one, else the accent placeholder
+        # tile (rounded ui_box) with the item's initials over it -- the current look.
+        thumb = ui.get(f"card{slot}-thumb")
+        tag = ui.get(f"card{slot}-tag")
+        if self.image:
+            thumb.texture(self.image)
+            thumb.color(WHITE)          # untinted so the artwork shows true
+            tag.text("")
+            tag.is_visible(False)
+        else:
+            thumb.texture("ui_box")
+            thumb.color(self.accent)
+            tag.text(self.tag())
+            tag.is_visible(True)
         own_text, own_color = self.owned_label(car)
         own = ui.get(f"card{slot}-own")
         own.text(own_text)
@@ -80,16 +92,18 @@ class ShopItem:
         buy.color(color)
         buy.command_fn(lambda: on_action(self))
         ui.get(f"card{slot}-rev").command_fn(lambda: on_review(self, slot))
-        for part in ("bg", "thumb", "tag", "name", "desc", "own", "buy", "rev"):
+        # (the tag's visibility is set above, per image vs placeholder)
+        for part in ("bg", "thumb", "name", "desc", "own", "buy", "rev"):
             ui.get(f"card{slot}-{part}").is_visible(True)
 
 
 def build_catalog() -> list[ShopItem]:
     """The full shop list, straight off the single ``PARTS`` table: every part becomes a
     card in table order (bolt-on mods first, then the turbo family). Each part row already
-    carries its name/blurb/review/price/accent/kind/category."""
+    carries its name/blurb/review/price/accent/kind/category/image."""
     return [
         ShopItem(key, p["name"], p["blurb"], p["review"], p["price"],
-                 p.get("accent", BLUE), p["kind"], category=p.get("category"))
+                 p.get("accent", BLUE), p["kind"], category=p.get("category"),
+                 image=p.get("image", ""))
         for key, p in PARTS.items()
     ]

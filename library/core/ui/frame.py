@@ -47,3 +47,11 @@ class Frame(BaseObject):
         self.node["frameSize"] = value
         if self.ring is not None:
             self.ring["frameSize"] = value
+
+    def texture(self, key=_UNSET):
+        """Get / set the frame's fill texture by IMAGE_FILES key (e.g. swap the rounded
+        ``ui_box`` tile for a shop-card thumbnail). Pair with ``color((1,1,1,1))`` so the
+        image shows untinted."""
+        if key is _UNSET:
+            return self.node["frameTexture"]
+        self.node["frameTexture"] = assets.image_path(key)

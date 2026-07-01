@@ -46,10 +46,12 @@ per-file map.
   poses, and the data tables (`CAR_TABLE`, `PARTS`, `ACHIEVEMENTS`, `RIVALS`, `DAVE_LINES`, …).
   Prefer one more table row over an `if/elif` staircase. One class per file.
 - **`PARTS` is the ONE catalog** of everything buyable (bolt-on mods + the turbo family) —
-  each row holds its shop copy (name/price/blurb/review/accent) AND its curve effect
+  each row holds its shop copy (name/price/blurb/review/accent/`image`) AND its curve effect
   (spool/weight/grip/max_boost/curve); turbos add `boost_limit`/`blown_boost`/`dave_on_blow`/
   `ed_cut`. Derived indices (`MOD_IDS`, `TURBO_IDS`, `MOD_KEYS`, `TURBO_DEFAULT`,
-  `BASE_EFFECTS`) are just views into it — add a part = add one `PARTS` row. The boost
+  `BASE_EFFECTS`) are just views into it — add a part = add one `PARTS` row. `image` is the
+  card thumbnail: an `IMAGE_FILES` key, or `""` for the accent-coloured placeholder tile
+  (all ship blank for now). The boost
   slider's ceiling is `Car.boost_slider_max()` (stock `max_boost`, or the fitted turbo's
   `blown_boost`).
 - **Geometry is authored Z-up** and loaded with `gltf.load_model(path,
