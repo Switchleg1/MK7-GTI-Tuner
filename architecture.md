@@ -147,14 +147,19 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `audio.py` — `GameAudio`: the runtime sound service on the shell. A looping engine
   note (+ intake roar + turbo whistle) pitched by RPM via `setPlayRate` and leveled by
   throttle load, plus pooled pop/bang/blow-off one-shots so overrun bursts overlap.
-  No-ops if Panda has no audio backend; tasks drive it via `app.audio` and it is
-  silenced on `TaskBase.exit()`. Sounds resolve via `assets.sound_path(key)`.
-  `set_fx_volume(v)` sets the master SFX gain via the `AudioManager` (options menu).
+  **Race stereo:** `set_engine(rpm, load, balance)` pans the player's engine + a **second
+  engine loop** (`set_rival_engine`, `silence_rival`) pans the rival's — RaceTask sets you
+  to `AUDIO["race_player_balance"]` (−0.5 → L1.0/R0.5) and the rival to `+0.5` (L0.5/R1.0);
+  everything else leaves `balance=0` (centred). Per-sound balance only actually pans on the
+  **FMOD** backend (see `panda_config._select_audio_backend`, which prefers FMOD and falls
+  back to OpenAL where balance is a harmless no-op). No-ops if Panda has no audio backend;
+  tasks drive it via `app.audio`. `set_fx_volume(v)` sets the master SFX gain (options menu).
 - `music.py` — `MusicPlayer`: per-stage background music. `set_track(key)` plays a
-  random song from `data/music/<key>/` (resolved by `assets.music_paths`); on the
-  finished event it auto-plays another random one. Each start raises a "now playing"
-  toast. `set_volume(v)` (driven by the options menu) levels the current + future songs.
-  Owned by the app and re-pointed in `_sync_overlays`.
+  random song from `data/music/<key>/` (resolved by `assets.music_paths`); **`update(dt)`
+  polls the song's `status()`** each frame and rolls to another random one when it ends
+  (FMOD doesn't implement `setFinishedEvent`, so polling keeps auto-advance backend-agnostic).
+  Each start raises a "now playing" toast. `set_volume(v)` levels current + future songs.
+  Owned by the app and re-pointed in `_sync_overlays`; `pause`/`resume` used by race clips.
 - `storage.py` — writable per-user paths + JSON I/O: `app_data_dir()` (`%APPDATA%/<APP_NAME>`,
   created on demand — writable even in a frozen build, unlike bundled `data/`),
   `config_path()`/`save_path()`/`has_save()`, and tolerant `read_json`/`write_json`

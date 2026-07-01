@@ -20,6 +20,26 @@ def configure_panda3d():
             ]
         ),
     )
+    _select_audio_backend()
+
+
+def _select_audio_backend():
+    """Prefer the FMOD backend, which honours per-sound stereo balance (used to pan the two
+    engines in a race). Fall back to OpenAL (Panda's default) when FMOD isn't available --
+    panning then no-ops but everything else still plays. An explicit ``null`` (offscreen
+    tests) is left untouched."""
+    from panda3d.core import AudioManager, ConfigVariableString
+
+    if ConfigVariableString("audio-library-name", "").getValue() == "null":
+        return
+    loadPrcFileData("", "audio-library-name p3fmod_audio")
+    try:
+        mgr = AudioManager.createAudioManager()
+        if mgr is not None and mgr.isValid():
+            return
+    except Exception:  # noqa: BLE001 - never let audio setup crash startup
+        pass
+    loadPrcFileData("", "audio-library-name p3openal_audio")
 
 
 def enable_gltf(base):

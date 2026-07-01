@@ -80,6 +80,10 @@ class RaceTask(TaskBase):
 
     def exit(self):
         self._clear_result_video(restore_controls=False)
+        # Drop the opponent voice and re-centre + quiet the player engine so it doesn't stay
+        # panned left in the next task.
+        self.app.audio.silence_rival()
+        self.app.audio.set_engine(self.game.car.idle, 0.0, 0.0)
         super().exit()
 
     def _build_track(self):
@@ -142,11 +146,17 @@ class RaceTask(TaskBase):
             rpm = self._engine_rpm(player, self.game.car)
             mph = player["v"] * 2.237
             load = AUDIO["pull_load"] if player["launched"] and not player["done"] else 0.2
-            self.app.audio.set_engine(rpm, load)
+            # Both engines play, panned to their lanes: you left (L1.0/R0.5), rival right.
+            self.app.audio.set_engine(rpm, load, AUDIO["race_player_balance"])
+            rival_rpm = self._engine_rpm(rival, foe.car)
+            rival_go = time.perf_counter() >= self.race["rival_launch"] and not rival["done"]
+            self.app.audio.set_rival_engine(rival_rpm, AUDIO["pull_load"] if rival_go else 0.2,
+                                            AUDIO["race_rival_balance"])
             self._update_dash(rpm, gear, mph)
             self._update_status()
         else:
             self.app.audio.idle(900)
+            self.app.audio.silence_rival()
             self._update_dash(self.game.car.idle, 1, 0)
             self._update_status()
 

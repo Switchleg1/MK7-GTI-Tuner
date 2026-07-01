@@ -25,6 +25,7 @@ class GameAudio:
         self.enabled = False
         self.fx_volume = FX_VOLUME  # master gain for all SFX (engine/pops/bangs)
         self.engine = self.intake = self.turbo = None
+        self.rival_engine = None    # a second engine loop for the opponent (panned right in a race)
         self.pops: list = []
         self.bangs: list = []
         self.bovs: list = []
@@ -39,6 +40,7 @@ class GameAudio:
             self.engine = self._loop("engine")
             self.intake = self._loop("intake")
             self.turbo = self._loop("turbo")
+            self.rival_engine = self._loop("engine")  # opponent engine (own voice so it pans separately)
             n = AUDIO["pool_size"]
             self.pops = self._pool(("pop_1", "pop_2", "pop_3"), n)
             self.bangs = self._pool(("bang_1", "bang_2", "bang_3"), n)
@@ -71,21 +73,41 @@ class GameAudio:
         return pool
 
     # -- engine ------------------------------------------------------------
-    def set_engine(self, rpm, load):
-        """Pitch/level the engine layers. ``load`` is 0..1 throttle/effort."""
+    def set_engine(self, rpm, load, balance=0.0):
+        """Pitch/level the player's engine layers. ``load`` is 0..1 throttle/effort;
+        ``balance`` pans them -1 (L) .. +1 (R) -- the race sets it left, everything else
+        leaves it centred (0)."""
         if not self.enabled:
             return
         load = clamp(load, 0.0, 1.0)
         rate = clamp(rpm / AUDIO["engine_base_rpm"], AUDIO["rate_min"], AUDIO["rate_max"])
         self.engine.setPlayRate(rate)
         self.engine.setVolume(load * AUDIO["engine_volume"])
+        self.engine.setBalance(balance)
         if self.intake is not None:
             self.intake.setVolume(load * load * AUDIO["intake_volume"])
             self.intake.setPlayRate(clamp(0.8 + rpm / 9000.0, 0.8, 1.8))
+            self.intake.setBalance(balance)
         if self.turbo is not None:
             spool = clamp((rpm - 2400) / 3800.0, 0.0, 1.0)
             self.turbo.setVolume(spool * load * AUDIO["turbo_volume"])
             self.turbo.setPlayRate(clamp(rpm / 3000.0, 0.6, 3.0))
+            self.turbo.setBalance(balance)
+
+    def set_rival_engine(self, rpm, load, balance=0.0):
+        """Pitch/level/pan the opponent's engine loop (its own voice, so it can sit in the
+        opposite speaker from yours during a race). Call ``silence_rival`` when not racing."""
+        if not self.enabled or self.rival_engine is None:
+            return
+        load = clamp(load, 0.0, 1.0)
+        rate = clamp(rpm / AUDIO["engine_base_rpm"], AUDIO["rate_min"], AUDIO["rate_max"])
+        self.rival_engine.setPlayRate(rate)
+        self.rival_engine.setVolume(load * AUDIO["rival_engine_volume"])
+        self.rival_engine.setBalance(balance)
+
+    def silence_rival(self):
+        if self.enabled and self.rival_engine is not None:
+            self.rival_engine.setVolume(0.0)
 
     def idle(self, rpm=950):
         self.set_engine(rpm, AUDIO["idle_load"])
@@ -100,7 +122,7 @@ class GameAudio:
     def silence(self):
         if not self.enabled:
             return
-        for sound in (self.engine, self.intake, self.turbo):
+        for sound in (self.engine, self.intake, self.turbo, self.rival_engine):
             if sound is not None:
                 sound.setVolume(0.0)
 

@@ -666,6 +666,12 @@ AUDIO = {
     "rate_max":         3.2,        # clamp for engine playRate (redline)
     "overrun_min_rpm":  3000,       # below this a throttle lift won't crackle
     "overrun_count":    24,         # max pops/bangs in a full-intensity burst
+    # Race stereo: your car sits in the left lane, the rival in the right. Balance is -1
+    # (full left) .. +1 (full right) -> per-channel gain L=min(1,1-b) / R=min(1,1+b). So
+    # -0.5 = L1.0/R0.5 (you) and +0.5 = L0.5/R1.0 (rival). Elsewhere the engine is centred.
+    "rival_engine_volume": 0.5,     # the rival's engine note (a touch under yours)
+    "race_player_balance": -0.5,
+    "race_rival_balance":  0.5,
 }
 
 # --------------------------------------------------------------------------
