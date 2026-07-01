@@ -401,8 +401,10 @@ CAR_TABLE = {
     },
 }
 
-# The street ladder: encounter metadata + the car_id each rival drives (its physics
-# come from CAR_TABLE). Ladder progression will later be tuned by giving rivals mods.
+# The street ladder: encounter metadata + the car_id each rival drives (its physics come
+# from CAR_TABLE). `mods` is the bolt-on/anchor id list; optional `turbo`/`ic` keys pin a
+# specific equippable variant (else the anchor -> family baseline is38/fmic) so a rival runs
+# the right curve + boost caps for its `tune` boost.
 RIVALS = [
     {
         "name":         "Stock Civic",
@@ -450,6 +452,8 @@ RIVALS = [
         "purse":        1150,
         "color":        rgba("#7e86cf"),
         "mods":         ["intake", "dp", "ic", "fuel", "turbo"],
+        "turbo":        "vortex",
+        "ic":           "fmic",
         "tune":         {
             "boost": 25.0,
             "timing": 15.0,
@@ -469,8 +473,10 @@ RIVALS = [
         "purse":        1350,
         "color":        rgba("#69ff0b"),
         "mods":         ["intake", "dp", "ic", "clutch", "fuel", "turbo"],
+        "turbo":        "vortex",
+        "ic":           "smic",
         "tune":         {
-            "boost": 24.0,
+            "boost": 29.0,
             "timing": 14.0,
             "lambda": 0.82,
             "fuel": "E85",
@@ -488,8 +494,10 @@ RIVALS = [
         "purse":        1700,
         "color":        rgba("#ff51ab"),
         "mods":         ["intake", "dp", "ic", "clutch", "fuel", "turbo"],
+        "turbo":        "arashi_3076",   # Kyle runs a big single -> 32 psi builds the right curve
+        "ic":           "smic",
         "tune":         {
-            "boost": 27.0,
+            "boost": 32.0,
             "timing": 14.0,
             "lambda": 0.82,
             "fuel": "E85",

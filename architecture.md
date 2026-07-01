@@ -354,8 +354,11 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   flagged unlocked-or-not, unlocked floated to the top (drives the scoreboard's pane).
 - `rival_green_name.py` — `RivalGreenName`: a ladder rival = encounter metadata
   (`name`/`purse`/`color`/win-loss clips) **plus a `Car`** built from the spec's `car_id`
-  (from `RIVALS`). Rivals start mod-free; the ladder will be tuned later by giving them
-  mods.
+  (from `RIVALS`). The spec's `mods` list sets the car's bolt-on/anchor bools; optional
+  per-family `turbo`/`ic` keys pin a **specific equippable variant** (generic over
+  `EQUIP_FAMILIES` — sets the equipped attr + owned set + anchor) so a rival runs the right
+  curve and boost caps for its `tune` boost (e.g. Kyle/"Lil Sporty" = arashi_3076 + smic @
+  32 psi ≈ 514 whp), else the anchor falls back to the family baseline (is38/fmic).
 - `car.py` — `Car(car_id)`: one class for the player AND rivals. Pulls its physics spec
   (real-world rpm→whp curve, gears, final drive, tire circ, mass, grip, redline, spool,
   boost ceiling) from `CAR_TABLE[car_id]`; ECU/tune/slot state is the player's (inert on
