@@ -15,6 +15,14 @@ DEFAULT_ASPECT = 16 / 9
 DEFAULT_FOV_DEG = 105
 
 TRACK_M = 402.336  # quarter-mile (m). Per-car gearing/curve/tire now live in CAR_TABLE.
+# Launch model (race_task._step_car): off the line the clutch slips at RACE_LAUNCH_RPM so the
+# engine makes launch-rev power (not idle) and the car "revs, spins, hooks, goes". Tractive
+# force is torque-through-the-gear; when it exceeds the tyres' grip the car spins (traction
+# falls off by RACE_SPIN_LOSS per unit of over-grip, floored at RACE_SPIN_FLOOR), otherwise
+# it's power-limited (a low-power car bogs). So launch quality = hp vs grip.
+RACE_LAUNCH_RPM = 2000
+RACE_SPIN_LOSS = 0.5
+RACE_SPIN_FLOOR = 0.65
 
 UI_REFRESH_SECONDS = 0.25
 UNLOCK_POLL_SECONDS = 0.25   # how often the game scans the ACHIEVEMENTS table for new unlocks
@@ -86,6 +94,16 @@ TUNE_THRESHOLDS = {
     # is lower on a knock-limited tune). Scaled up by the equipped parts' `flow` (see PARTS)
     # so each psi is worth more on higher-flowing hardware (IC/intake/dp/turbo).
     "boost_hp_per_psi": 11.6,
+    # Curve shape (build_whp_curve): the engine's off-boost power is `na_power_frac` of the
+    # full (boosted) curve; boost ramps in over an effective width, reaching full AT the spool
+    # onset (car spool_rpm + the parts' `spool` delta). So a bigger turbo (larger +spool)
+    # spools later, and changing a spool value just slides the onset -- no low-rpm flat-hold.
+    "na_power_frac": 0.42,
+    # Effective ramp width = `spool_width` (stock, no aftermarket parts) + each equipped part's
+    # `spool_width` delta (turbos WIDEN it -> laggier; flow mods dp/IC/intake NARROW it ->
+    # quicker spool), floored at `spool_width_min`. Wider = boost takes longer to come in.
+    "spool_width": 800,
+    "spool_width_min": 250,
     "lean_lambda": 0.87,
     "safe_lambda": 0.82,
     "cash_low": 150,
@@ -221,9 +239,10 @@ SLIDERS = [
 # fitted; see EQUIP_FAMILIES below. Bolt-on "mod" parts have no family (category=None).
 # `curve` = [(rpm, base_add, scaler)] whp adders interpolated across rpm; at each rpm the
 # gain is base_add + scaler * (running total of earlier parts' adds), so parts compound.
-# `spool` shifts boost onset (- earlier / + later), `weight` kg +/-, `grip` traction +/-,
-# `max_boost` raises the psi ceiling, `flow` (airflow parts: IC/intake/dp/turbo) makes each
-# psi of boost worth more whp (summed into a >=1.0 multiplier on the boost term in
+# `spool` shifts boost ONSET (- earlier / + later), `spool_width` widens/narrows the ramp
+# (+ turbos = laggier, - flow mods dp/IC/intake = quicker), `weight` kg +/-, `grip` traction
+# +/-, `max_boost` raises the psi ceiling, `flow` (airflow parts: IC/intake/dp/turbo) makes
+# each psi of boost worth more whp (summed into a >=1.0 multiplier on the boost term in
 # compute_tune). `image` is the shop-card thumbnail: an IMAGE_FILES
 # key (drop a PNG in data/images, register it in IMAGE_FILES, put the key here) or "" for
 # the plain accent-coloured placeholder tile. Both the player's Car and rival Cars pull
@@ -235,26 +254,26 @@ PARTS = {
                "blurb": "+6 whp, quicker spool.",
                "review": ("A intake. It makes the turbo-flutter louder and adds a couple of whp you will "
                           "absolutely tell everyone about. Dave calls it 'the gateway drug'."),
-               "spool": -150, "weight": 0, "grip": 0.00, "max_boost": 0, "flow": 0.02,
+               "spool": -150, "weight": 0, "grip": 0.00, "max_boost": 0, "flow": 0.02, "spool_width": -50,
                "curve": [(3000, 3, 0.02), (5000, 6, 0.04), (6700, 6, 0.04)]},
     "dp": {"kind": "mod", "name": "Catless Downpipe", "price": 250, "accent": BLUE, "image": "",
            "blurb": "+12 whp and much louder bangs. Cops notice fast.",
            "review": ("Catless downpipe: deletes the cat, wakes up the mid-range, and turns every tunnel "
                       "into a fireworks show. The cops WILL find you. Worth it."),
-           "spool": -200, "weight": 0, "grip": 0.00, "max_boost": 1, "flow": 0.03,
+           "spool": -200, "weight": 0, "grip": 0.00, "max_boost": 1, "flow": 0.03, "spool_width": -150,
            "curve": [(3500, 6, 0.05), (5000, 10, 0.06), (6700, 12, 0.06)]},
     "fmic": {"kind": "ic", "name": "Front-Mount Intercooler", "price": 300, "accent": BLUE, "image": "fmic",
              "blurb": "More knock headroom and lower EGT.",
              "review": ("Front-mount intercooler. Cooler charge, more knock headroom, lower EGTs -- the "
                         "unsexy mod that keeps your motor alive when you get greedy. Buy it before the turbo."),
-             "spool": 0, "weight": 5, "grip": 0.00, "max_boost": 1, "flow": 0.02,
+             "spool": 0, "weight": 5, "grip": 0.00, "max_boost": 1, "flow": 0.02, "spool_width": -100,
              "headroom": 2, "egt_relief": 45, "rel_bonus": 6,
              "curve": [(4500, 4, 0.03), (6700, 8, 0.05)]},
     "smic": {"kind": "ic", "name": "Stock-Mount Intercooler", "price": 600, "accent": RED, "image": "smic",
              "blurb": "More knock headroom and lower EGT.",
              "review": ("Stock-mount intercooler. Cooler charge, more knock headroom, lower EGTs -- the "
                         "unsexy mod that keeps your motor alive when you get greedy. Buy it before the turbo."),
-             "spool": 0, "weight": 6, "grip": 0.00, "max_boost": 2, "flow": 0.04,
+             "spool": 0, "weight": 6, "grip": 0.00, "max_boost": 2, "flow": 0.04, "spool_width": -150,
              "headroom": 3, "egt_relief": 60, "rel_bonus": 8,
              "curve": [(4500, 4, 0.03), (6700, 8, 0.07)]},
     "clutch": {"kind": "mod", "name": "Stage 2 Clutch + LSD", "price": 450, "accent": BLUE, "image": "",
@@ -280,7 +299,7 @@ PARTS = {
                         "fine, mid-range is fine, top end is fine. Nobody ever got fired for buying "
                         "an IS38.\n\nDave says: 'Boring. Reliable. Boring. I respect it.'\n\n"
                         "Heads up: a slice of your money still ends up in Ed's pocket. Such is life."),
-             "spool": 250, "weight": 0, "grip": 0.00, "max_boost": 5, "flow": 0.06,
+             "spool": 250, "weight": 0, "grip": 0.00, "max_boost": 5, "flow": 0.06, "spool_width": 250,
              "curve": [(3500, -5, 0.0), (4500, 15, 0.10), (5500, 35, 0.15), (6700, 45, 0.15)],
              "boost_limit": 27, "blown_boost": 29, "dave_on_blow": "blown", "ed_cut": True},
     "cts_jb600": {"kind": "turbo", "name": "CTS JB600", "price": 650, "accent": RED, "image": "jb600",
@@ -291,7 +310,7 @@ PARTS = {
                              "more often than any other turbo on this list, and when it goes, it goes "
                              "BIG. You get what you pay for. You paid for very little.\n\n"
                              "Two stars, would (financially have to) buy again."),
-                  "spool": 400, "weight": 0, "grip": 0.0, "max_boost": 3, "flow": 0.03,
+                  "spool": 400, "weight": 0, "grip": 0.0, "max_boost": 3, "flow": 0.03, "spool_width": 350,
                   "curve": [(3800, -8, 0.0), (4800, 10, 0.08), (5800, 22, 0.10), (6700, 26, 0.10)],
                   "boost_limit": 22, "blown_boost": 24, "dave_on_blow": "blown", "ed_cut": True},
     "vortex": {"kind": "turbo", "name": "Vortex", "price": 1600, "accent": VIOLET, "image": "vortex",
@@ -302,7 +321,7 @@ PARTS = {
                           "one lets go on the dyno, Dyno Dave will look you dead in the eye and insist "
                           "it was YOUR tune, YOUR fuel, YOUR fault — and then question your bloodline.\n\n"
                           "Great turbo. Bring thick skin."),
-               "spool": 120, "weight": 0, "grip": 0.0, "max_boost": 5, "flow": 0.10,
+               "spool": 120, "weight": 0, "grip": 0.0, "max_boost": 5, "flow": 0.10, "spool_width": 150,
                "curve": [(3300, -3, 0.0), (4300, 18, 0.10), (5300, 36, 0.14), (6700, 44, 0.15)],
                "boost_limit": 30, "blown_boost": 32, "dave_on_blow": "blown_deny", "ed_cut": True},
     "arashi_3076": {"kind": "turbo", "name": "Arashi 3076", "price": 1400, "accent": GREEN, "image": "arashi",
@@ -313,7 +332,7 @@ PARTS = {
                                "not one cent goes to Ed. The crew respects the Arashi. Ed is reportedly "
                                "'not mad, just disappointed' (he's mad).\n\nIf you can afford it, this is "
                                "the one."),
-                    "spool": 170, "weight": 0, "grip": 0.0, "max_boost": 6, "flow": 0.15,
+                    "spool": 170, "weight": 0, "grip": 0.0, "max_boost": 6, "flow": 0.15, "spool_width": 500,
                     "curve": [(3600, -6, 0.0), (4600, 14, 0.10), (5600, 40, 0.16), (6700, 58, 0.18)],
                     "boost_limit": 35, "blown_boost": 37, "dave_on_blow": "blown", "ed_cut": False},
 }

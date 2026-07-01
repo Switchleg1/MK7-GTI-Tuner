@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import time
+from math import pi
 
 from panda3d.core import CardMaker, MovieTexture, TextNode, Vec4
 
@@ -9,8 +10,11 @@ import library.core.assets as assets
 from library.core.constants import (
     AMBER, AUDIO, BLUE, BOX_LINE, CHASE_CAM_LOOK, CHASE_CAM_POS, CHASE_FOV, DIM, ED_HEAL_ON_WIN,
     ED_LOSS, ED_RACE_GRIP_PENALTY, ED_RACE_WHP_PENALTY, ED_TAUNT_THRESHOLD,
-    GREEN, GREEN_2, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, RED, TEXT, TRACK_M, WHITE,
+    GREEN, GREEN_2, OVERLAY_BIN, OVERLAY_SORT, PANEL_DARK, RACE_LAUNCH_RPM, RACE_SPIN_FLOOR,
+    RACE_SPIN_LOSS, RED, TEXT, TRACK_M, WHITE,
 )
+
+NM_PER_LBFT = 1.35582
 from library.core.utils import clamp
 from library.game.geometry import make_box
 from library.game.tuning import whp_at
@@ -156,9 +160,12 @@ class RaceTask(TaskBase):
 
     def _engine_rpm(self, state, car) -> float:
         """Engine rpm from road speed, the car's current gear, final drive and tire
-        circumference -- clamped to the car's idle..redline."""
+        circumference -- clamped to the car's idle..redline. Off the line (launched, still in
+        1st, road speed not yet caught up) the clutch slips at the launch rev."""
         gear = int(clamp(state.get("gear", 1), 1, len(car.gears)))
         rpm = state["v"] / car.tire_circ * car.gears[gear - 1] * car.final_drive * 60
+        if state.get("launched") and not state.get("done") and gear == 1 and rpm < RACE_LAUNCH_RPM:
+            rpm = RACE_LAUNCH_RPM
         return clamp(rpm, car.idle, car.redline)
 
     def _update_status(self):
@@ -425,14 +432,29 @@ class RaceTask(TaskBase):
             self._resolve_race(player, rival, foe)
 
     def _step_car(self, state, car, curve, weight, grip, dt, whp_scale=1.0, grip_scale=1.0):
-        """Power-limited launch: tractive force is grip-capped at low speed, then the
-        wheel power at the *current rpm* / velocity, minus drag. The current gear sets the
-        rpm, so being in the wrong gear costs power -- and bouncing off the rev limiter
-        (rpm >= redline) makes NO power until you upshift, so gearing genuinely matters."""
+        """Launch + accel model. The engine rev is the road-speed rpm, but off the line the
+        clutch slips at ``RACE_LAUNCH_RPM`` so the car makes launch-rev power at v~0 (revs,
+        spins, hooks, goes) instead of idling. Tractive force is engine torque through the
+        current gear; if that exceeds the tyres' grip the car SPINS (traction falls off,
+        floored at ``RACE_SPIN_FLOOR``), otherwise it's power-limited and a low-power car
+        BOGS. So the launch is decided by hp vs grip. The current gear sets the rev, so a
+        wrong gear costs power and bouncing off the limiter (rpm >= redline) makes none."""
         gear = int(clamp(state.get("gear", 1), 1, len(car.gears)))
-        rpm = state["v"] / car.tire_circ * car.gears[gear - 1] * car.final_drive * 60
-        whp_now = 0.0 if rpm >= car.redline else whp_at(curve, max(rpm, car.idle)) * whp_scale
-        force = min(weight * 9.81 * grip * grip_scale, whp_now * 745.7 / max(state["v"], 2))
+        road_rpm = state["v"] / car.tire_circ * car.gears[gear - 1] * car.final_drive * 60
+        rpm = max(road_rpm, RACE_LAUNCH_RPM) if gear == 1 else road_rpm  # clutch slip off the line
+        grip_force = weight * 9.81 * grip * grip_scale
+        if rpm >= car.redline:
+            force = 0.0  # on the limiter -> no drive until you upshift
+        else:
+            whp_now = whp_at(curve, max(rpm, car.idle)) * whp_scale
+            # F = P/v, computed via torque-through-the-gear so it's finite at launch (v~0).
+            wheel_torque = (whp_now * 5252.0 / rpm) * car.gears[gear - 1] * car.final_drive  # lb-ft
+            wheel_force = wheel_torque * NM_PER_LBFT / (car.tire_circ / (2.0 * pi))            # N
+            if wheel_force > grip_force:  # more grunt than the tyres can hold -> wheelspin
+                over = wheel_force / grip_force
+                force = grip_force * clamp(1.0 - (over - 1.0) * RACE_SPIN_LOSS, RACE_SPIN_FLOOR, 1.0)
+            else:
+                force = wheel_force  # traction to spare -> power-limited (bogs if low on hp)
         drag = 0.5 * 1.2 * 0.62 * state["v"] * state["v"]
         state["v"] = max(0, state["v"] + ((force - drag) / weight) * dt)
         state["d"] += state["v"] * dt

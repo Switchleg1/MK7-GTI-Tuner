@@ -150,7 +150,14 @@ class Car:
         plus owned mods. The tune scales in once the car is flashed (the player flashes to
         write the map; rival cars are constructed already flashed, so their tune applies)."""
         return build_whp_curve(self.base_curve, self.owned_mods(), self._tune_factor(),
-                               self.idle, self.redline, effects=self._effects_table())
+                               self.idle, self.redline, effects=self._effects_table(),
+                               spool_rpm=self.spool_rpm)
+
+    def stock_curve(self) -> list:
+        """The stock (no mods, stock tune) rpm->whp curve -- the faint dyno reference. Runs
+        through the same NA-floor + spool-ramp model so it has no low-rpm torque spike."""
+        return build_whp_curve(self.base_curve, [], 1.0, self.idle, self.redline,
+                               spool_rpm=self.spool_rpm)
 
     def _tune_factor(self) -> float:
         """The active tune's power *relative to the stock tune* (car-agnostic, since

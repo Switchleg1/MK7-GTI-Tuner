@@ -52,7 +52,7 @@ class DynoTask(TaskBase):
         # Current (built) curve previewed full at rest; stock base curve as a faint
         # reference so you can see what the tune + mods added.
         self.points = self._points_from_curve(car.build_whp())
-        self.stock_points = self._points_from_curve(car.base_curve)
+        self.stock_points = self._points_from_curve(car.stock_curve())
         self.rpm_lo = self.points[0]["rpm"] if self.points else car.idle
         self.rpm_hi = self.points[-1]["rpm"] if self.points else car.redline
         self.graph = None

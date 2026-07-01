@@ -398,10 +398,18 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   bool — and `flow` (≥1.0, the equipped parts' airflow, `Car._boost_flow`) multiplies the
   boost→whp term `(boost−18)·TUNE_THRESHOLDS["boost_hp_per_psi"]·flow` so each psi is worth
   more on flowier hardware; **hardware power lives in the mod curves now, not here**), `build_whp_curve(base,
-  owned_mods, …, effects=BASE_EFFECTS)` (a car passes its own `effects` so each family anchor
-  resolves to the fitted variant; below the spool-delayed onset it ramps power in from 0 at
-  idle so the low-rpm end — and the dyno's `whp·5252/rpm` torque trace — climbs naturally
-  instead of spiking at idle) + `whp_at(curve, rpm)`, plus grading, pops, rep.
+  owned_mods, …, effects=BASE_EFFECTS, spool_rpm=…)` (a car passes its own `effects` so each
+  family anchor resolves to the fitted variant). **NA-floor + spool-ramp model:** each rpm's
+  power = `base(rpm)·tune_factor·(na_frac + (1−na_frac)·spool_frac)` + the mods' top-end
+  `curve` adders, where boost ramps in over an effective width reaching full at the onset =
+  `spool_rpm + Σ mod spool` (`na_power_frac` is the off-boost floor). Width = `spool_width`
+  (stock 800) + each part's `spool_width` delta (turbos widen → laggier, flow mods dp/IC/intake
+  narrow → quicker), floored at `spool_width_min`. A part's `spool` slides the onset (− earlier
+  / + later; bigger turbo = later) and its `spool_width` the ramp length, so any spool value is
+  robust — at full spool it equals `base·tune_factor` (peak/grades unchanged), off-boost it
+  tapers to the NA floor, so the low-rpm end (and the dyno's `whp·5252/rpm` torque trace) rises
+  realistically with no flat-hold/kink/idle-spike. `Car.stock_curve()` runs the stock (no-mod,
+  factor 1) curve through the same model for the faint dyno reference. Plus `whp_at`, grading, pops, rep.
 - `simos.py` — "Ask Simon" rules engine; `build_context(game, tab)` reads bro + car (and
   shows Simon the real **built** peak whp, not the tune-only figure).
 
@@ -418,10 +426,16 @@ shows full at rest. Records the built peak + `grade_for_result` on the `Car`. (N
 
 The **RaceTask** (`library/stages/tasks/race_task.py`) accelerates both cars off their
 `Car` curves through their own gearing: `_engine_rpm` derives rpm from speed + the current
-gear + final drive + tire circ, `_step_car` makes power = `whp_at(curve, rpm)` (grip-capped
-at low speed, **zero on the rev limiter** so you must shift), and the rival `_auto_shift`s
-near its redline (the player shifts on SPACE). Each car's curve + mass/grip are built once
-per run in `_start_race`.
+gear + final drive + tire circ. **Launch model** (`_step_car`): off the line the clutch slips
+at `RACE_LAUNCH_RPM` (2000) so the engine makes launch-rev power at v≈0 (revs → spins →
+hooks → goes) instead of idling; tractive force is engine **torque through the current gear**
+(finite at v≈0, unlike `P/v`), and if it exceeds the tyres' grip (`weight·g·grip`) the car
+**spins** (traction falls off by `RACE_SPIN_LOSS` per unit over-grip, floored at
+`RACE_SPIN_FLOOR`), else it's power-limited and a low-hp car **bogs** — so launch quality =
+hp vs grip. Still **zero on the rev limiter** (rpm ≥ redline) so you must shift; the rival
+`_auto_shift`s near redline, the player shifts on SPACE. Each car's curve + mass/grip are
+built once per run in `_start_race`. (`build_whp_curve` keeps idle power very low but
+NON-zero so the launch has something to pull against.)
 
 The **ShopTask** (`library/stages/tasks/shop_task.py`) is a **2×3 grid of cards** (`N_CARDS=6`),
 one per `ShopItem` (`shop_item.py`): thumbnail · name · brief description · an owned/equipped

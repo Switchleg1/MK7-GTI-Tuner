@@ -127,38 +127,45 @@ def _mod_curve_value(nodes: list, rpm: float):
 
 def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0,
                     idle: int = 900, redline: int = 6700, step: int = 100,
-                    effects: dict | None = None) -> list:
+                    effects: dict | None = None, spool_rpm: int = 3000) -> list:
     """Compose a car's final rpm->whp curve from its stock ``base_curve`` + owned mods
     (+ tune). Returns ``[(rpm, whp), ...]`` from idle to redline.
 
-    - ``tune_factor`` scales the whole base curve. It is a *relative* multiplier (this
-      tune's power vs the stock tune, per ``compute_tune``), so it is car-agnostic -- a
-      hot tune lifts any car's stock curve by the same percentage (1.0 = stock tune).
-    - Each owned mod's ``spool`` shifts the sub-peak onset (- earlier / + later) and its
-      ``curve`` nodes add whp, compounding (``base + scaler * running_total``). Mods are
-      applied in the given order.
+    The model is NA-floor + boost ramp: the engine always makes an off-boost floor
+    (``na_power_frac`` of the full curve), and boost ramps IN over an effective width,
+    reaching full at the spool ONSET (``spool_rpm`` + the parts' ``spool`` delta). So each
+    rpm's power = ``base(rpm) * tune_factor * (na_frac + (1-na_frac) * spool_frac)`` plus the
+    mods' top-end ``curve`` adders. At full spool this equals ``base * tune_factor`` (peak +
+    grades unchanged); below onset it tapers to the NA floor so low-rpm power -- and the
+    dyno's ``whp*5252/rpm`` torque -- rise realistically instead of flat-holding/spiking.
+
+    - ``tune_factor`` scales the whole base curve (this tune's power vs stock, car-agnostic).
+    - Each owned mod's ``spool`` slides the boost ONSET (- earlier / + later; a bigger turbo
+      spools later) and its ``spool_width`` widens/narrows the ramp (+ turbos = laggier,
+      - flow mods = quicker); the effective width = ``spool_width`` base + the parts' deltas,
+      floored at ``spool_width_min``. Its ``curve`` nodes add whp on top, compounding.
     - ``effects`` is the spool/curve lookup (defaults to ``BASE_EFFECTS``); a car passes its
-      own table so the ``"turbo"`` entry resolves to the SELECTED turbo variant's spec."""
+      own table so ``"turbo"``/``"ic"`` resolve to the SELECTED variant. ``spool_rpm`` is the
+      car's base spool point (CAR_TABLE)."""
     effects = effects or BASE_EFFECTS
     factor = tune_factor
-    peak_rpm = max(base_curve, key=lambda p: p[1])[0]
-    lo_rpm, hi_rpm = base_curve[0][0], base_curve[-1][0]
-    spool_delta = sum(effects[m]["spool"] for m in owned_mods)
-    onset = lo_rpm + max(0.0, spool_delta)  # where the (spool-delayed) curve actually starts
+    lo_rpm = base_curve[0][0]
+    na_frac = TUNE_THRESHOLDS["na_power_frac"]
+    onset = spool_rpm + sum(effects[m]["spool"] for m in owned_mods)  # rpm where boost is fully in
+    # Ramp width: stock base widened by turbos (laggier) / narrowed by flow mods (dp/IC/intake).
+    width = max(TUNE_THRESHOLDS["spool_width_min"],
+                TUNE_THRESHOLDS["spool_width"] + sum(effects[m].get("spool_width", 0) for m in owned_mods))
     grid = []
     rpm = idle
     while rpm <= redline + 1:
-        # Spool only reshapes the rising (sub-peak) side so a bigger turbo doesn't lose
-        # top-end; above the peak the base is untouched and mods add the top-end gains.
-        look = rpm - spool_delta if rpm <= peak_rpm else rpm
-        look = clamp(look, lo_rpm, hi_rpm)
-        whp = whp_at(base_curve, look) * factor
-        # Below the (spool-delayed) onset the base is flat-held at its first value; ramp it
-        # in from idle (0 at idle -> full at onset; a no-op above it) so low-rpm power -- and
-        # torque (whp*5252/rpm) -- climb naturally rather than spiking at idle, where the tiny
-        # rpm divisor blows the torque figure up.
-        if onset > idle:
-            whp *= clamp((rpm - idle) / (onset - idle), 0.0, 1.0)
+        # Boost ramps in over `width` rpm, full AT the onset; below that it's the NA floor.
+        spool_frac = clamp((rpm - (onset - width)) / width, 0.0, 1.0)
+        whp = whp_at(base_curve, rpm) * factor * (na_frac + (1.0 - na_frac) * spool_frac)
+        # Keep the very bottom (below the base curve's first rpm, which flat-holds) low but
+        # NEVER zero -- races launch off this floor -- while still climbing so the dyno torque
+        # trace doesn't hook at idle: taper from half the floor at idle up to full at lo_rpm.
+        if rpm < lo_rpm and lo_rpm > idle:
+            whp *= 0.5 + 0.5 * clamp((rpm - idle) / (lo_rpm - idle), 0.0, 1.0)
         accumulated = 0.0
         for mod_id in owned_mods:
             base, scaler = _mod_curve_value(effects[mod_id]["curve"], rpm)
