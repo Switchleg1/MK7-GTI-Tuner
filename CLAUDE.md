@@ -83,6 +83,11 @@ per-file map.
   `options.cfg` live under `%APPDATA%\MK7 GTI Tuner\`, not `data/`.
 - **Font:** the mono UI font (Consolas) lacks some glyphs — `★`(U+2605) / `✓` render as tofu;
   use `*` / ASCII. `◄ ▲ ▼` (U+25C4/25B2/25BC) render fine.
+- **Frame rate is hard-capped** (`panda_config`: `clock-mode limited` + `clock-frame-rate 60`)
+  on top of `sync-video true`. vsync alone free-runs the render loop on drivers that ignore it
+  in windowed mode (pegs CPU/GPU → whole-system bog, even at the idle menu). Don't remove the
+  clock cap. (The menu/dyno/race were profiled leak-free — objects/nodes/tasks stay flat — so
+  a system bog is CPU/GPU saturation, not a memory leak.)
 - **Offscreen test caveats:** `direct.interval` animations don't advance under rapid
   `taskMgr.step()` (dt ≈ 0) — call `interval.finish()` to jump to the end-state for a
   screenshot/assert. Real-time dyno pulls likewise can't be fast-forwarded — call

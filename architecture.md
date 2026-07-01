@@ -147,13 +147,14 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
 - `audio.py` — `GameAudio`: the runtime sound service on the shell. A looping engine
   note (+ intake roar + turbo whistle) pitched by RPM via `setPlayRate` and leveled by
   throttle load, plus pooled pop/bang/blow-off one-shots so overrun bursts overlap.
-  **Race stereo:** `set_engine(rpm, load, balance)` pans the player's engine + a **second
-  engine loop** (`set_rival_engine`, `silence_rival`) pans the rival's — RaceTask sets you
-  to `AUDIO["race_player_balance"]` (−0.5 → L1.0/R0.5) and the rival to `+0.5` (L0.5/R1.0);
-  everything else leaves `balance=0` (centred). Per-sound balance only actually pans on the
-  **FMOD** backend (see `panda_config._select_audio_backend`, which prefers FMOD and falls
-  back to OpenAL where balance is a harmless no-op). No-ops if Panda has no audio backend;
-  tasks drive it via `app.audio`. `set_fx_volume(v)` sets the master SFX gain (options menu).
+  **Both engines in a race:** the player's engine + a **second engine loop**
+  (`set_rival_engine` / `silence_rival`) both play, so you hear yourself and the rival.
+  `set_engine`/`set_rival_engine` also take a `balance` (−1 L .. +1 R) and RaceTask passes
+  `AUDIO["race_player_balance"]`/`race_rival_balance` — but **per-sound balance only pans on
+  the FMOD backend, and we run OpenAL** (`panda_config._select_audio_backend`) because FMOD
+  can't decode the audio track out of the race-result `.mp4` clips. So on OpenAL the balance
+  is a harmless no-op (both engines centred); the plumbing stays for a future FMOD/3D pan.
+  No-ops if Panda has no audio backend; `set_fx_volume(v)` sets the master SFX gain.
 - `music.py` — `MusicPlayer`: per-stage background music. `set_track(key)` plays a
   random song from `data/music/<key>/` (resolved by `assets.music_paths`); **`update(dt)`
   polls the song's `status()`** each frame and rolls to another random one when it ends
