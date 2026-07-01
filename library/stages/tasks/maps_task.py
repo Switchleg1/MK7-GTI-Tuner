@@ -10,6 +10,7 @@ from library.stages.task_base import TaskBase
 
 # Derived once: slider attr -> tune key, and each row's (attr, box index, z).
 SLIDER_KEY = {attr: key for attr, key, _, _ in SLIDERS}
+BOOST_FLOOR = SLIDERS[0][2][0]  # sl_boost range low; its high is dynamic (car.boost_slider_max)
 _ROW_Z = (0.30, 0.18, 0.06, 0.18, 0.06, -0.06)  # first 3 left panel, last 3 right
 SLIDER_ROWS = [(SLIDERS[i][0], 0 if i < 3 else 1, _ROW_Z[i]) for i in range(len(SLIDERS))]
 
@@ -56,6 +57,8 @@ class MapsTask(TaskBase):
         self.ui.add_text("t-slots", "SWITCH SLOTS", (rbox[0] + 0.05, 0, -0.18), 0.032, DIM)
         for attr, box_i, z in SLIDER_ROWS:
             vrange = next(s[2] for s in SLIDERS if s[0] == attr)
+            if attr == "sl_boost":  # boost ceiling tracks the hardware (stock max / turbo blown-boost)
+                vrange = (BOOST_FLOOR, car.boost_slider_max())
             value = car.tune[SLIDER_KEY[attr]]
             slider = self.ui.add_slider(attr, (boxes[box_i][0] + 0.64, 0, z), vrange, value, width=0.5)
             slider.command_fn(self._on_slide)  # wired after build so init doesn't fire it
@@ -65,6 +68,15 @@ class MapsTask(TaskBase):
     def update_ui(self, left, right):
         self._ready = False
         car = self.game.car
+        # The boost slider's ceiling follows the hardware: the car's stock max boost, or
+        # the fitted turbo's blown-boost limit. Re-range it (a turbo may have been bought or
+        # swapped since the last visit) and pull the tune under the ceiling if a smaller
+        # turbo now caps it.
+        boost_max = car.boost_slider_max()
+        self.sl_boost.range_of((BOOST_FLOOR, boost_max))
+        if car.tune["boost"] > boost_max:
+            car.tune["boost"] = boost_max
+            car.dirty = car.flashed
         # Sliders are persistent; redraws only sync their values and labels.
         for attr, box_i, z in SLIDER_ROWS:
             fmt = next(s[3] for s in SLIDERS if s[0] == attr)

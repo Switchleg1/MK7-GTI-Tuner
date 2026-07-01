@@ -47,11 +47,6 @@ class PhoneScreen:
         self.ui.add_frame("screen", frame_size=(CX - 0.30, CX + 0.30, -0.66, 0.65), color=PHONE_SCREEN, border=None, texture=None)
         self.ui.add_image("wallpaper", "wallpaper", (CX, 0, -0.005), (0.30, 1, 0.655))
 
-        self._label("time", "9:41", (CX - 0.27, 0, 0.595), 0.03, DIM)
-        self._label("status", "SimosTools  -  LTE  -  87%", (CX + 0.27, 0, 0.595), 0.03, DIM, align=TextNode.ARight)
-
-        self.ui.add_image("app-icon", "app_icon", (CX - 0.225, 0, 0.50), 0.045)
-        self._label("app-title", "SimosTools", (CX - 0.165, 0, 0.485), 0.05, GREEN)
         self._label("app-subtitle", "ECM3 bench flash", (CX - 0.27, 0, 0.42), 0.03, DIM)
         self.ui.add_frame("divider", frame_size=(CX - 0.27, CX + 0.27, -0.004, 0.004), pos=(0, 0, 0.385), color=(0.16, 0.30, 0.34, 1), border=None, texture=None)
 
@@ -64,11 +59,10 @@ class PhoneScreen:
             "flash", "FLASH", (CX, 0, -0.55), (0.52, 0.12),
             self._on_flash, True, GREEN_2, 0.06, is_visible=False)
 
-        self.percent = self._label("percent", "", (CX, 0, -0.50), 0.045, GREEN, align=TextNode.ACenter)
-        self.progress = ProgressBar(self.root, (CX, 0, -0.57), 0.54, 0.045, (0.05, 0.08, 0.10, 1), GREEN)
+        self.percent = self._label("percent", "", (CX, 0, -0.45), 0.045, GREEN, align=TextNode.ACenter)
+        self.progress = ProgressBar(self.root, (CX, 0, -0.50), 0.54, 0.045, (0.05, 0.08, 0.10, 1), GREEN)
         self.progress.track.hide()
 
-        self.check = self.ui.add_image("check", "check", (CX, 0, -0.50), 0.13, is_visible=False)
         self.done_label = self._label("done", "", (CX, 0, -0.66), 0.038, GREEN, align=TextNode.ACenter)
 
     # -- behaviour ---------------------------------------------------------
@@ -112,7 +106,6 @@ class PhoneScreen:
     def show_complete(self, message: str):
         self.progress.track.hide()
         self.percent.text("")
-        self.check.is_visible(True)
         self.done_label.text(message)
         self.done_label.color(GREEN)
 

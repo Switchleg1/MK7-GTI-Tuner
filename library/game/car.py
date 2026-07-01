@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import CAR_TABLE, MOD_TABLE, MODS, PRESETS, TURBOS, UNLOCKABLE_MAPS, DEFAULT_TUNE
+from library.core.constants import BASE_EFFECTS, CAR_TABLE, MOD_KEYS, PARTS, PRESETS, TURBO_DEFAULT, UNLOCKABLE_MAPS, DEFAULT_TUNE
 from library.game.tuning import (
     build_whp_curve, clone_tune, compute_tune, default_tune, grade_for_result, pop_score, whp_at,
 )
@@ -30,6 +30,7 @@ class Car:
         self.idle                   = spec["idle"]
         self.redline                = spec["redline"]
         self.spool_rpm              = spec["spool_rpm"]
+        self.max_boost              = spec["max_boost"]      # stock boost slider ceiling (no aftermarket turbo)
         self.boost_ceiling          = spec["boost_ceiling"]
         # ECU / build state (player; defaults are inert for rivals).
         self.connected              = False
@@ -42,11 +43,11 @@ class Car:
         self.flashed_tune           = None
         self.slots                  = [clone_tune(self.tune), None, None, None]
         self.active_slot            = 0
-        self.mods                   = mods if mods is not None else {mod[0]: False for mod in MODS}
+        self.mods                   = mods if mods is not None else {k: False for k in MOD_KEYS}
         # Which turbo variant is fitted (None = stock). `mods["turbo"]` stays the bool
-        # "owns an aftermarket turbo"; this picks WHICH from TURBOS. A car built with
+        # "owns an aftermarket turbo"; this picks WHICH from PARTS. A car built with
         # `mods["turbo"]` True but no explicit variant (rivals, old saves) defaults to IS38.
-        self.turbo                  = "is38" if self.mods.get("turbo") else None
+        self.turbo                  = TURBO_DEFAULT if self.mods.get("turbo") else None
         # Turbos are OWNED (bought once) and one is EQUIPPED. You can switch freely between
         # ones you own. (Intercoolers will become the same kind of equippable family next.)
         self.owned_turbos: list     = [self.turbo] if self.turbo else []
@@ -97,16 +98,22 @@ class Car:
         return [mod_id for mod_id in self.mods if self.mods[mod_id]]
 
     def _turbo_spec(self) -> dict | None:
-        """The fitted turbo's spec (a TURBOS entry), or None when stock. Falls back to
+        """The fitted turbo's spec (a PARTS turbo entry), or None when stock. Falls back to
         IS38 if the bool ``mods["turbo"]`` is set but no explicit variant (rivals/old saves)."""
         if self.turbo:
-            return TURBOS.get(self.turbo, TURBOS["is38"])
-        return TURBOS["is38"] if self.mods.get("turbo") else None
+            return PARTS.get(self.turbo, PARTS[TURBO_DEFAULT])
+        return PARTS[TURBO_DEFAULT] if self.mods.get("turbo") else None
 
     def _effects_table(self) -> dict:
-        """MOD_TABLE with its generic ``"turbo"`` entry swapped for the SELECTED turbo's
-        spec, so the curve/perf math reflects which turbo is fitted."""
-        return {**MOD_TABLE, "turbo": self._turbo_spec() or MOD_TABLE["turbo"]}
+        """The curve-effect lookup (BASE_EFFECTS) with its generic ``"turbo"`` entry swapped
+        for the SELECTED turbo's spec, so the curve/perf math reflects which turbo is fitted."""
+        return {**BASE_EFFECTS, "turbo": self._turbo_spec() or BASE_EFFECTS["turbo"]}
+
+    def boost_slider_max(self) -> float:
+        """The boost slider's upper bound: with an aftermarket turbo fitted, that turbo's
+        blown-boost limit; otherwise the car's stock max boost."""
+        spec = self._turbo_spec()
+        return spec["blown_boost"] if spec else self.max_boost
 
     def build_whp(self) -> list:
         """The car's final rpm->whp curve = stock base curve scaled by the active tune,
@@ -190,8 +197,7 @@ class Car:
 
     def set_mod(self, mod_id: str):
         self.mods[mod_id] = True
-        name = next(item[1] for item in MODS if item[0] == mod_id)
-        return (f"installed {name}", "ok")
+        return (f"installed {PARTS[mod_id]['name']}", "ok")
 
     def buy_turbo(self, turbo_id: str):
         """Purchase a turbo: add it to the owned set and equip it. Also sets the
@@ -200,14 +206,14 @@ class Car:
             self.owned_turbos.append(turbo_id)
         self.turbo = turbo_id
         self.mods["turbo"] = True
-        return (f"bought + fitted {TURBOS[turbo_id]['name']}", "ok")
+        return (f"bought + fitted {PARTS[turbo_id]['name']}", "ok")
 
     def equip_turbo(self, turbo_id: str):
         """Switch to a turbo you already own (free)."""
         if turbo_id not in self.owned_turbos:
             return None
         self.turbo = turbo_id
-        return (f"equipped {TURBOS[turbo_id]['name']}", "ok")
+        return (f"equipped {PARTS[turbo_id]['name']}", "ok")
 
     def blow_dave_pool(self) -> str:
         """Which DAVE_LINES pool plays when this car grenades on the dyno (a turbo can
@@ -248,7 +254,7 @@ class Car:
         # v3 saves predate the turbo variant: a car that owned the (single) turbo loads
         # as the IS38 baseline so its curve/caps resolve.
         if self.turbo is None and self.mods.get("turbo"):
-            self.turbo = "is38"
+            self.turbo = TURBO_DEFAULT
         # keep owned/equipped consistent (and back-fill owned for pre-owned_turbos saves)
         if self.turbo and self.turbo not in self.owned_turbos:
             self.owned_turbos = list(self.owned_turbos) + [self.turbo]

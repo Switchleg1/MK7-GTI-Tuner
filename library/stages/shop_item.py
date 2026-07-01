@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import (
-    AMBER, BLUE, GREEN, GREEN_2, MOD_REVIEWS, MODS, RED, TURBOS, VIOLET,
-)
-
-# Accent colour per turbo (the others fall back to BLUE for bolt-on mods).
-_TURBO_ACCENT = {"is38": BLUE, "cts_jb600": RED, "vortex": VIOLET, "arashi_3076": GREEN}
+from library.core.constants import AMBER, BLUE, GREEN, GREEN_2, PARTS, VIOLET
 
 
 class ShopItem:
@@ -90,15 +85,11 @@ class ShopItem:
 
 
 def build_catalog() -> list[ShopItem]:
-    """The full shop list: the bolt-on mods (the ``MODS`` rows, minus the ``turbo`` bool
-    anchor) then the turbo family (``TURBOS``). Reviews come from ``MOD_REVIEWS`` /
-    each turbo's ``review``."""
-    items: list[ShopItem] = []
-    for mod_id, name, cost, blurb in MODS:
-        if mod_id == "turbo":
-            continue  # the turbo *family* is the TURBOS entries below, not this bool anchor
-        items.append(ShopItem(mod_id, name, blurb, MOD_REVIEWS.get(mod_id, ""), cost, BLUE, "mod"))
-    for turbo_id, spec in TURBOS.items():
-        items.append(ShopItem(turbo_id, spec["name"], spec["blurb"], spec["review"], spec["price"],
-                              _TURBO_ACCENT.get(turbo_id, BLUE), "turbo", category="turbo"))
-    return items
+    """The full shop list, straight off the single ``PARTS`` table: every part becomes a
+    card in table order (bolt-on mods first, then the turbo family). Each part row already
+    carries its name/blurb/review/price/accent/kind/category."""
+    return [
+        ShopItem(key, p["name"], p["blurb"], p["review"], p["price"],
+                 p.get("accent", BLUE), p["kind"], category=p.get("category"))
+        for key, p in PARTS.items()
+    ]

@@ -63,7 +63,7 @@ class ReviewOverlay(DirectObject):
                                    text_align=TextNode.ALeft, text_font=self.font, frameColor=(0, 0, 0, 0),
                                    pos=(WINDOW_FS[0] + 0.12, 0, 0.40))
         self.body = DirectLabel(parent=self.window, text="", text_scale=0.052, text_fg=BODY,
-                                text_align=TextNode.ALeft, text_wordwrap=36, text_font=self.font,
+                                text_align=TextNode.ALeft, text_wordwrap=30, text_font=self.font,
                                 frameColor=(0, 0, 0, 0), pos=(WINDOW_FS[0] + 0.12, 0, 0.30))
         # The fact-checker clipart on the right (placeholder; swap data/images/detective.png).
         self.detective = OnscreenImage(parent=self.window, image=assets.image_path("detective"),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import DEFAULT_TUNE, FUEL, GRADE_TABLE, MOD_TABLE, REPS, TUNE_THRESHOLDS
+from library.core.constants import BASE_EFFECTS, DEFAULT_TUNE, FUEL, GRADE_TABLE, REPS, TUNE_THRESHOLDS
 from library.core.utils import clamp
 
 
@@ -30,7 +30,7 @@ def compute_tune(tune: dict, mods: dict, turbo: dict | None = None) -> dict:
     from *hardware* (intake/dp/turbo/...) is NOT here -- it flows through the curve in
     ``build_whp_curve``; mods still factor into headroom/EGT/reliability/boost ceiling.
 
-    ``turbo`` is the selected turbo's spec (a ``TURBOS`` entry) and supplies the boost
+    ``turbo`` is the selected turbo's spec (a ``PARTS`` turbo entry) and supplies the boost
     ceiling + blow-up threshold (so a CTS grenades sooner than an Arashi). When omitted,
     it falls back to the old behaviour keyed off the ``mods["turbo"]`` bool (hybrid vs
     stock limits) so bare callers (e.g. simos) are unaffected."""
@@ -129,9 +129,9 @@ def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0
     - Each owned mod's ``spool`` shifts the sub-peak onset (- earlier / + later) and its
       ``curve`` nodes add whp, compounding (``base + scaler * running_total``). Mods are
       applied in the given order.
-    - ``effects`` is the spool/curve lookup (defaults to ``MOD_TABLE``); a car passes its
+    - ``effects`` is the spool/curve lookup (defaults to ``BASE_EFFECTS``); a car passes its
       own table so the ``"turbo"`` entry resolves to the SELECTED turbo variant's spec."""
-    effects = effects or MOD_TABLE
+    effects = effects or BASE_EFFECTS
     factor = tune_factor
     peak_rpm = max(base_curve, key=lambda p: p[1])[0]
     lo_rpm, hi_rpm = base_curve[0][0], base_curve[-1][0]

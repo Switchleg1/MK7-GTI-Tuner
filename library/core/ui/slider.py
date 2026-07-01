@@ -39,3 +39,10 @@ class Slider(BaseObject):
         if fn is _UNSET:
             return self.node["command"]
         self.node["command"] = fn
+
+    def range_of(self, value_range=_UNSET):
+        """Get / set the slider's ``(lo, hi)`` value range (e.g. a boost ceiling that
+        tracks the fitted turbo). Setting it re-clamps the thumb to the new bounds."""
+        if value_range is _UNSET:
+            return self.node["range"]
+        self.node["range"] = value_range

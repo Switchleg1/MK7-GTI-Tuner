@@ -6,7 +6,7 @@ from panda3d.core import TextNode
 
 from library.core.constants import (
     AMBER, BLUE, BOX_LINE, DIM, ED_BAD_REVIEW, GREEN, GREEN_2, GREEN_NAME_CRED, LINE, PANEL,
-    PRO_MAPS, RED, SALE_BAD, TEXT, TUNE_SALE, TURBOS, VIOLET, WHITE,
+    PARTS, PRO_MAPS, RED, SALE_BAD, TEXT, TUNE_SALE, VIOLET, WHITE,
 )
 from library.core.utils import pick
 from library.stages.review_overlay import ReviewOverlay
@@ -14,7 +14,7 @@ from library.stages.shop_item import build_catalog
 from library.stages.task_base import TaskBase
 
 CENTER, RIGHT = TextNode.ACenter, TextNode.ARight
-COLS, ROWS = 2, 3
+COLS, ROWS = 3, 3
 N_CARDS = COLS * ROWS              # 2x3 grid of cards (the catalog scrolls through them)
 ROW_Z = (0.26, 0.045, -0.17)       # the 3 row centres
 CARD_HH = 0.105                    # card half-height
@@ -42,22 +42,22 @@ class ShopTask(TaskBase):
 
         # ── 2x3 card grid (built once; items bind into slots on scroll) ───────────
         gap = 0.05
-        col_w = (right - left - 0.04 - gap) / 2
+        col_w = (right - left - 0.04 - gap) / COLS
         hw = col_w / 2
-        col_x = (left + 0.02 + hw, left + 0.02 + hw + col_w + gap)
+        margin_x = 0.02
         for i in range(N_CARDS):
-            cx, cz = col_x[i % COLS], ROW_Z[i // COLS]
+            cx, cz = left + margin_x + hw + (margin_x + col_w) * (i % COLS), ROW_Z[i // COLS]
             self.ui.add_frame(f"card{i}-bg", frame_size=(cx - hw, cx + hw, cz - CARD_HH, cz + CARD_HH),
                               color=PANEL, border=BOX_LINE)
-            self.ui.add_frame(f"card{i}-thumb", frame_size=(cx - hw + 0.03, cx - hw + 0.18, cz - 0.045, cz + 0.075),
+            self.ui.add_frame(f"card{i}-thumb", frame_size=(cx - hw + 0.05, cx - hw + 0.20, cz - 0.045, cz + 0.075),
                               color=BLUE, border=None)
-            self.ui.add_text(f"card{i}-tag", "", (cx - hw + 0.105, 0, cz + 0.005), 0.030, WHITE, align=CENTER)
+            self.ui.add_text(f"card{i}-tag", "", (cx - hw + 0.125, 0, cz + 0.005), 0.030, WHITE, align=CENTER)
             self.ui.add_text(f"card{i}-name", "", (cx - hw + 0.22, 0, cz + 0.05), 0.034, BLUE)
             self.ui.add_text(f"card{i}-own", "", (cx + hw - 0.04, 0, cz + 0.055), 0.024, AMBER, align=RIGHT)
             self.ui.add_text(f"card{i}-desc", "", (cx - hw + 0.22, 0, cz + 0.008), 0.023, DIM, wordwrap=40)
-            self.ui.add_button(f"card{i}-rev", "Read review", (cx - 0.39, 0, cz - 0.066), (0.74, 0.058),
+            self.ui.add_button(f"card{i}-rev", "Read review", (cx - hw / 2, 0, cz - 0.066), (hw - margin_x * 4, 0.058),
                                None, True, VIOLET, 0.030)
-            self.ui.add_button(f"card{i}-buy", "Buy", (cx + 0.39, 0, cz - 0.066), (0.74, 0.058),
+            self.ui.add_button(f"card{i}-buy", "Buy", (cx + hw / 2, 0, cz - 0.066), (hw - margin_x * 4, 0.058),
                                None, True, GREEN_2, 0.030)
 
         # ── scroll controls (top-right, beside the cash line) ─────────────────────
@@ -135,7 +135,7 @@ class ShopTask(TaskBase):
             return
         if item.category == "turbo":
             self._log_result(car.buy_turbo(item.key))
-            spec = TURBOS[item.key]
+            spec = PARTS[item.key]
             if spec.get("ed_cut"):
                 game.log(f"Ed takes his cut of that {spec['name']} sale. He's delighted. Gross.", "warn")
             else:

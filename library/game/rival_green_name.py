@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from library.core.constants import RIVALS, MODS
+from library.core.constants import RIVALS, MOD_KEYS
 from library.game.car import Car
 
 
@@ -12,7 +12,7 @@ class RivalGreenName:
 
     def __init__(self, name: str, car_id: str, purse: int, color, mods: list, tune, video_loss=None, video_win=None):
         self.name           = name
-        self.car            = Car(car_id, {mod[0]: mod[0] in mods for mod in MODS}, tune)
+        self.car            = Car(car_id, {k: k in mods for k in MOD_KEYS}, tune)
         self.car.flashed    = True  # a rival's ECU is already flashed with its map, so its tune applies
         self.model          = self.car.model  # convenience (race_task loads the rival's glb by this)
         self.purse          = purse
