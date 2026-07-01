@@ -82,6 +82,10 @@ TUNE_THRESHOLDS = {
     "stock_turbo_blown_boost": 26.5,
     "hybrid_turbo_boost_limit": 27,
     "hybrid_turbo_blown_boost": 29,
+    # whp gained per psi of boost over the 18 psi baseline, BEFORE knock pulls timing (net
+    # is lower on a knock-limited tune). Scaled up by the equipped parts' `flow` (see PARTS)
+    # so each psi is worth more on higher-flowing hardware (IC/intake/dp/turbo).
+    "boost_hp_per_psi": 11.6,
     "lean_lambda": 0.87,
     "safe_lambda": 0.82,
     "cash_low": 150,
@@ -202,20 +206,25 @@ SLIDERS = [
 # PARTS -- the SINGLE catalog of everything you can buy for the car. One row per part
 # holds BOTH its shop-facing copy (name/price/blurb/review/accent/image) AND its curve-shape
 # effect (spool/weight/grip/max_boost/curve) that reshapes the rpm->whp curve in
-# tuning.build_whp_curve. `kind` splits two behaviours:
-#   "mod"   -- a bolt-on. Cumulative: bought once it's a bool on Car.mods and just stays
-#              on (category=None).
-#   "turbo" -- a member of the MUTUALLY-EXCLUSIVE turbo family (category="turbo"): you
-#              OWN several and EQUIP one. Turbos also carry the compute_tune caps
-#              `boost_limit`/`blown_boost` (lower = grenades sooner AND a lower boost
-#              slider ceiling), `dave_on_blow` (which DAVE_LINES pool plays when it lets
-#              go on the dyno) and `ed_cut` (flavour: the money funnels to rival Ed).
-#              `mods["turbo"]` stays a bool anchor ("owns an aftermarket turbo" -- keeps
-#              rivals/simos/fully_built happy); Car.turbo picks WHICH variant.
+# tuning.build_whp_curve. `kind` splits three behaviours:
+#   "mod"   -- a bolt-on. Cumulative: bought once it's a bool on Car.mods and just stays on.
+#   "turbo" -- a member of the MUTUALLY-EXCLUSIVE turbo family: you OWN several and EQUIP
+#              one. Turbos also carry the compute_tune caps `boost_limit`/`blown_boost`
+#              (lower = grenades sooner AND a lower boost slider ceiling), `dave_on_blow`
+#              (which DAVE_LINES pool plays when it lets go on the dyno) and `ed_cut`
+#              (flavour: the money funnels to rival Ed).
+#   "ic"    -- an intercooler, the OTHER equippable family (own several, equip one). ICs
+#              carry the compute_tune relief `headroom` (knock headroom, psi-equiv),
+#              `egt_relief` (deg cooler charge) and `rel_bonus` (reliability points).
+# Every equippable family (turbo, ic) has a bool ANCHOR in Car.mods ("owns an aftermarket
+# one" -- keeps rivals/simos/fully_built happy) plus a Car attr picking WHICH variant is
+# fitted; see EQUIP_FAMILIES below. Bolt-on "mod" parts have no family (category=None).
 # `curve` = [(rpm, base_add, scaler)] whp adders interpolated across rpm; at each rpm the
 # gain is base_add + scaler * (running total of earlier parts' adds), so parts compound.
 # `spool` shifts boost onset (- earlier / + later), `weight` kg +/-, `grip` traction +/-,
-# `max_boost` raises the psi ceiling. `image` is the shop-card thumbnail: an IMAGE_FILES
+# `max_boost` raises the psi ceiling, `flow` (airflow parts: IC/intake/dp/turbo) makes each
+# psi of boost worth more whp (summed into a >=1.0 multiplier on the boost term in
+# compute_tune). `image` is the shop-card thumbnail: an IMAGE_FILES
 # key (drop a PNG in data/images, register it in IMAGE_FILES, put the key here) or "" for
 # the plain accent-coloured placeholder tile. Both the player's Car and rival Cars pull
 # from CAR_TABLE and compose their final curve via tuning.build_whp_curve.
@@ -226,47 +235,55 @@ PARTS = {
                "blurb": "+6 whp, quicker spool.",
                "review": ("A intake. It makes the turbo-flutter louder and adds a couple of whp you will "
                           "absolutely tell everyone about. Dave calls it 'the gateway drug'."),
-               "spool": -150, "weight": 0, "grip": 0.00, "max_boost": 0,
+               "spool": -150, "weight": 0, "grip": 0.00, "max_boost": 0, "flow": 0.02,
                "curve": [(3000, 3, 0.02), (5000, 6, 0.04), (6700, 6, 0.04)]},
     "dp": {"kind": "mod", "name": "Catless Downpipe", "price": 250, "accent": BLUE, "image": "",
            "blurb": "+12 whp and much louder bangs. Cops notice fast.",
            "review": ("Catless downpipe: deletes the cat, wakes up the mid-range, and turns every tunnel "
                       "into a fireworks show. The cops WILL find you. Worth it."),
-           "spool": -200, "weight": 0, "grip": 0.00, "max_boost": 1,
+           "spool": -200, "weight": 0, "grip": 0.00, "max_boost": 1, "flow": 0.03,
            "curve": [(3500, 6, 0.05), (5000, 10, 0.06), (6700, 12, 0.06)]},
-    "fmic": {"kind": "mod", "name": "Front-Mount Intercooler", "price": 300, "accent": BLUE, "image": "",
+    "fmic": {"kind": "ic", "name": "Front-Mount Intercooler", "price": 300, "accent": BLUE, "image": "fmic",
              "blurb": "More knock headroom and lower EGT.",
              "review": ("Front-mount intercooler. Cooler charge, more knock headroom, lower EGTs -- the "
                         "unsexy mod that keeps your motor alive when you get greedy. Buy it before the turbo."),
-             "spool": 0, "weight": 5, "grip": 0.00, "max_boost": 1,
+             "spool": 0, "weight": 5, "grip": 0.00, "max_boost": 1, "flow": 0.02,
+             "headroom": 2, "egt_relief": 45, "rel_bonus": 6,
              "curve": [(4500, 4, 0.03), (6700, 8, 0.05)]},
+    "smic": {"kind": "ic", "name": "Stock-Mount Intercooler", "price": 600, "accent": RED, "image": "smic",
+             "blurb": "More knock headroom and lower EGT.",
+             "review": ("Stock-mount intercooler. Cooler charge, more knock headroom, lower EGTs -- the "
+                        "unsexy mod that keeps your motor alive when you get greedy. Buy it before the turbo."),
+             "spool": 0, "weight": 6, "grip": 0.00, "max_boost": 2, "flow": 0.04,
+             "headroom": 3, "egt_relief": 60, "rel_bonus": 8,
+             "curve": [(4500, 4, 0.03), (6700, 8, 0.07)]},
     "clutch": {"kind": "mod", "name": "Stage 2 Clutch + LSD", "price": 450, "accent": BLUE, "image": "",
                "blurb": "Launch grip for the strip.",
                "review": ("Stage 2 clutch + LSD. Finally puts the power down instead of roasting one tyre "
                           "at the line. Your launches stop being a comedy routine."),
                "spool": 0, "weight": 0, "grip": 0.18, "max_boost": 0, "curve": []},
-    "wheels": {"kind": "mod", "name": "Lightweight Wheels", "price": 200, "accent": BLUE, "image": "",
+    "wheels": {"kind": "mod", "name": "Lightweight Wheels", "price": 200, "accent": BLUE, "image": "wheels",
                "blurb": "Less rotating weight.",
                "review": ("Lightweight wheels. Less rotating mass, quicker to rev, and they look the part. "
                           "The single most Instagram-per-dollar mod on the car."),
                "spool": 0, "weight": -50, "grip": 0.02, "max_boost": 0, "curve": []},
-    "fuel": {"kind": "mod", "name": "Port Injection + LPFP", "price": 700, "accent": BLUE, "image": "",
+    "fuel": {"kind": "mod", "name": "Port Injection + LPFP", "price": 700, "accent": BLUE, "image": "mpi",
              "blurb": "Feeds E85 safely.",
              "review": ("Port injection + low-pressure fuel pump. The unlock for E85 without leaning out "
                         "and grenading. Boring plumbing, huge enabler. Dave approves."),
              "spool": 0, "weight": 0, "grip": 0.00, "max_boost": 0,
              "curve": [(4000, 8, 0.05), (6000, 14, 0.08), (6700, 14, 0.08)]},
     # -- turbo family (own many, equip one; category="turbo") --
-    "is38": {"kind": "turbo", "category": "turbo", "name": "IS38", "price": 900, "accent": BLUE, "image": "",
+    "is38": {"kind": "turbo", "name": "IS38", "price": 900, "accent": BLUE, "image": "is38",
              "blurb": "The proven hybrid. Solid all-rounder.",
              "review": ("The IS38 is the tune-forum default for a reason: it just works. Spool is "
                         "fine, mid-range is fine, top end is fine. Nobody ever got fired for buying "
                         "an IS38.\n\nDave says: 'Boring. Reliable. Boring. I respect it.'\n\n"
                         "Heads up: a slice of your money still ends up in Ed's pocket. Such is life."),
-             "spool": 250, "weight": 0, "grip": 0.00, "max_boost": 5,
+             "spool": 250, "weight": 0, "grip": 0.00, "max_boost": 5, "flow": 0.06,
              "curve": [(3500, -5, 0.0), (4500, 15, 0.10), (5500, 35, 0.15), (6700, 45, 0.15)],
              "boost_limit": 27, "blown_boost": 29, "dave_on_blow": "blown", "ed_cut": True},
-    "cts_jb600": {"kind": "turbo", "category": "turbo", "name": "CTS JB600", "price": 650, "accent": RED, "image": "",
+    "cts_jb600": {"kind": "turbo", "name": "CTS JB600", "price": 650, "accent": RED, "image": "jb600",
                   "blurb": "Cheapest boost money can (barely) buy.",
                   "review": ("Look, it's cheap. That's the whole pitch. Spool is a slideshow, boost "
                              "tops out early, and the dyno operator keeps a fire extinguisher within "
@@ -274,10 +291,10 @@ PARTS = {
                              "more often than any other turbo on this list, and when it goes, it goes "
                              "BIG. You get what you pay for. You paid for very little.\n\n"
                              "Two stars, would (financially have to) buy again."),
-                  "spool": 400, "weight": 0, "grip": 0.0, "max_boost": 3,
+                  "spool": 400, "weight": 0, "grip": 0.0, "max_boost": 3, "flow": 0.03,
                   "curve": [(3800, -8, 0.0), (4800, 10, 0.08), (5800, 22, 0.10), (6700, 26, 0.10)],
                   "boost_limit": 22, "blown_boost": 24, "dave_on_blow": "blown", "ed_cut": True},
-    "vortex": {"kind": "turbo", "category": "turbo", "name": "Vortex", "price": 1600, "accent": VIOLET, "image": "",
+    "vortex": {"kind": "turbo", "name": "Vortex", "price": 1600, "accent": VIOLET, "image": "vortex",
                "blurb": "Snappy spool, decent boost. Premium price.",
                "review": ("The boutique option. Spools up early and feels alive in the mid-range, and "
                           "the boost curve is genuinely nice. It also costs more than the Arashi, which "
@@ -285,10 +302,10 @@ PARTS = {
                           "one lets go on the dyno, Dyno Dave will look you dead in the eye and insist "
                           "it was YOUR tune, YOUR fuel, YOUR fault — and then question your bloodline.\n\n"
                           "Great turbo. Bring thick skin."),
-               "spool": 120, "weight": 0, "grip": 0.0, "max_boost": 5,
+               "spool": 120, "weight": 0, "grip": 0.0, "max_boost": 5, "flow": 0.10,
                "curve": [(3300, -3, 0.0), (4300, 18, 0.10), (5300, 36, 0.14), (6700, 44, 0.15)],
                "boost_limit": 30, "blown_boost": 32, "dave_on_blow": "blown_deny", "ed_cut": True},
-    "arashi_3076": {"kind": "turbo", "category": "turbo", "name": "Arashi 3076", "price": 1400, "accent": GREEN, "image": "",
+    "arashi_3076": {"kind": "turbo", "name": "Arashi 3076", "price": 1400, "accent": GREEN, "image": "arashi",
                     "blurb": "Monster top-end. None of your cash funds Ed.",
                     "review": ("Spool is a touch lazier than the Vortex, but who cares once it's lit — "
                                "the top end PULLS, holding boost to redline and making the most whp of "
@@ -296,20 +313,33 @@ PARTS = {
                                "not one cent goes to Ed. The crew respects the Arashi. Ed is reportedly "
                                "'not mad, just disappointed' (he's mad).\n\nIf you can afford it, this is "
                                "the one."),
-                    "spool": 170, "weight": 0, "grip": 0.0, "max_boost": 6,
+                    "spool": 170, "weight": 0, "grip": 0.0, "max_boost": 6, "flow": 0.15,
                     "curve": [(3600, -6, 0.0), (4600, 14, 0.10), (5600, 40, 0.16), (6700, 58, 0.18)],
                     "boost_limit": 35, "blown_boost": 37, "dave_on_blow": "blown", "ed_cut": False},
 }
 
 # Derived views into PARTS (the single source of truth above -- these are just indices).
-MOD_IDS = [k for k, v in PARTS.items() if v["kind"] == "mod"]      # the cumulative bolt-ons
-TURBO_IDS = [k for k, v in PARTS.items() if v["kind"] == "turbo"]  # the equippable turbo family
-TURBO_DEFAULT = TURBO_IDS[0]                                       # baseline (rivals / old saves) = IS38
-MOD_KEYS = MOD_IDS + ["turbo"]                                     # the bool ids stored on Car.mods
+MOD_IDS         = [k for k, v in PARTS.items() if v["kind"] == "mod"]       # the cumulative bolt-ons
+IC_IDS          = [k for k, v in PARTS.items() if v["kind"] == "ic"]        # the equippable intercooler family
+TURBO_IDS       = [k for k, v in PARTS.items() if v["kind"] == "turbo"]     # the equippable turbo family
+IC_DEFAULT      = IC_IDS[0]                                                 # baseline IC (rivals / old saves)
+TURBO_DEFAULT   = TURBO_IDS[0]                                              # baseline turbo (rivals / old saves) = IS38
+
+# The equippable-mod families: kind -> the Car state that tracks it. `equipped` is the attr
+# holding WHICH variant is fitted, `owned` the attr holding the owned set, `anchor` the bool
+# key in Car.mods, `default` the baseline variant. buy_mod/equip_mod read this table to know
+# which attrs to touch, so adding a family (e.g. exhaust) is one row here + kind on the parts.
+EQUIP_FAMILIES = {
+    "turbo": {"equipped": "turbo", "owned": "owned_turbos", "anchor": "turbo", "default": TURBO_DEFAULT},
+    "ic":    {"equipped": "ic",    "owned": "owned_ic",     "anchor": "ic",    "default": IC_DEFAULT},
+}
+ANCHOR_KEYS     = [fam["anchor"] for fam in EQUIP_FAMILIES.values()]        # ["turbo", "ic"]
+MOD_KEYS        = MOD_IDS + ANCHOR_KEYS                                     # the bool ids stored on Car.mods
 # Effect lookup for the curve math: each part IS its own effect (spool/weight/grip/curve);
-# the "turbo" bool anchor resolves to the baseline variant, but a Car swaps in the one it
+# each family's bool anchor resolves to its baseline variant, but a Car swaps in the one it
 # has EQUIPPED (see Car._effects_table).
-BASE_EFFECTS = {**{k: PARTS[k] for k in MOD_IDS}, "turbo": PARTS[TURBO_DEFAULT]}
+BASE_EFFECTS = {**{k: PARTS[k] for k in MOD_IDS},
+                **{fam["anchor"]: PARTS[fam["default"]] for fam in EQUIP_FAMILIES.values()}}
 
 # Each car: real-world-derived stock wheel-power curve [(rpm, whp)] + gearing + tire +
 # mass + grip. `power_curve` is the STOCK base; the player's tune scales it and owned
@@ -380,7 +410,7 @@ RIVALS = [
         "car_id":       "wrx_sti",
         "purse":        480,
         "color":        rgba("#3a6ad6"),
-        "mods":         ["intake", "dp", "fmic", "turbo"],
+        "mods":         ["intake", "dp", "ic", "turbo"],
         "tune":         DEFAULT_TUNE,
         "video_loss":   ["loss/ed_dis.mp4"],
         "video_win":    []
@@ -390,7 +420,7 @@ RIVALS = [
         "car_id":       "bmw_m2",
         "purse":        850,
         "color":        rgba("#742E2E"),
-        "mods":         ["intake", "dp", "fmic"],
+        "mods":         ["intake", "dp", "ic"],
         "tune":         DEFAULT_TUNE,
         "video_loss":   ["loss/ed_dis.mp4"],
         "video_win":    []
@@ -400,7 +430,7 @@ RIVALS = [
         "car_id":       "mk7_gti",
         "purse":        1150,
         "color":        rgba("#7e86cf"),
-        "mods":         ["intake", "dp", "fmic", "fuel", "turbo"],
+        "mods":         ["intake", "dp", "ic", "fuel", "turbo"],
         "tune":         {
             "boost": 25.0,
             "timing": 15.0,
@@ -419,7 +449,7 @@ RIVALS = [
         "car_id":       "mk7_gti",
         "purse":        1350,
         "color":        rgba("#69ff0b"),
-        "mods":         ["intake", "dp", "fmic", "clutch", "fuel", "turbo"],
+        "mods":         ["intake", "dp", "ic", "clutch", "fuel", "turbo"],
         "tune":         {
             "boost": 24.0,
             "timing": 14.0,
@@ -438,7 +468,7 @@ RIVALS = [
         "car_id":       "mk7_gti",
         "purse":        1700,
         "color":        rgba("#ff51ab"),
-        "mods":         ["intake", "dp", "fmic", "clutch", "fuel", "turbo"],
+        "mods":         ["intake", "dp", "ic", "clutch", "fuel", "turbo"],
         "tune":         {
             "boost": 27.0,
             "timing": 14.0,
@@ -500,7 +530,7 @@ DYNO_GAUGES = [
     ("ENGINE SPEED", "rpm", 0, 7000, 6800, "rpm", 0),
     ("KNOCK", "kr", 0, 6, 3, "deg", 1),
     ("LAMBDA", "lambda", 0.70, 1.00, 0.90, "L", 2),
-    ("EGT", "egt", 600, 1100, 980, "C", 0),
+    ("EGT", "egt", 600, 1200, 980, "C", 0),
     ("POWER", "whp", 0, 600, 9999, "whp", 0),
 ]
 DYNO_ZONE_GREEN = rgba("#0e5a31")   # in-spec band
@@ -546,25 +576,33 @@ MISC_MODEL_FILES = {
 }
 
 IMAGE_FILES = {
-    "wallpaper": "phone_wallpaper.png",
-    "app_icon": "simostools_icon.png",
-    "check": "flash_complete.png",
-    "logo": "logo.png",
-    "simon": "simon.png",
-    "simon_panel": "simon_panel.png",
+    "wallpaper":    "phone_wallpaper.png",
+    "app_icon":     "simostools_icon.png",
+    "check":        "flash_complete.png",
+    "logo":         "logo.png",
+    "simon":        "simon.png",
+    "simon_panel":  "simon_panel.png",
     "simon_button": "simon_button.png",
-    "tip_bulb": "tip_bulb.png",
-    "emoji_cred": "emoji_cred.png",
-    "emoji_karen": "emoji_karen.png",
-    "emoji_pops": "emoji_pops.png",
-    "emoji_fire": "emoji_fire.png",
-    "emoji_cash": "emoji_cash.png",
+    "tip_bulb":     "tip_bulb.png",
+    "emoji_cred":   "emoji_cred.png",
+    "emoji_karen":  "emoji_karen.png",
+    "emoji_pops":   "emoji_pops.png",
+    "emoji_fire":   "emoji_fire.png",
+    "emoji_cash":   "emoji_cash.png",
     # UI chrome (tinted at runtime via frameColor / colorScale).
-    "ui_box": "ui_box.png",      # solid rounded rectangle -> glass panel / button fill
-    "ui_ring": "ui_ring.png",    # rounded-rectangle outline -> panel / button border
-    "knob": "knob.png",          # round slider thumb (placeholder; edit freely)
-    "avatar": "avatar.png",      # default round discord avatar, tinted per user
-    "detective": "detective.png",  # fact-checker clipart on the review browser (placeholder)
+    "ui_box":       "ui_box.png",           # solid rounded rectangle -> glass panel / button fill
+    "ui_ring":      "ui_ring.png",          # rounded-rectangle outline -> panel / button border
+    "knob":         "knob.png",             # round slider thumb (placeholder; edit freely)
+    "avatar":       "avatar.png",           # default round discord avatar, tinted per user
+    "detective":    "detective.png",        # fact-checker clipart on the review browser (placeholder)
+    "is38":         "store/is38.png",
+    "jb600":        "store/jb600.png",
+    "vortex":       "store/vortexstd.png",
+    "arashi":       "store/arashi3076.png",
+    "wheels":       "store/wheels.png",
+    "mpi":          "store/mpi.png",
+    "fmic":         "store/fmic.png",
+    "smic":         "store/smic.png",
 }
 
 # --------------------------------------------------------------------------
@@ -573,34 +611,34 @@ IMAGE_FILES = {
 # setPlayRate; pops/bangs are one-shots played from a pool so bursts overlap.
 # --------------------------------------------------------------------------
 SOUND_FILES = {
-    "engine": "engine_loop.wav",
-    "intake": "intake_loop.wav",
-    "turbo": "turbo_loop.wav",
-    "pop_1": "pop_1.wav",
-    "pop_2": "pop_2.wav",
-    "pop_3": "pop_3.wav",
-    "bang_1": "bang_1.wav",
-    "bang_2": "bang_2.wav",
-    "bang_3": "bang_3.wav",
-    "bov": "bov.wav",
+    "engine":   "engine_loop.wav",
+    "intake":   "intake_loop.wav",
+    "turbo":    "turbo_loop.wav",
+    "pop_1":    "pop_1.wav",
+    "pop_2":    "pop_2.wav",
+    "pop_3":    "pop_3.wav",
+    "bang_1":   "bang_1.wav",
+    "bang_2":   "bang_2.wav",
+    "bang_3":   "bang_3.wav",
+    "bov":      "bov.wav",
 }
 
 AUDIO = {
-    "engine_base_rpm": 3000.0,   # rpm the engine_loop.wav is rendered at (rate 1.0)
-    "engine_volume": 0.55,       # master gain for the engine note at full load
-    "intake_volume": 0.35,       # induction roar, scaled by load^2
-    "turbo_volume": 0.22,        # spool whistle, scaled by spool*load
-    "pop_volume": 0.30,          # base one-shot gain for a pop
-    "bang_volume": 0.52,         # base one-shot gain for a bang
-    "bov_volume": 0.40,          # blow-off "pshhh"
-    "idle_load": 0.12,           # engine load floor when idling
-    "pull_load": 0.95,           # engine load on a WOT dyno pull / launch
-    "pool_size": 4,              # overlapping instances loaded per one-shot file
-    "concurrent_limit": 32,      # max simultaneous sounds (pops stack up)
-    "rate_min": 0.35,            # clamp for engine playRate (idle)
-    "rate_max": 3.2,             # clamp for engine playRate (redline)
-    "overrun_min_rpm": 3000,     # below this a throttle lift won't crackle
-    "overrun_count": 24,         # max pops/bangs in a full-intensity burst
+    "engine_base_rpm":  3000.0,     # rpm the engine_loop.wav is rendered at (rate 1.0)
+    "engine_volume":    0.55,       # master gain for the engine note at full load
+    "intake_volume":    0.35,       # induction roar, scaled by load^2
+    "turbo_volume":     0.22,       # spool whistle, scaled by spool*load
+    "pop_volume":       0.30,       # base one-shot gain for a pop
+    "bang_volume":      0.52,       # base one-shot gain for a bang
+    "bov_volume":       0.40,       # blow-off "pshhh"
+    "idle_load":        0.12,       # engine load floor when idling
+    "pull_load":        0.95,       # engine load on a WOT dyno pull / launch
+    "pool_size":        4,          # overlapping instances loaded per one-shot file
+    "concurrent_limit": 32,         # max simultaneous sounds (pops stack up)
+    "rate_min":         0.35,       # clamp for engine playRate (idle)
+    "rate_max":         3.2,        # clamp for engine playRate (redline)
+    "overrun_min_rpm":  3000,       # below this a throttle lift won't crackle
+    "overrun_count":    24,         # max pops/bangs in a full-intensity burst
 }
 
 # --------------------------------------------------------------------------
@@ -723,7 +761,7 @@ ECU_READOUT = [
     ("SW", "06K 906 026 ER"),
     ("Calibration", "8V0 906 264 K"),
     ("Flash size", "4.00 MB"),
-    ("Base map", "IS38 / Stock"),
+    ("Base map", "IS20 / Stock"),
 ]
 
 # --------------------------------------------------------------------------

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from library.core.constants import BASE_EFFECTS, DEFAULT_TUNE, FUEL, GRADE_TABLE, REPS, TUNE_THRESHOLDS
+from library.core.constants import (
+    BASE_EFFECTS, DEFAULT_TUNE, FUEL, GRADE_TABLE,
+    REPS, TUNE_THRESHOLDS
+)
 from library.core.utils import clamp
 
 
@@ -24,24 +27,29 @@ def rep_title(cred: float) -> str:
     return title
 
 
-def compute_tune(tune: dict, mods: dict, turbo: dict | None = None) -> dict:
+def compute_tune(tune: dict, mods: dict, turbo: dict | None = None, ic: dict | None = None,
+                 flow: float = 1.0) -> dict:
     """The calibration sim: turns the tune (boost/timing/lambda/fuel) into a tune-driven
     peak ``whp`` plus the safety diagnostics (knock/EGT/reliability/pop/blown). Power
     from *hardware* (intake/dp/turbo/...) is NOT here -- it flows through the curve in
     ``build_whp_curve``; mods still factor into headroom/EGT/reliability/boost ceiling.
 
     ``turbo`` is the selected turbo's spec (a ``PARTS`` turbo entry) and supplies the boost
-    ceiling + blow-up threshold (so a CTS grenades sooner than an Arashi). When omitted,
-    it falls back to the old behaviour keyed off the ``mods["turbo"]`` bool (hybrid vs
-    stock limits) so bare callers (e.g. simos) are unaffected."""
+    ceiling + blow-up threshold (so a CTS grenades sooner than an Arashi). ``ic`` is the
+    selected intercooler's spec and supplies the knock ``headroom`` / ``egt_relief`` /
+    ``rel_bonus`` (so a bigger IC lets you lean on it harder). Either omitted falls back to
+    the baseline variant keyed off its ``mods`` bool anchor, so bare callers (e.g. simos)
+    are unaffected. ``flow`` (>= 1.0) is the equipped parts' airflow multiplier on the boost
+    term -- higher-flowing hardware makes each psi worth more whp (see Car._boost_flow)."""
     fuel = FUEL[tune["fuel"]]
-    headroom = fuel["head"] + (2 if mods["fmic"] else 0) + (3 if mods["fuel"] else 0)
+    ic = ic if ic is not None else (BASE_EFFECTS["ic"] if mods.get("ic") else None)
+    headroom = fuel["head"] + (ic["headroom"] if ic else 0) + (3 if mods["fuel"] else 0)
     knock_idx = (tune["boost"] - 18) * 0.85 + (tune["timing"] - 9) * 1.25 + (tune["lambda"] - 0.82) * 14 - headroom
     kr = max(0, knock_idx) * 1.1
     effective_timing = max(2, tune["timing"] - kr)
     whp = (
         210
-        + (tune["boost"] - 18) * 7.6
+        + (tune["boost"] - 18) * TUNE_THRESHOLDS["boost_hp_per_psi"] * flow
         + (effective_timing - 9) * 3.8
         + fuel["pwr"]
         - abs(tune["lambda"] - 0.83) * 40
@@ -56,7 +64,7 @@ def compute_tune(tune: dict, mods: dict, turbo: dict | None = None) -> dict:
         + (tune["lambda"] - 0.82) * 220
         + tune["of"] * 1.4
         + tune["or"] * 1.7
-        - (45 if mods["fmic"] else 0)
+        - (ic["egt_relief"] if ic else 0)
         - (25 if has_turbo else 0)
     )
     pop = pop_score(tune)
@@ -75,7 +83,7 @@ def compute_tune(tune: dict, mods: dict, turbo: dict | None = None) -> dict:
         - max(0, egt - 950) * 0.13
         - max(0, tune["lambda"] - 0.86) * (40 if mods["fuel"] else 140)
         - pop * 0.16
-        + (6 if mods["fmic"] else 0)
+        + (ic["rel_bonus"] if ic else 0)
     )
     rel = clamp(rel, 0, 100)
     blown = (knock_idx > 7 and tune["lambda"] > 0.86 and not mods["fuel"]) or egt > TUNE_THRESHOLDS["egt_blown"] or (tune["boost"] > blown_limit and rel < 22)
@@ -136,6 +144,7 @@ def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0
     peak_rpm = max(base_curve, key=lambda p: p[1])[0]
     lo_rpm, hi_rpm = base_curve[0][0], base_curve[-1][0]
     spool_delta = sum(effects[m]["spool"] for m in owned_mods)
+    onset = lo_rpm + max(0.0, spool_delta)  # where the (spool-delayed) curve actually starts
     grid = []
     rpm = idle
     while rpm <= redline + 1:
@@ -144,6 +153,12 @@ def build_whp_curve(base_curve: list, owned_mods: list, tune_factor: float = 1.0
         look = rpm - spool_delta if rpm <= peak_rpm else rpm
         look = clamp(look, lo_rpm, hi_rpm)
         whp = whp_at(base_curve, look) * factor
+        # Below the (spool-delayed) onset the base is flat-held at its first value; ramp it
+        # in from idle (0 at idle -> full at onset; a no-op above it) so low-rpm power -- and
+        # torque (whp*5252/rpm) -- climb naturally rather than spiking at idle, where the tiny
+        # rpm divisor blows the torque figure up.
+        if onset > idle:
+            whp *= clamp((rpm - idle) / (onset - idle), 0.0, 1.0)
         accumulated = 0.0
         for mod_id in owned_mods:
             base, scaler = _mod_curve_value(effects[mod_id]["curve"], rpm)

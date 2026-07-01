@@ -57,7 +57,7 @@ class MapsTask(TaskBase):
         self.ui.add_text("t-slots", "SWITCH SLOTS", (rbox[0] + 0.05, 0, -0.18), 0.032, DIM)
         for attr, box_i, z in SLIDER_ROWS:
             vrange = next(s[2] for s in SLIDERS if s[0] == attr)
-            if attr == "sl_boost":  # boost ceiling tracks the hardware (stock max / turbo blown-boost)
+            if attr == "sl_boost":  # boost ceiling tracks the hardware (stock max + equipped mods' max_boost)
                 vrange = (BOOST_FLOOR, car.boost_slider_max())
             value = car.tune[SLIDER_KEY[attr]]
             slider = self.ui.add_slider(attr, (boxes[box_i][0] + 0.64, 0, z), vrange, value, width=0.5)
@@ -68,10 +68,10 @@ class MapsTask(TaskBase):
     def update_ui(self, left, right):
         self._ready = False
         car = self.game.car
-        # The boost slider's ceiling follows the hardware: the car's stock max boost, or
-        # the fitted turbo's blown-boost limit. Re-range it (a turbo may have been bought or
-        # swapped since the last visit) and pull the tune under the ceiling if a smaller
-        # turbo now caps it.
+        # The boost slider's ceiling follows the hardware: the car's stock max boost plus
+        # the max_boost of every equipped mod (turbo, intercooler, bolt-ons). Re-range it
+        # (mods may have been bought/swapped since the last visit) and pull the tune under
+        # the ceiling if a smaller-ceiling combo now caps it.
         boost_max = car.boost_slider_max()
         self.sl_boost.range_of((BOOST_FLOOR, boost_max))
         if car.tune["boost"] > boost_max:

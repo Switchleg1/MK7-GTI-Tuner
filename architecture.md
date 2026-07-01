@@ -132,13 +132,17 @@ Modules import each other by absolute path (`from library.<sub>.<mod> import …
   thumbnail — an `IMAGE_FILES` key or `""` placeholder) AND its
   curve effect (`spool`/`weight`/`grip`/`max_boost`/compounding rpm `curve` adders). `kind`
   splits behaviour: `"mod"` bolt-ons are cumulative bools on `Car.mods`; `"turbo"` rows are
-  the mutually-exclusive turbo family (is38/cts_jb600/vortex/arashi_3076, `category="turbo"`)
-  that additionally carry `compute_tune` caps (`boost_limit`/`blown_boost` — lower = grenades
-  sooner AND a lower boost-slider ceiling), a `dave_on_blow` Dave-pool key, and `ed_cut`
-  flavour. Derived views (single source of truth is `PARTS`): `MOD_IDS`/`TURBO_IDS` (by
-  kind), `TURBO_DEFAULT` (baseline IS38 for rivals/old saves), `MOD_KEYS` (the bool ids on
-  `Car.mods` = bolt-ons + the `"turbo"` anchor), `BASE_EFFECTS` (the curve-effect lookup).
-  (`mods["turbo"]` stays a bool anchor; `Car.turbo` picks the variant — see car.py.)
+  the mutually-exclusive turbo family (is38/cts_jb600/vortex/arashi_3076) that additionally
+  carry `compute_tune` caps (`boost_limit`/`blown_boost` — lower = grenades sooner AND a lower
+  boost-slider ceiling), a `dave_on_blow` Dave-pool key, and `ed_cut` flavour; `"ic"` rows are
+  the intercooler family (fmic/smic) carrying `compute_tune` relief (`headroom`/`egt_relief`/
+  `rel_bonus`). **`EQUIP_FAMILIES`** declares the equippable families (`kind` →
+  `{equipped, owned, anchor, default}` `Car` attr names) so `Car.buy_mod`/`equip_mod` and
+  `ShopItem` are generic over any family. Derived views (single source of truth is `PARTS`):
+  `MOD_IDS`/`TURBO_IDS`/`IC_IDS` (by kind), `TURBO_DEFAULT`/`IC_DEFAULT` (baselines for
+  rivals/old saves), `ANCHOR_KEYS`, `MOD_KEYS` (the bool ids on `Car.mods` = bolt-ons + each
+  family's anchor), `BASE_EFFECTS` (the curve-effect lookup, each anchor → its baseline
+  variant). (Each `mods[anchor]` stays a bool; `Car.turbo`/`Car.ic` pick the variant.)
 - `utils.py` — `clamp`, `pick`, `rgba`.
 - `audio.py` — `GameAudio`: the runtime sound service on the shell. A looping engine
   note (+ intake roar + turbo whistle) pitched by RPM via `setPlayRate` and leveled by
@@ -358,14 +362,21 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   rivals, which never flash). **`build_whp()`** composes the final rpm→whp curve = base
   curve + owned mods (+ the flashed tune, which scales it) via `tuning.build_whp_curve`;
   `whp_at(rpm)` interpolates it; `car_perf()` returns the curve + peak whp + mass/grip
-  (base ± mod deltas) + blown/rel. **Turbo variants (owned + equipped):** `Car.owned_turbos`
-  is the set you've bought and `Car.turbo` is the one fitted; `buy_turbo(id)` owns+equips,
-  `equip_turbo(id)` switches free among owned. `_turbo_spec()` resolves the fitted variant
-  (defaulting to IS38 for rivals/old saves that only have the `mods["turbo"]` bool) and
-  `_effects_table()` = `BASE_EFFECTS` with `"turbo"` swapped for that spec, so `build_whp`/
-  `car_perf`/`compute` reflect the chosen turbo. `boost_slider_max()` returns the boost
-  slider's ceiling (stock `max_boost`, or the fitted turbo's `blown_boost`). `blow_dave_pool()`
-  picks the Dave pool when it grenades. State-change methods return `(message, kind)` so `Game` logs them.
+  (base ± mod deltas) + blown/rel. **Equippable families (owned + equipped):** turbos AND
+  intercoolers work the same way — `Car.owned_turbos`/`Car.owned_ic` are the sets you've
+  bought and `Car.turbo`/`Car.ic` are the ones fitted. `buy_mod(part_id)` owns+equips and
+  `equip_mod(part_id)` switches free among owned — **both generic**, reading `PARTS[id]["kind"]`
+  → `EQUIP_FAMILIES` to know which attrs/anchor to touch (no per-family method).
+  `_equipped_spec(kind)` resolves the fitted variant (defaulting to the family baseline for
+  rivals/old saves that only have the `mods[anchor]` bool); `_turbo_spec()`/`_ic_spec()` wrap
+  it, and `_effects_table()` = `BASE_EFFECTS` with each anchor swapped for its fitted spec, so
+  `build_whp`/`car_perf`/`compute` reflect the chosen turbo+IC. `compute()`/`_tune_factor()`
+  pass both specs + `_boost_flow()` (1.0 + every equipped part's `flow`) to `compute_tune`
+  (turbo → boost caps, IC → knock/EGT/reliability relief, flow → more whp per psi). `boost_slider_max()`
+  returns the boost slider's ceiling = the car's stock `max_boost` + the `max_boost` of every
+  equipped mod (turbo + IC + bolt-ons, via `_effects_table`).
+  `blow_dave_pool()` picks the Dave pool when it grenades. State-change methods return
+  `(message, kind)` so `Game` logs them.
   `apply_preset` accepts `PRESETS` **and** `COMMUNITY_MAPS` keys. Save dict adds `car_id` +
   `turbo` + `owned_turbos` (old v3 saves with `mods["turbo"]` migrate to IS38 + back-fill
   owned; `SAVE_VERSION` 4).
@@ -380,12 +391,17 @@ reads go straight to `game.bro`/`game.car`; cross-node actions are orchestrated 
   role subclasses (Admin trusts good, GreenName pulls money, NormalUser is persona-only).
 - `app.py` — `MK7Tuner3D`: the ShowBase shell + stage manager + `TASK_CLASSES`.
 - `geometry.py` — box/grid builders (the exhaust-flame cubes).
-- `tuning.py` — tune + curve math: `compute_tune(tune, mods, turbo=None)` (calibration →
-  tune-only peak whp + knock/EGT/reliability/pop/blown; the optional `turbo` spec sets the
-  boost ceiling + blow-up threshold, else it falls back to the `mods["turbo"]` bool;
-  **hardware power lives in the mod curves now, not here**), `build_whp_curve(base,
-  owned_mods, …, effects=BASE_EFFECTS)` (a car passes its own `effects` so `"turbo"` resolves
-  to the fitted variant) + `whp_at(curve, rpm)`, plus grading, pops, rep.
+- `tuning.py` — tune + curve math: `compute_tune(tune, mods, turbo=None, ic=None, flow=1.0)`
+  (calibration → tune-only peak whp + knock/EGT/reliability/pop/blown; the optional `turbo`
+  spec sets the boost ceiling + blow-up threshold, the `ic` spec sets knock `headroom` /
+  EGT / reliability relief — each falls back to its family baseline via the `mods[anchor]`
+  bool — and `flow` (≥1.0, the equipped parts' airflow, `Car._boost_flow`) multiplies the
+  boost→whp term `(boost−18)·TUNE_THRESHOLDS["boost_hp_per_psi"]·flow` so each psi is worth
+  more on flowier hardware; **hardware power lives in the mod curves now, not here**), `build_whp_curve(base,
+  owned_mods, …, effects=BASE_EFFECTS)` (a car passes its own `effects` so each family anchor
+  resolves to the fitted variant; below the spool-delayed onset it ramps power in from 0 at
+  idle so the low-rpm end — and the dyno's `whp·5252/rpm` torque trace — climbs naturally
+  instead of spiking at idle) + `whp_at(curve, rpm)`, plus grading, pops, rep.
 - `simos.py` — "Ask Simon" rules engine; `build_context(game, tab)` reads bro + car (and
   shows Simon the real **built** peak whp, not the tune-only figure).
 
@@ -410,19 +426,20 @@ per run in `_start_race`.
 The **ShopTask** (`library/stages/tasks/shop_task.py`) is a **2×3 grid of cards** (`N_CARDS=6`),
 one per `ShopItem` (`shop_item.py`): thumbnail · name · brief description · an owned/equipped
 tag · **Read review** · **Buy/Equip**. `build_catalog()` builds the list straight off the
-single `PARTS` table (6 bolt-on mods + the 4 turbos, in table order); the task holds the 6 fixed card slots and an item paints itself into
+single `PARTS` table (bolt-on mods + the intercooler + turbo families, in table order); the task holds the 6 fixed card slots and an item paints itself into
 a slot via `ShopItem.bind_to_slot` (wiring that slot's two buttons back to `_card_action` /
 `_open_review`). **Card thumbnail:** each part's `image` (a `PARTS`/`ShopItem` field) is an
 `IMAGE_FILES` key — `bind_to_slot` swaps the thumb `Frame`'s `frameTexture` (via the new
 `Frame.texture()`) to that art (untinted, initials tag hidden); a blank `""` falls back to
 the accent-coloured `ui_box` placeholder tile + `tag()` initials (all parts ship blank).
 That is the same windowed-scroll pattern as the scoreboard pane (scroll by a row =
-`COLS`, via wheel / ▲▼ / arrows). **Equippable families:** `ShopItem.category` ("turbo" today,
-"intercooler" next) marks mutually-exclusive items you **own many of and equip one** —
-`is_owned`/`is_equipped`/`owned_label`/`action` drive a dual button: **Buy $price** (unowned,
-GREEN) → **Equip** (owned, not fitted, free swap, VIOLET) → **Equipped** (disabled). Bolt-on
-mods (`category=None`) are cumulative. `_card_action` spends + `Car.buy_turbo`/`Car.set_mod`,
-or free `Car.equip_turbo`; `ed_cut` turbos log an "Ed gets his cut" line. `_open_review` opens
+`COLS`, via wheel / ▲▼ / arrows). **Equippable families:** `ShopItem.category` (== the part's
+`kind`: "turbo" or "ic") marks mutually-exclusive items you **own many of and equip one** —
+`is_owned`/`is_equipped` are generic over `EQUIP_FAMILIES`, and `owned_label`/`action` drive a
+dual button: **Buy $price** (unowned, GREEN) → **Equip** (owned, not fitted, free swap, VIOLET)
+→ **Equipped** (disabled). Bolt-on mods (`category=None`) are cumulative. `_card_action` spends
++ `Car.buy_mod`/`Car.set_mod`, or free `Car.equip_mod`; `ed_cut` turbos log an "Ed gets his
+cut" line. `_open_review` opens
 the **`ReviewOverlay`** (`review_overlay.py`) — a faux-browser pane that animates a tiny rect
 at the pressed button out to a near-fullscreen, slightly-translucent window (LerpPos+LerpScale
 via `direct.interval`, like `unlock_stage`) showing the item's full `review` with the

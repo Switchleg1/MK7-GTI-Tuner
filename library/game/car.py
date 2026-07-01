@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from library.core.constants import BASE_EFFECTS, CAR_TABLE, MOD_KEYS, PARTS, PRESETS, TURBO_DEFAULT, UNLOCKABLE_MAPS, DEFAULT_TUNE
+from library.core.constants import (
+    BASE_EFFECTS, CAR_TABLE, EQUIP_FAMILIES, MOD_KEYS, PARTS, PRESETS,
+    TURBO_DEFAULT, UNLOCKABLE_MAPS, DEFAULT_TUNE, IC_DEFAULT
+)
 from library.game.tuning import (
     build_whp_curve, clone_tune, compute_tune, default_tune, grade_for_result, pop_score, whp_at,
 )
@@ -48,9 +51,14 @@ class Car:
         # "owns an aftermarket turbo"; this picks WHICH from PARTS. A car built with
         # `mods["turbo"]` True but no explicit variant (rivals, old saves) defaults to IS38.
         self.turbo                  = TURBO_DEFAULT if self.mods.get("turbo") else None
-        # Turbos are OWNED (bought once) and one is EQUIPPED. You can switch freely between
-        # ones you own. (Intercoolers will become the same kind of equippable family next.)
+        # Which intercooler variant is fitted (None = stock). `mods["ic"]` stays the bool
+        # "owns an aftermarket IC"; this picks WHICH from PARTS. A car built with
+        # `mods["ic"]` True but no explicit variant (rivals, old saves) defaults to the baseline.
+        self.ic                     = IC_DEFAULT if self.mods.get("ic") else None
+        # Turbos and intercoolers are equippable families: each part is OWNED (bought once)
+        # and one is EQUIPPED. You can switch freely between ones you own (see EQUIP_FAMILIES).
         self.owned_turbos: list     = [self.turbo] if self.turbo else []
+        self.owned_ic: list         = [self.ic] if self.ic else []
         self.dyno_result            = None
         self.grade                  = ""
         if tune is not None and tune != DEFAULT_TUNE:
@@ -92,28 +100,50 @@ class Car:
     def compute(self) -> dict:
         """The calibration diagnostics for the running tune (whp/knock/EGT/rel/pop/blown).
         Power-from-mods is not here -- see ``build_whp``."""
-        return compute_tune(self.flashed_tune or self.tune, self.mods, self._turbo_spec())
+        return compute_tune(self.flashed_tune or self.tune, self.mods,
+                            self._turbo_spec(), self._ic_spec(), self._boost_flow())
 
     def owned_mods(self) -> list:
         return [mod_id for mod_id in self.mods if self.mods[mod_id]]
 
+    def _equipped_spec(self, kind: str) -> dict | None:
+        """The fitted variant's spec for an equippable family (``"turbo"`` / ``"ic"``), or
+        None when stock. Falls back to the family's baseline if its bool anchor is set but
+        no explicit variant is chosen (rivals / old saves)."""
+        fam = EQUIP_FAMILIES[kind]
+        equipped = getattr(self, fam["equipped"])
+        if equipped:
+            return PARTS.get(equipped, PARTS[fam["default"]])
+        return PARTS[fam["default"]] if self.mods.get(fam["anchor"]) else None
+
     def _turbo_spec(self) -> dict | None:
-        """The fitted turbo's spec (a PARTS turbo entry), or None when stock. Falls back to
-        IS38 if the bool ``mods["turbo"]`` is set but no explicit variant (rivals/old saves)."""
-        if self.turbo:
-            return PARTS.get(self.turbo, PARTS[TURBO_DEFAULT])
-        return PARTS[TURBO_DEFAULT] if self.mods.get("turbo") else None
+        return self._equipped_spec("turbo")
+
+    def _ic_spec(self) -> dict | None:
+        return self._equipped_spec("ic")
 
     def _effects_table(self) -> dict:
-        """The curve-effect lookup (BASE_EFFECTS) with its generic ``"turbo"`` entry swapped
-        for the SELECTED turbo's spec, so the curve/perf math reflects which turbo is fitted."""
-        return {**BASE_EFFECTS, "turbo": self._turbo_spec() or BASE_EFFECTS["turbo"]}
+        """BASE_EFFECTS with each equippable family's generic anchor entry swapped for the
+        SELECTED variant's spec, so the curve/perf math reflects what's actually fitted."""
+        eff = dict(BASE_EFFECTS)
+        for kind, fam in EQUIP_FAMILIES.items():
+            eff[fam["anchor"]] = self._equipped_spec(kind) or BASE_EFFECTS[fam["anchor"]]
+        return eff
+
+    def _boost_flow(self) -> float:
+        """Airflow multiplier on the boost->whp term: 1.0 + the ``flow`` of every equipped
+        mod (turbo + IC + intake/dp), each family anchor resolved to its fitted variant.
+        Higher-flowing hardware makes each psi of boost worth more power (see compute_tune)."""
+        eff = self._effects_table()
+        return 1.0 + sum(eff[m].get("flow", 0.0) for m in self.owned_mods())
 
     def boost_slider_max(self) -> float:
-        """The boost slider's upper bound: with an aftermarket turbo fitted, that turbo's
-        blown-boost limit; otherwise the car's stock max boost."""
-        spec = self._turbo_spec()
-        return spec["blown_boost"] if spec else self.max_boost
+        """The boost slider's upper bound: the car's stock max boost raised by the
+        ``max_boost`` of EVERY equipped mod (turbo + intercooler + bolt-ons). Each part's
+        ``max_boost`` in PARTS is how much psi ceiling it unlocks; the equipped turbo/IC
+        variants resolve through ``_effects_table``."""
+        eff = self._effects_table()
+        return self.max_boost + sum(eff[m]["max_boost"] for m in self.owned_mods())
 
     def build_whp(self) -> list:
         """The car's final rpm->whp curve = stock base curve scaled by the active tune,
@@ -124,11 +154,14 @@ class Car:
 
     def _tune_factor(self) -> float:
         """The active tune's power *relative to the stock tune* (car-agnostic, since
-        ``compute_tune`` is GTI-calibrated and absolute). 1.0 = stock / unflashed."""
+        ``compute_tune`` is GTI-calibrated and absolute). 1.0 = stock / unflashed. The
+        equipped parts' airflow (`_boost_flow`) is applied to both so a flowier build turns
+        the same boost into a bigger tune factor (=> more whp on the composed curve)."""
         if not self.flashed:
             return 1.0
-        stock = compute_tune(PRESETS["stock"], self.mods)["whp"] or 1.0
-        return compute_tune(self.flashed_tune or self.tune, self.mods)["whp"] / stock
+        flow = self._boost_flow()
+        stock = compute_tune(PRESETS["stock"], self.mods, flow=flow)["whp"] or 1.0
+        return compute_tune(self.flashed_tune or self.tune, self.mods, flow=flow)["whp"] / stock
 
     def whp_at(self, rpm: float, curve: list | None = None) -> float:
         return whp_at(curve if curve is not None else self.build_whp(), rpm)
@@ -142,7 +175,8 @@ class Car:
         weight = self.base_weight + sum(eff[m]["weight"] for m in owned)
         grip = self.base_grip + sum(eff[m]["grip"] for m in owned)
         if self.flashed:
-            diag = compute_tune(self.flashed_tune or self.tune, self.mods, self._turbo_spec())
+            diag = compute_tune(self.flashed_tune or self.tune, self.mods,
+                                self._turbo_spec(), self._ic_spec(), self._boost_flow())
             blown, rel = diag["blown"], diag["rel"]
         else:
             blown, rel = False, 100.0
@@ -199,21 +233,26 @@ class Car:
         self.mods[mod_id] = True
         return (f"installed {PARTS[mod_id]['name']}", "ok")
 
-    def buy_turbo(self, turbo_id: str):
-        """Purchase a turbo: add it to the owned set and equip it. Also sets the
-        ``mods["turbo"]`` bool so the bool-based callers (fully_built/simos/etc.) see it."""
-        if turbo_id not in self.owned_turbos:
-            self.owned_turbos.append(turbo_id)
-        self.turbo = turbo_id
-        self.mods["turbo"] = True
-        return (f"bought + fitted {PARTS[turbo_id]['name']}", "ok")
+    def buy_mod(self, part_id: str):
+        """Purchase an equippable-family part (a turbo or intercooler): add it to that
+        family's owned set, equip it, and set its bool anchor so the bool-based callers
+        (fully_built/simos/etc.) see it. The part's ``kind`` selects which Car attrs to
+        touch, via the EQUIP_FAMILIES table -- so adding a family needs no new method."""
+        fam = EQUIP_FAMILIES[PARTS[part_id]["kind"]]
+        owned = getattr(self, fam["owned"])
+        if part_id not in owned:
+            owned.append(part_id)
+        setattr(self, fam["equipped"], part_id)
+        self.mods[fam["anchor"]] = True
+        return (f"bought + fitted {PARTS[part_id]['name']}", "ok")
 
-    def equip_turbo(self, turbo_id: str):
-        """Switch to a turbo you already own (free)."""
-        if turbo_id not in self.owned_turbos:
+    def equip_mod(self, part_id: str):
+        """Switch to an equippable-family part you already own (free)."""
+        fam = EQUIP_FAMILIES[PARTS[part_id]["kind"]]
+        if part_id not in getattr(self, fam["owned"]):
             return None
-        self.turbo = turbo_id
-        return (f"equipped {PARTS[turbo_id]['name']}", "ok")
+        setattr(self, fam["equipped"], part_id)
+        return (f"equipped {PARTS[part_id]['name']}", "ok")
 
     def blow_dave_pool(self) -> str:
         """Which DAVE_LINES pool plays when this car grenades on the dyno (a turbo can
@@ -244,6 +283,8 @@ class Car:
             "mods",
             "turbo",
             "owned_turbos",
+            "ic",
+            "owned_ic",
             "dyno_result",
             "grade"
         )}
@@ -251,10 +292,15 @@ class Car:
     def from_dict(self, data: dict):
         for key, value in data.items():
             setattr(self, key, value)
-        # v3 saves predate the turbo variant: a car that owned the (single) turbo loads
-        # as the IS38 baseline so its curve/caps resolve.
-        if self.turbo is None and self.mods.get("turbo"):
-            self.turbo = TURBO_DEFAULT
-        # keep owned/equipped consistent (and back-fill owned for pre-owned_turbos saves)
-        if self.turbo and self.turbo not in self.owned_turbos:
-            self.owned_turbos = list(self.owned_turbos) + [self.turbo]
+        # Older saves predate the turbo/IC variants: a car that owned the (single) unit loads
+        # as that family's baseline variant so its curve/caps/relief resolve. Then keep each
+        # family's owned/equipped consistent (back-filling owned for pre-owned-set saves).
+        for kind, fam in EQUIP_FAMILIES.items():
+            equipped = getattr(self, fam["equipped"], None)
+            if equipped is None and self.mods.get(fam["anchor"]):
+                equipped = fam["default"]
+                setattr(self, fam["equipped"], equipped)
+            owned = list(getattr(self, fam["owned"], []) or [])
+            if equipped and equipped not in owned:
+                owned.append(equipped)
+            setattr(self, fam["owned"], owned)

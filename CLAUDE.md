@@ -45,13 +45,21 @@ per-file map.
 - **`constants.py` is the single source of every tunable** — numbers, colours, asset paths,
   poses, and the data tables (`CAR_TABLE`, `PARTS`, `ACHIEVEMENTS`, `RIVALS`, `DAVE_LINES`, …).
   Prefer one more table row over an `if/elif` staircase. One class per file.
-- **`PARTS` is the ONE catalog** of everything buyable (bolt-on mods + the turbo family) —
-  each row holds its shop copy (name/price/blurb/review/accent/`image`) AND its curve effect
-  (spool/weight/grip/max_boost/curve); turbos add `boost_limit`/`blown_boost`/`dave_on_blow`/
-  `ed_cut`. Derived indices (`MOD_IDS`, `TURBO_IDS`, `MOD_KEYS`, `TURBO_DEFAULT`,
-  `BASE_EFFECTS`) are just views into it — add a part = add one `PARTS` row. `image` is the
-  card thumbnail: an `IMAGE_FILES` key, or `""` for the accent-coloured placeholder tile
-  (all ship blank for now). The boost
+- **`PARTS` is the ONE catalog** of everything buyable — each row holds its shop copy
+  (name/price/blurb/review/accent/`image`) AND its curve effect (spool/weight/grip/max_boost/
+  curve). `kind` is one of: `"mod"` (cumulative bolt-on), `"turbo"` (adds `boost_limit`/
+  `blown_boost`/`dave_on_blow`/`ed_cut`), `"ic"` (intercooler; adds `headroom`/`egt_relief`/
+  `rel_bonus`). Derived indices (`MOD_IDS`/`TURBO_IDS`/`IC_IDS`/`MOD_KEYS`/`BASE_EFFECTS`) are
+  views into it — add a part = add one `PARTS` row. `image` is the card thumbnail: an
+  `IMAGE_FILES` key, or `""` for the accent-coloured placeholder tile.
+- **Equippable families** (own many, equip one) are declared in `constants.EQUIP_FAMILIES`:
+  `kind → {equipped, owned, anchor, default}` naming the `Car` attrs (`turbo`/`owned_turbos`,
+  `ic`/`owned_ic`) + the `Car.mods` bool anchor. `Car.buy_mod`/`equip_mod` and
+  `ShopItem.is_owned`/`is_equipped` are **generic over this table** — adding a family (e.g.
+  exhaust) is one `EQUIP_FAMILIES` row + `kind` on the parts, no new methods. `compute_tune`
+  takes the fitted `turbo`/`ic` specs (caps + headroom) plus a `flow` multiplier
+  (`Car._boost_flow` = 1 + every equipped part's `flow`) so each psi of boost is worth more
+  whp on higher-flowing hardware; the base rate is `TUNE_THRESHOLDS["boost_hp_per_psi"]`. The boost
   slider's ceiling is `Car.boost_slider_max()` (stock `max_boost`, or the fitted turbo's
   `blown_boost`).
 - **Geometry is authored Z-up** and loaded with `gltf.load_model(path,

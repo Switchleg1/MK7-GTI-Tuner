@@ -124,22 +124,24 @@ class ShopTask(TaskBase):
         self.dirty = True  # re-bind the window on the next redraw
 
     def _card_action(self, item):
-        """Buy (mods + first turbo purchase) or Equip (switch to an owned turbo, free)."""
+        """Buy (bolt-ons + first purchase of an equippable part) or Equip (switch to an
+        owned turbo/intercooler, free)."""
         game, car = self.game, self.game.car
         if item.is_owned(car):
-            if item.category == "turbo" and not item.is_equipped(car):
-                self._log_result(car.equip_turbo(item.key))
+            if item.category and not item.is_equipped(car):
+                self._log_result(car.equip_mod(item.key))
                 self.dirty = True
             return
         if not game.bro.spend(item.price):
             return
-        if item.category == "turbo":
-            self._log_result(car.buy_turbo(item.key))
+        if item.category:                       # an equippable family (turbo / intercooler)
+            self._log_result(car.buy_mod(item.key))
             spec = PARTS[item.key]
-            if spec.get("ed_cut"):
-                game.log(f"Ed takes his cut of that {spec['name']} sale. He's delighted. Gross.", "warn")
-            else:
-                game.log(f"{spec['name']} fitted - not a cent to Ed. The crew approves.", "ok")
+            if item.category == "turbo":        # the Ed-cut flavour is a turbo thing
+                if spec.get("ed_cut"):
+                    game.log(f"Ed takes his cut of that {spec['name']} sale. He's delighted. Gross.", "warn")
+                else:
+                    game.log(f"{spec['name']} fitted - not a cent to Ed. The crew approves.", "ok")
         else:
             self._log_result(car.set_mod(item.key))  # fully_built trophy polls car.fully_built
         game.dave("shop")

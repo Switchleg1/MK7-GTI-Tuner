@@ -8,7 +8,7 @@ from library.core.utils import pick
 def build_context(game, tab: str = "") -> dict:
     car, bro = game.car, game.bro
     tune = car.flashed_tune if car.flashed and car.flashed_tune else car.tune
-    result = compute_tune(tune, car.mods)
+    result = compute_tune(tune, car.mods, car._turbo_spec(), car._ic_spec(), car._boost_flow())
     # compute_tune's whp is tune-only now; show Simon the real BUILT peak (curve + mods)
     # so his power roasts/thresholds reflect the actual car.
     result["whp"] = max((w for _, w in car.build_whp()), default=result["whp"])

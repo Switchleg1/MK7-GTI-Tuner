@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from library.core.constants import AMBER, BLUE, GREEN, GREEN_2, PARTS, VIOLET, WHITE
+from library.core.constants import AMBER, BLUE, EQUIP_FAMILIES, GREEN, GREEN_2, PARTS, VIOLET, WHITE
 
 
 class ShopItem:
-    """One shop entry (a bolt-on mod OR a turbo variant). The shop task holds a list of
-    these and a pool of card *slots*; an item paints itself into a slot (``bind_to_slot``)
-    and wires that slot's two buttons back to the task's action / review callbacks.
+    """One shop entry (a bolt-on mod OR an equippable-family part). The shop task holds a
+    list of these and a pool of card *slots*; an item paints itself into a slot
+    (``bind_to_slot``) and wires that slot's two buttons back to the task's action / review
+    callbacks.
 
-    ``category`` marks an **equippable family** (mutually exclusive, own many / equip one) --
-    "turbo" today, "intercooler" next. Bolt-on mods have ``category=None`` (cumulative: once
-    bought they're just on). The actual purchase / fitment lives on ``Car``."""
+    ``category`` is the **equippable-family** id (mutually exclusive, own many / equip one) --
+    "turbo" or "ic" today. Bolt-on mods have ``category=None`` (cumulative: once bought they're
+    just on). The actual purchase / fitment lives on ``Car`` (see EQUIP_FAMILIES)."""
 
     def __init__(self, key, name, blurb, review, price, accent, kind, category=None, image=""):
         self.key = key
@@ -19,19 +20,19 @@ class ShopItem:
         self.review = review        # full review (the animated overlay)
         self.price = price
         self.accent = accent        # placeholder-tile tint (used when there's no image)
-        self.kind = kind            # "mod" | "turbo"
-        self.category = category    # equippable-family id, or None for cumulative bolt-ons
+        self.kind = kind            # "mod" | "turbo" | "ic"
+        self.category = category    # equippable-family id (== kind for turbo/ic), or None for bolt-ons
         self.image = image          # thumbnail: an IMAGE_FILES key, or "" -> accent placeholder tile
 
     # -- state queries -----------------------------------------------------
     def is_owned(self, car) -> bool:
-        if self.category == "turbo":
-            return self.key in car.owned_turbos
+        if self.category:           # an equippable family: owned = in that family's owned set
+            return self.key in getattr(car, EQUIP_FAMILIES[self.category]["owned"])
         return bool(car.mods.get(self.key))
 
     def is_equipped(self, car) -> bool:
-        if self.category == "turbo":
-            return car.turbo == self.key
+        if self.category:           # equipped = this variant is the fitted one
+            return getattr(car, EQUIP_FAMILIES[self.category]["equipped"]) == self.key
         return self.is_owned(car)   # cumulative mods are always "on" once owned
 
     def tag(self) -> str:
@@ -99,11 +100,13 @@ class ShopItem:
 
 def build_catalog() -> list[ShopItem]:
     """The full shop list, straight off the single ``PARTS`` table: every part becomes a
-    card in table order (bolt-on mods first, then the turbo family). Each part row already
-    carries its name/blurb/review/price/accent/kind/category/image."""
+    card in table order (bolt-on mods, then the intercooler + turbo families). Each part
+    row carries its name/blurb/review/price/accent/kind/image; ``category`` is the part's
+    ``kind`` for the equippable families (turbo/ic), else None for cumulative bolt-ons."""
     return [
         ShopItem(key, p["name"], p["blurb"], p["review"], p["price"],
-                 p.get("accent", BLUE), p["kind"], category=p.get("category"),
+                 p.get("accent", BLUE), p["kind"],
+                 category=(p["kind"] if p["kind"] in EQUIP_FAMILIES else None),
                  image=p.get("image", ""))
         for key, p in PARTS.items()
     ]
